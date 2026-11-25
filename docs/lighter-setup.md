@@ -1,15 +1,16 @@
-# Before real following: what you will need on Lighter
+# Following on Lighter: testnet first, then mainnet
 
-**Real following does not exist yet.** FUZE v0.1 follows on a simulated account only. This page lists what you will
-need once Lighter testnet following is released, so you can prepare. FUZE is not affiliated with Lighter. Lighter's
-own documentation is the authority; where this page says "check on Lighter", we could not confirm the detail in their
-docs. Facts below were checked against https://docs.lighter.xyz (which https://apidocs.lighter.xyz now redirects to)
-on 2026-11-25.
+FUZE's modes `testnet` and `mainnet` trade on Lighter (lighter.xyz). **This code is new and has not yet been proven
+against the real exchange**: it is tested against a fake one. Start on testnet with small sizes and watch it. FUZE is
+not affiliated with Lighter. Lighter's own documentation is the authority; where this page says "check on Lighter",
+we could not confirm the detail in their docs. Facts below were checked against https://docs.lighter.xyz (which
+https://apidocs.lighter.xyz now redirects to) on 2026-11-25.
 
 ## 1. A wallet only you control
 
 Lighter accounts belong to an Ethereum ("L1") address. Use a wallet whose recovery phrase only you have, on a device you
-trust. The wallet's private key never goes into FUZE, a config file, a chat or an AI tool.
+trust. The wallet's private key never goes into FUZE, a config file, a chat or an AI tool. FUZE only ever takes an
+**API key**.
 
 ## 2. A Lighter account, testnet first
 
@@ -17,8 +18,14 @@ trust. The wallet's private key never goes into FUZE, a config file, a chat or a
   Ethereum Sepolia; its faucet gives test USDC but no ETH, so you need Sepolia ETH from a public Sepolia faucet.
   How to use the faucet in the app: check on Lighter.
 - Mainnet app: https://app.lighter.xyz (API https://mainnet.zklighter.elliot.ai).
-- Your **account index** is Lighter's number for your account. Lighter's API looks it up from your wallet address
-  (`/api/v1/accountsByL1Address`). Where the app shows it: check on Lighter.
+- Your **account index** is Lighter's number for your account. It is public (it is in the explorer's address). To
+  look it up from your wallet address, open (testnet)
+  `https://api.testnet.lighter.xyz/api/v1/accountsByL1Address?l1_address=<your address>` or (mainnet)
+  `https://mainnet.zklighter.elliot.ai/api/v1/accountsByL1Address?l1_address=<your address>`: the answer lists your
+  main account and sub-accounts with their `index`. Where the app shows it: check on Lighter.
+- Your account on the public explorer: testnet `https://testnet.app.lighter.xyz/explorer/accounts/<index>`, mainnet
+  `https://app.lighter.xyz/explorer/accounts/<index>`. Each order FUZE sends is logged with its link
+  (`.../explorer/logs/<transaction hash>`) in `~/.fuze/trades.jsonl`.
 
 Source: https://docs.lighter.xyz/developers/getting-started/environments.md and
 https://docs.lighter.xyz/developers/getting-started/core-concepts.md
@@ -26,8 +33,13 @@ https://docs.lighter.xyz/developers/getting-started/core-concepts.md
 ## 3. A dedicated sub-account holding only what you can lose
 
 Lighter has sub-accounts, each with its own index, balances and API keys, and you move funds between your main account
-and a sub-account with transfers. Follow FUZE only on a sub-account, and put in it only money you can afford to lose
-completely. Creating a sub-account in the app: check on Lighter.
+and a sub-account with transfers. Follow FUZE only on a sub-account of its own, and put in it only money you can afford
+to lose completely. FUZE treats every reduce-only trigger order on BTC and ETH in that account as its own take profit
+or stop loss and may cancel it, and `fuze mode` refuses an account that already holds positions or orders. Creating a
+sub-account in the app: check on Lighter.
+
+FUZE does not change your margin mode or leverage on Lighter. Your sizing and `max_x` decide how big the positions are;
+if the account cannot margin an order, Lighter refuses it and `fuze status` reports an order that did not fill.
 
 Source: https://docs.lighter.xyz/developers/getting-started/core-concepts.md and
 https://docs.lighter.xyz/developers/integration-guides/deposits-transfers-and-withdrawals.md
@@ -37,30 +49,72 @@ https://docs.lighter.xyz/developers/integration-guides/deposits-transfers-and-wi
 What Lighter's docs say (https://docs.lighter.xyz/developers/integration-guides/api-keys.md):
 
 - Each account, main or sub-account, has its own API keys at indexes 0 to 254. Indexes 0–3 are reserved for Lighter's
-  own apps; use 4–254.
+  own apps; use 4–254 (FUZE accepts only these).
 - Making a key pair does not need your wallet, but registering it on your account does: your wallet signs it.
 - **An API key alone can trade, make "secure withdrawals" (these can only go back to the wallet address that owns the
   account) and transfer between accounts of the same owner.** It cannot alone transfer to another owner or make a
   "fast withdrawal" to another address; those also need your wallet's signature.
 - **You can restrict a key to a list of markets.** Such a key can only create, modify and cancel orders in those
   markets; every other transaction fails, including withdrawals and transfers. Restrictions are set with your wallet's
-  signature. We recommend a key restricted to the BTC and ETH markets for FUZE.
+  signature. **We recommend a key restricted to the BTC and ETH markets for FUZE.**
 - You can give a key an expiry (`valid_until`, at most 180 days ahead). After it, the key cannot sign. Expiry does not
   cancel the key's open orders.
 
 What this means: a leaked FUZE key cannot (per Lighter's docs) send your money to someone else's address, but an
 unrestricted one can trade it away. Restrict it to markets, keep only what you can lose on that sub-account, and never
-paste the key into a chat or an AI tool.
+paste the key into a chat or an AI tool. Steps to create and register a key in the app: check on Lighter.
 
-## 5. How to revoke a key
+## 5. Give FUZE the key (your terminal, never a chat)
+
+```sh
+pip install "fuze-agent[lighter]"   # Lighter's SDK (signs orders on your machine; macOS and Linux) and keyring
+fuze keys testnet                    # asks: account index, API key index, then the API key, hidden as you type
+fuze check                           # reads the account with it: balance, positions, protective orders. No order
+```
+
+The key is stored in your OS keyring, or, without one, in `~/.fuze/lighter-testnet.key` readable only by you (set
+`FUZE_NO_KEYRING=1` on a server to use the file). It is never printed or logged and never reaches the MCP server or
+an AI tool, which only see "set" or "missing". `fuze keys` with no argument shows what is set.
+
+## 6. Rehearse, then follow on testnet
+
+```sh
+fuze rehearse          # testnet: open the smallest Bitcoin position, place its take profit and stop loss,
+                       # cancel them, close it; every step confirmed by reading the account
+fuze mode testnet      # the agent must be stopped and nothing open in simulation; type RAISE
+fuze run
+```
+
+Watch the account on the testnet explorer while it follows. `fuze status` shows the mode, the link, what the agent
+holds and why.
+
+## 7. Mainnet: the same, with real money
+
+Only if you accept the risks in the [README](../README.md#risks), and only after the testnet rehearsal passed on this
+machine with this version of FUZE (`fuze mode` tells you). Then:
+
+```sh
+fuze keys mainnet      # a separate mainnet API key, restricted to BTC and ETH, on a sub-account of its own
+fuze check
+fuze mode mainnet      # agent stopped, nothing open in the current mode; type RAISE, then REAL MONEY
+fuze run
+```
+
+Warnings, plainly:
+
+- This code had never sent a real order when it was released. The rehearsal is the first time it meets Lighter.
+- A stop loss is a trigger order: in a fast market it can fill worse than its price, or not at all.
+- When FUZE's own account is a practice (`paper`) account, its results cost it nothing; yours cost real money.
+  `fuze status` says when this is the case.
+- You can lose everything on that sub-account. This is not financial advice.
+
+To leave mainnet: `fuze flatten`, let the agent close everything, stop it, `fuze mode simulation` (it reads the
+account to check nothing is open), then `fuze unflatten` if you want it to follow in simulation.
+
+## 8. How to revoke a key
 
 Lighter's docs describe no separate "revoke" for trading keys. Registering a new key at the same index replaces the old
 one, and the new key starts without restrictions (set them again). An expired key also stops working. Steps in the app:
 check on Lighter. If you think a key leaked: replace it at once, cancel its open orders with another key, and move the
-funds out of that sub-account.
-
-## 6. Then, in order
-
-1. Dry run (today): `fuze run` on the simulated account until you understand what it does.
-2. Testnet, when FUZE releases it: a testnet sub-account and key, small limits.
-3. Real money last, only if you accept the risks in the [README](../README.md#risks).
+funds out of that sub-account. `fuze keys testnet --delete` (or mainnet) removes FUZE's copy from this machine; it does
+not stop the key on Lighter.

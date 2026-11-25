@@ -2,24 +2,63 @@
 
 **F**utures signals, **U**ser-side, **Z**ero-custody **E**xecution.
 
+**Vibe trading, with your limits.** Tell your AI coding tool (Claude Code, Codex, GitHub Copilot in VS Code, Cursor),
+in plain words, "follow the FUZE signal with 5% of my balance". It installs and sets up this agent for you, on your
+machine and your own account. Your limits stay yours: the AI can lower them and stop the agent, but anything that
+raises risk, the mode (simulation, test money, real money) and your exchange key are typed by you in your own terminal.
+No promise of profit: it copies one account, and that account can lose.
+
 A FUZE server publishes, signed, the position that our own trading account holds on Bitcoin and Ether perpetual
-futures. This agent runs on **your** machine or server, checks every message against a key built into the code, and
-follows that position on **your** account at the size and limits **you** set. Nobody else holds your keys or your
-money. You can watch and control the agent from an AI coding tool (Claude Code, Codex, GitHub Copilot in VS Code,
-Cursor) through an MCP server that can only make things safer.
+futures. This agent checks every message against a key built into the code, and follows that position on **your**
+account at the size and limits **you** set. Nobody else holds your keys or your money. The AI tool watches and
+controls the agent through an MCP server that can only make things safer.
 
 FUZE is not affiliated with Lighter or with any exchange or AI tool named here.
 
-## Status today: dry run only
+## Status today
 
-| Stage | State |
-|---|---|
-| Dry run: follow the signal on a simulated $1,000 account on your computer | **v0.1, this release** |
-| Lighter testnet (test money) | next, only after our own order code has been proven |
-| Real money on Lighter | last |
+| Mode | Where it trades | State |
+|---|---|---|
+| `simulation` (default) | a simulated $1,000 account on your computer, no money | **proven end to end** |
+| `testnet` | Lighter's test exchange, test money | **new code, not yet proven against the real exchange** |
+| `mainnet` | Lighter, real money | **new code, not yet proven against the real exchange**; locked until your testnet rehearsal passed |
 
-There is no exchange code, no key handling and no real or test money in v0.1. `fuze run` refuses any mode other than
-`dry`. The signal server (fuze.trade) is not live yet.
+The Lighter code has never sent an order to the real exchange: it is tested only against a fake exchange. Start on
+testnet, with small sizes, and watch it. The signal server is https://fuze.trade (`/v1/signal`, `/v1/stream`).
+
+## Three modes
+
+The signal is the same in every mode: per coin, our position divided by our balance (`x`). Because it is a ratio, any
+mode follows any of our accounts (`source` in the signal: our practice account `paper`, `testnet` or `mainnet`). When
+your mode risks more real money than the account you follow, for example real money following our practice account,
+`fuze status`, `fuze check` and the MCP `status` tool say so in plain words.
+
+| | simulation | testnet | mainnet |
+|---|---|---|---|
+| Money | none | Lighter test money | **real** |
+| Needs | nothing | `pip install "fuze-agent[lighter]"`, a Lighter testnet account and API key | the same on mainnet, plus a passed testnet rehearsal on this machine |
+| Switch to it | `fuze mode simulation` | `fuze mode testnet`, type `RAISE` | `fuze mode mainnet`, type `RAISE` and `REAL MONEY` |
+
+- **Choosing**: `fuze init` asks the mode (Enter keeps simulation). Later, `fuze mode` shows it and `fuze mode testnet`
+  changes it. Only in a terminal; never through the MCP server or an AI tool. The agent must be stopped, and nothing
+  may be open in the current mode: close it first (`fuze flatten`, let the agent close everything, stop it).
+- **Keys**: `fuze keys testnet` (or `mainnet`) asks your Lighter account index, the API key's index and the API key
+  itself, hidden as you type. The key goes into your OS keyring (with the `keyring` package) or else a file only you can
+  read in `~/.fuze`. It is never printed, logged, shown to an AI tool, or accepted as a command-line argument. Use an
+  API key restricted to the BTC and ETH markets, on a sub-account holding only what you can lose:
+  [docs/lighter-setup.md](docs/lighter-setup.md).
+- **The rehearsal** (`fuze rehearse`, testnet): opens the smallest Bitcoin position Lighter takes, places its take
+  profit and stop loss, cancels them and closes the position, confirming every step by reading the account. Mainnet
+  stays locked until this passed on this machine with this version of FUZE (a new version asks for a new rehearsal).
+- **`fuze check`** in testnet or mainnet reads your key and account (balance, positions, protective orders) and sends
+  no order.
+- **Same rules everywhere**: your sizing, cap per position, exposure cap, daily loss stop and stale-signal behaviour work
+  the same in every mode. On Lighter, in addition: after every order the agent reads the account back before doing
+  anything else and never sends a blind second order; an order in flight is written to disk first, so a restart reads
+  the account instead of sending it again; reductions are reduce-only; every market order has a worst price (0.5%
+  past the signal's price to open, 2% to close); sizes and prices are rounded to the decimals and minimum order
+  Lighter publishes; the scalp part rests under its own take profit and stop loss on the exchange, sized to that part,
+  re-placed when it changes and cancelled when it closes, and if the exchange does not show them, that part is closed.
 
 ## What it is not
 
@@ -27,19 +66,34 @@ There is no exchange code, no key handling and no real or test money in v0.1. `f
 - Not advice. It copies one account's position. That account can lose, and so will yours.
 - Not a promise of results. We make no performance claims.
 
-## Quick start (dry run)
+## Quick start
+
+Or just ask your AI coding tool to do this for you; [AGENTS.md](AGENTS.md) tells it how, safely.
 
 ```sh
 # from a clone of this repository (the first PyPI release is not out yet); see SECURITY.md for a hash-pinned install
 python3 -m venv ~/.fuze-venv && ~/.fuze-venv/bin/pip install '.[mcp]'   # [mcp] adds the server AI coding tools talk to
-~/.fuze-venv/bin/fuze init        # ~/.fuze; asks how big your positions should be (Enter keeps the safe default)
+~/.fuze-venv/bin/fuze init        # ~/.fuze; asks the mode and how big your positions should be (Enter keeps the safe default)
 ~/.fuze-venv/bin/fuze run         # in its own terminal; Ctrl+C to stop
 ~/.fuze-venv/bin/fuze status      # what it holds and why
 ~/.fuze-venv/bin/fuze check       # checks your setup
 ```
 
+Later, on Lighter testnet (macOS or Linux: the SDK's signer ships for those):
+
+```sh
+~/.fuze-venv/bin/pip install '.[mcp,lighter]'
+~/.fuze-venv/bin/fuze keys testnet     # account index, key index, then the API key (hidden)
+~/.fuze-venv/bin/fuze check            # reads the account, sends nothing
+~/.fuze-venv/bin/fuze rehearse         # optional on testnet, required before mainnet
+~/.fuze-venv/bin/fuze mode testnet     # type RAISE
+~/.fuze-venv/bin/fuze run
+```
+
 Files live in `~/.fuze` (or `$FUZE_HOME`), private to your user: `config.json`, the simulated account `dry.json`, the
-trade log `trades.jsonl`, and `status.json`.
+trade and order log `trades.jsonl`, `status.json`, and in live modes the order in flight `pending.json`, the
+protective orders placed `lighter-<mode>.json`, the rehearsal `rehearsal.json`, and the key file `lighter-<mode>.key`
+if there is no OS keyring.
 
 ## How following works
 
@@ -52,8 +106,9 @@ trade log `trades.jsonl`, and `status.json`.
 3. Your position per coin is sized as you chose (see [How big are my positions](#how-big-are-my-positions)), then
    cut to your cap per position, then the total across coins is cut down to your `max_x` if it is larger. Changes
    smaller than $10 or 2% of your balance are skipped, unless the target is zero.
-4. The scalp part of a position gets its own take profit and stop loss. If the stop loss is on the wrong side of the
-   price or more than 1.5% away, or the take profit is on the wrong side, that part is not opened (the rest is).
+4. The scalp part of a position gets its own take profit and stop loss (on Lighter: resting on the exchange). If the
+   stop loss is on the wrong side of the price or more than 1.5% away, or the take profit is on the wrong side, or
+   the part is under the exchange's smallest order, that part is not opened (the rest is).
 5. Signal says `flat`: close everything and stay out. Signal `offline`, expired, or nothing valid for 60 seconds: hold
    what you have, open nothing new. With `stale_flat_min` set, close everything after that many minutes without a
    live signal.
@@ -102,14 +157,17 @@ your limits.
 Setting up without questions (for scripts, or an AI coding tool doing what you asked):
 `fuze init --yes --size-mode percent --percent 5 --max-position-usd 300 --max-x 2 --daily-loss 5`. With no terminal
 and no flags it writes the safe defaults. It never replaces an existing config without `--force`, and a new config
-always starts in mode `dry`. A config written by an older version with `scale` still loads: `scale` 0.1 becomes 10%.
+is saved in mode `simulation` unless you confirm another mode at a terminal. A config written by an older version
+still loads: mode `dry` is `simulation`, `scale` 0.1 becomes 10%.
 
 ## Use it from an AI coding tool
 
 `fuze mcp` starts a local MCP server. Its tools: `status`, `signal`, `trades`, `setup_check`, `docs`, `pause`,
 `flatten`, `lower_limits`. **They can only read or reduce risk.** No tool resumes, unflattens, raises a limit, removes
-the cap per position, switches between a share of your balance and a fixed amount, changes the server or mode, places
-an order, or touches files outside `~/.fuze`. Install `fuze` first so the command is on
+the cap per position, switches between a share of your balance and a fixed amount, changes the server or mode, takes
+or shows a key, places an order, or touches files outside `~/.fuze`. `status` reports the mode, your exchange
+account's public explorer link and whether keys are "set" or "missing"; `setup_check` covers what testnet and mainnet
+need; `docs` has a `modes` topic. Install `fuze` first so the command is on
 your `PATH`; the snippets below start it.
 
 | Tool | File | Snippet |
@@ -129,12 +187,14 @@ your `PATH`; the snippets below start it.
 - Most scalping rules we have tested lose money after trading costs. Past results promise nothing about the future.
 - Futures use leverage. You can lose everything you put in, and faster than you expect.
 - Software, servers, exchanges and networks fail. Limits and stop losses reduce losses; they do not prevent them.
+- FUZE's Lighter code is new and has not yet traded on the real exchange. A stop loss can fill worse than its price
+  in a fast market, or not at all.
 - Only use money you can afford to lose completely. This is not financial advice.
 
 ## More
 
 - [SECURITY.md](SECURITY.md): threat model, safe installs, reporting a vulnerability
-- [docs/lighter-setup.md](docs/lighter-setup.md): what you will need before real following exists
+- [docs/lighter-setup.md](docs/lighter-setup.md): a Lighter account and API key, testnet first
 - Development: `python3 -m venv .venv && .venv/bin/pip install -e '.[test]' && .venv/bin/python -m pytest -q`
 
 License: MIT.

@@ -1,6 +1,6 @@
 {
   "name": "fuze",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "MCP server for the FUZE agent: status, the verified signal, and tools that can only reduce risk. Runs the `fuze` command you installed yourself.",
   "author": {
     "name": "FUZE"

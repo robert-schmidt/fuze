@@ -1,3 +1,3 @@
 """FUZE agent: follow a signed position signal, on your own account."""
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"

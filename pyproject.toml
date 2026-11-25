@@ -4,8 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fuze-agent"
-version = "0.1.0"
-description = "Follow the signed FUZE position signal on your own account (v0.1: dry run only)."
+version = "0.2.0"
+description = "Vibe trading, with your limits: tell your AI coding tool to follow the signed FUZE position signal, and it sets up this agent on your own account (simulation, Lighter testnet or mainnet). No promise of profit."
+keywords = ["vibe trading", "trading agent", "copy trading", "signal", "perpetual futures", "bitcoin", "ether", "lighter", "mcp", "ai coding tool", "claude code", "codex", "self-custody"]
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
@@ -14,6 +15,9 @@ dependencies = ["cryptography>=42"]  # the trading loop needs nothing else
 
 [project.optional-dependencies]
 mcp = ["mcp>=2.0,<3"]  # only for `fuze mcp` (the server AI coding tools talk to). MCP 2 renamed FastMCP to MCPServer
+# only for modes testnet and mainnet: Lighter's official SDK signs orders on your machine (pinned: the adapter is written
+# against this version's API), keyring keeps the API key in the OS keyring (without it: a 0600 file)
+lighter = ["lighter-sdk==1.1.8", "keyring>=24"]
 test = ["pytest>=8", "mcp>=2.0,<3"]
 
 [project.scripts]

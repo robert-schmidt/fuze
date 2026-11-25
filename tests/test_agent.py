@@ -73,7 +73,7 @@ def run_agent(fuze_home, server, until):
 
 def test_end_to_end_stream(fuze_home):
     st = run_agent(fuze_home, Server(), lambda s: (s.get("signal") or {}).get("seq") == 3)
-    assert st["signal"]["rev"] == 2 and st["mode"] == "dry"
+    assert st["signal"]["rev"] == 2 and st["mode"] == "simulation"
     acct = st["account"]
     assert acct["positions"] == {"ETH": pytest.approx(-0.4 * 0.1 * 1000 / 2000)} and acct["brackets"] == []
     trades = [json.loads(x) for x in (fuze_home / "trades.jsonl").read_text().splitlines()]

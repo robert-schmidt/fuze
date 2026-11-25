@@ -7,7 +7,7 @@ from fuze import config
 
 def test_defaults_and_private_files(fuze_home):
     cfg = config.save(dict(config.DEFAULTS))
-    assert cfg == config.load() and cfg["mode"] == "dry"
+    assert cfg == config.load() and cfg["mode"] == "simulation"
     assert cfg["size_mode"] == "percent" and cfg["percent"] == 10.0 and cfg["max_position_usd"] is None
     assert stat.S_IMODE(fuze_home.stat().st_mode) == 0o700
     assert stat.S_IMODE((fuze_home / "config.json").stat().st_mode) == 0o600
@@ -27,22 +27,36 @@ def test_good_servers(url):
     assert config.validate({"server": url})["server"] == url.rstrip("/")
 
 
-@pytest.mark.parametrize("bad", [{"mode": "live"}, {"mode": "testnet"}, {"scale": 0}, {"scale": 1.5},
+@pytest.mark.parametrize("bad", [{"mode": "live"}, {"mode": "paper"}, {"mode": None}, {"scale": 0}, {"scale": 1.5},
                                  {"scale": True}, {"scale": "0.1"}, {"scale": float("nan")}, {"max_x": 26},
                                  {"max_x": 0.05}, {"daily_loss_frac": 0.6}, {"daily_loss_frac": 0.001},
                                  {"stale_flat_min": 0}, {"dry_balance": "1000"}, {"surprise": 1},
                                  {"size_mode": "constant"}, {"size_mode": None}, {"percent": 0.5},
                                  {"percent": 101}, {"percent": True}, {"fixed_usd": 5}, {"fixed_usd": 2e6},
                                  {"fixed_usd": None}, {"max_position_usd": 5}, {"max_position_usd": 2e6},
-                                 {"max_position_usd": float("inf")}, {"max_position_usd": "500"}])
+                                 {"max_position_usd": float("inf")}, {"max_position_usd": "500"},
+                                 {"testnet_account": -1}, {"testnet_account": "12"}, {"testnet_account": 1.5},
+                                 {"mainnet_account": True}, {"testnet_key_index": 3}, {"mainnet_key_index": 255},
+                                 {"mainnet_key_index": None}])
 def test_bad_values(bad):
     with pytest.raises(ValueError):
         config.validate(bad)
 
 
 def test_mode_message_is_clear():
-    with pytest.raises(ValueError, match="dry"):
-        config.validate({"mode": "mainnet"})
+    with pytest.raises(ValueError, match="simulation.*testnet.*mainnet"):
+        config.validate({"mode": "real"})
+
+
+@pytest.mark.parametrize("mode", ["simulation", "testnet", "mainnet"])
+def test_three_modes(mode):
+    assert config.validate({"mode": mode})["mode"] == mode
+
+
+def test_old_dry_mode_is_simulation(fuze_home):
+    config.ensure_home()
+    (fuze_home / "config.json").write_text('{"mode": "dry"}')
+    assert config.load()["mode"] == "simulation"
 
 
 def test_invalid_file_refused(fuze_home):

@@ -1,11 +1,7 @@
-"""Simulated exchange for dry-run following. No money, no keys, no network.
+"""The simulated account (mode "simulation"). No money, no keys, no network. The interface is in venue.py.
 
-Any exchange adapter (a Lighter one later) implements the same five methods:
-  account() -> {"balance", "positions": {coin: units}, "brackets": [scalp ids]}
-  market(coin, units, ref_px)   buy (units > 0) or sell at market; ref_px is the price we expect
-  protect(coin, units, tp, sl, id)   rest a take profit and stop loss for `units` of the position
-  cancel(coin)                  remove that coin's take profit / stop loss
-  mark(prices)                  new prices seen (the simulator checks its brackets; a real adapter ignores it)
+Fills market orders at the signal's price plus SLIPPAGE, and checks its take profit / stop loss pairs on every price
+it is shown (mark).
 """
 
 from __future__ import annotations
@@ -15,12 +11,13 @@ import time
 from pathlib import Path
 
 from fuze.config import read_json, write_json
+from fuze.venue import Venue
 
 SLIPPAGE = 0.0001  # 0.01% worse than the reference price on every market fill
 FEE = 0.0
 
 
-class DryExchange:
+class DryExchange(Venue):
     def __init__(self, home: Path, start_balance: float, clock=time.time):
         self.path, self.log, self.clock = Path(home) / "dry.json", Path(home) / "trades.jsonl", clock
         self.s = read_json(self.path) or {"cash": start_balance, "pos": {}, "marks": {}, "brackets": {}}
@@ -49,15 +46,36 @@ class DryExchange:
             f.write(json.dumps({"t": self.clock(), "coin": coin, "units": orig,
                                 "px": px, "kind": kind, "pnl": round(pnl, 6)}) + "\n")
 
-    def account(self) -> dict:
+    def account(self, fresh: bool = False) -> dict:
         upnl = sum(p["units"] * (self.s["marks"].get(c, p["entry"]) - p["entry"]) for c, p in self.s["pos"].items())
         return {"balance": self.s["cash"] + upnl,
                 "positions": {c: p["units"] for c, p in self.s["pos"].items() if p["units"]},
                 "brackets": [b["id"] for b in self.s["brackets"].values()]}
 
-    def market(self, coin: str, units: float, ref_px: float | None) -> None:
+    def price(self, coin: str) -> float | None:
+        return self.s["marks"].get(coin)
+
+    def round(self, coin: str, units: float) -> float:
+        return units
+
+    def tradable(self, coin: str, units: float, px) -> bool:
+        return abs(units) > 1e-12
+
+    def link(self):
+        return None
+
+    def market(self, coin: str, units: float, ref_px: float | None, worst: float | None = None,
+               reduce_only: bool = False) -> None:
         px = ref_px or self.s["marks"][coin]
-        self._fill(coin, units, px * (1 + SLIPPAGE if units > 0 else 1 - SLIPPAGE), "market")
+        px = px * (1 + SLIPPAGE if units > 0 else 1 - SLIPPAGE)
+        if worst is not None and (px > worst if units > 0 else px < worst):
+            return  # like an immediate-or-cancel order on an exchange: nothing fills past the worst price
+        if reduce_only:  # never opens, adds or flips
+            held = self.s["pos"].get(coin, {}).get("units", 0.0)
+            units = 0.0 if held * units >= 0 else max(-abs(held), min(abs(held), units))
+            if not units:
+                return
+        self._fill(coin, units, px, "market")
         self._save()
 
     def protect(self, coin: str, units: float, tp: float, sl: float, id: int) -> None:

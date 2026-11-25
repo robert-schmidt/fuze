@@ -1,4 +1,4 @@
-"""Local settings in ~/.fuze (or $FUZE_HOME). Nothing here is secret in v0.1."""
+"""Local settings in ~/.fuze (or $FUZE_HOME). Nothing in config.json is secret: the API key is kept apart (keys.py)."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from urllib.parse import urlsplit
 
 DEFAULTS = {
     "server": "https://fuze.trade",
-    "mode": "dry",
+    "mode": "simulation",  # "simulation" (no money), "testnet" (Lighter, test money), "mainnet" (Lighter, real money)
     "dry_balance": 1000.0,
     "size_mode": "percent",  # "percent": a share of the balance follows the signal; "fixed": a fixed amount does
     "percent": 10.0,
@@ -20,6 +20,10 @@ DEFAULTS = {
     "max_x": 3.0,
     "daily_loss_frac": 0.1,
     "stale_flat_min": None,
+    "testnet_account": None,  # Lighter account index (public: it is in the explorer's address); set with `fuze keys`
+    "testnet_key_index": 4,  # the API key's index on that account; Lighter keeps 0 to 3 for its own apps
+    "mainnet_account": None,
+    "mainnet_key_index": 4,
 }
 RANGES = {"percent": (1.0, 100.0), "fixed_usd": (10.0, 1e6), "max_position_usd": (10.0, 1e6),
           "max_x": (0.1, 25.0), "daily_loss_frac": (0.01, 0.5), "dry_balance": (10.0, 1e9),
@@ -27,8 +31,8 @@ RANGES = {"percent": (1.0, 100.0), "fixed_usd": (10.0, 1e6), "max_position_usd":
 SIZE_MODES = ("percent", "fixed")
 LIMITS = ("size_mode", "percent", "fixed_usd", "max_position_usd", "max_x", "daily_loss_frac", "stale_flat_min")
 LOCAL_HOSTS = ("localhost", "127.0.0.1")
-DRY_ONLY = ('Only "dry" mode exists in FUZE v0.1: it follows the signal on a simulated account. '
-            "Following on Lighter testnet comes later, and real money only after that.")
+MODES = ("simulation", "testnet", "mainnet")  # in order of how real the money is
+NETS = ("testnet", "mainnet")
 
 
 def home() -> Path:
@@ -89,6 +93,10 @@ def _number(name, value) -> float:
     return float(value)
 
 
+def _whole(v) -> bool:
+    return isinstance(v, int) and not isinstance(v, bool)
+
+
 def validate(cfg) -> dict:
     if not isinstance(cfg, dict):
         raise ValueError("config must be a JSON object")
@@ -103,8 +111,17 @@ def validate(cfg) -> dict:
         raise ValueError(f"unknown config fields: {', '.join(sorted(unknown))}")
     out = {**DEFAULTS, **cfg}
     out["server"] = check_server(out["server"])
-    if out["mode"] != "dry":
-        raise ValueError(DRY_ONLY)
+    if out["mode"] == "dry":  # the name before testnet and mainnet existed
+        out["mode"] = "simulation"
+    if out["mode"] not in MODES:
+        raise ValueError('mode must be "simulation", "testnet" or "mainnet"')
+    for net in NETS:
+        acct, idx = out[f"{net}_account"], out[f"{net}_key_index"]
+        if acct is not None and not (_whole(acct) and 0 <= acct < 2**48):
+            raise ValueError(f"{net}_account must be a whole number (your Lighter account index)")
+        if not (_whole(idx) and 4 <= idx <= 254):
+            raise ValueError(f"{net}_key_index must be a whole number from 4 to 254 "
+                             "(Lighter keeps 0 to 3 for its own apps)")
     if out["size_mode"] not in SIZE_MODES:
         raise ValueError('size_mode must be "percent" (a share of your balance) or "fixed" (a fixed amount)')
     for name in ("dry_balance", "percent", "fixed_usd", "max_x", "daily_loss_frac"):

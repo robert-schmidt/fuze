@@ -38,7 +38,7 @@ The signature covers the payload **text**. Verify first, parse after. Never re-s
 | `seq` | rises by one with every signed message, heartbeats included. For spotting gaps; it may restart if the signer is rebuilt, so it is not the replay guard |
 | `rev` | rises only when our position, its stop loss / take profit, or `state` changed. **Act on a new `rev`**, not on every message: `x` drifts with the price while our position does not |
 | `ts`, `expires` | unix seconds. `ts` rises with every message and **is the replay guard**. A message is valid until `expires` (60 s after `ts`); a heartbeat comes every 5 s |
-| `source` | the account we trade: `paper` (practice money), `testnet`, `mainnet` |
+| `source` | the account we trade: `paper` (practice money), `testnet`, `mainnet`. Independent of the follower's own mode: since `x` is a ratio, a follower in any mode (simulation, testnet, mainnet) can follow any source; an agent should say so when its mode risks more real money than the source |
 | `state` | `live`: follow `targets`. `flat`: we closed everything and are staying out; close and stay out. `offline`: we have no fresh reading; hold what you have, open nothing new (`targets` is empty) |
 | `targets[coin].x` | our position value divided by our balance. Negative is short. `0` means none |
 | `targets[coin].px` | the price `x` was computed at |
