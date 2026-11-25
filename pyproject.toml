@@ -25,6 +25,8 @@ fuze = "fuze.cli:main"
 
 [project.urls]
 Homepage = "https://fuze.trade"
+Repository = "https://github.com/robert-schmidt/fuze"
+Documentation = "https://docs.fuze.trade"
 
 [tool.setuptools.packages.find]
 where = ["src"]

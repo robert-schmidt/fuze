@@ -7,8 +7,8 @@ the tools; the AI picks them.
 
 | You say | What happens |
 |---|---|
-| "Install the FUZE agent from this checkout and set it up in simulation with 5% of my balance, a $300 cap per position and a 5% daily loss stop." | It creates the virtual environment, installs, and runs `fuze init --yes --size-mode percent --percent 5 --max-position-usd 300 --daily-loss 5`, then shows you the worked example |
-| "Connect FUZE to this tool." | It runs `fuze mcp-config` and adds what it prints (the full path and `FUZE_HOME`), as on [the setup that works](README.md#the-setup-that-works) |
+| "Install the FUZE agent from github.com/robert-schmidt/fuze and set it up in simulation with 5% of my balance, a $300 cap per position and a 5% daily loss stop." | It installs it with `uv tool install` (or `pipx install`) from that address, runs `fuze init --yes --size-mode percent --percent 5 --max-position-usd 300 --daily-loss 5`, then shows you the worked example |
+| "Connect FUZE to this tool." | It adds the server, using what `fuze mcp-config` prints when `fuze` is not on its PATH or you use another folder, as on [the setup that works](README.md#the-setup-that-works) |
 | "Start following in simulation." | It may run `fuze run` for you in simulation |
 
 ## Watching

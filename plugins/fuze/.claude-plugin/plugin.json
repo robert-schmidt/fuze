@@ -1,12 +1,32 @@
 {
   "name": "fuze",
   "version": "0.3.0",
-  "description": "MCP server for the FUZE agent: status, the verified signal, the address of the local read-only page (`fuze ui`), and tools that can only reduce risk. Starts the command `fuze`, so it works only when fuze (installed from the repository checkout; not on PyPI yet) is on the PATH Claude Code sees and the agent uses the default folder ~/.fuze. Otherwise use `fuze mcp-config`.",
+  "description": "MCP server for the FUZE agent: status, the verified signal, the address of the local read-only page (`fuze ui`), and tools that can only reduce risk. Starts the command `fuze`, as installed by `uv tool install` or `pipx install` from https://github.com/robert-schmidt/fuze, with the default folder ~/.fuze. For a virtualenv install or another folder, use `fuze mcp-config`.",
   "author": {
     "name": "FUZE"
   },
   "homepage": "https://fuze.trade",
+  "repository": "https://github.com/robert-schmidt/fuze",
   "license": "MIT",
+  "keywords": [
+    "trading",
+    "trading agent",
+    "copy trading",
+    "signal",
+    "perpetual futures",
+    "bitcoin",
+    "ether",
+    "lighter",
+    "mcp",
+    "self-custody"
+  ],
+  "network": {
+    "hosts": [
+      "fuze.trade",
+      "api.testnet.lighter.xyz",
+      "mainnet.zklighter.elliot.ai"
+    ]
+  },
   "mcpServers": {
     "fuze": {
       "command": "fuze",

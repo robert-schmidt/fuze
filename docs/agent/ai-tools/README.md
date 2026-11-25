@@ -25,34 +25,48 @@ your files or running commands for you); see [Security model](../security.md) fo
 
 ## The setup that works
 
-Every tool needs the same two things:
+**With `fuze` on your PATH** (installed with `uv tool install` or `pipx install`, see [Install](../start/install.md))
+and the default folder `~/.fuze`, the settings are just the command `fuze` with the argument `mcp`:
 
-1. **The full path to `fuze`**, because AI tools start MCP servers without your shell's PATH, for example
-   `/Users/you/.fuze-venv/bin/fuze` on macOS or `/home/you/.fuze-venv/bin/fuze` on Linux.
-2. **`FUZE_HOME`**, the folder your agent uses, set in the server's environment, because AI tools also start servers
-   with a filtered environment. The default folder is `~/.fuze`, written out in full, for example `/Users/you/.fuze`.
+```json
+{
+  "mcpServers": {
+    "fuze": {
+      "type": "stdio",
+      "command": "fuze",
+      "args": ["mcp"]
+    }
+  }
+}
+```
 
-**`fuze mcp-config` prints both, ready to paste**, for every tool on these pages. Run it the way you run the agent
-(the same `fuze`, the same `FUZE_HOME`):
+The Claude Code plugin, the Add to Cursor link, the one-line `claude mcp add` and `codex mcp add` forms and the snippets
+in the repository's `integrations/` folder all start it this way.
+
+**Otherwise, `fuze mcp-config` prints the settings for you.** AI tools start MCP servers with a filtered environment
+and not always with your shell's PATH. When you installed in a virtual environment, use another folder (`FUZE_HOME`),
+or your tool cannot find `fuze`, the settings need two things filled in:
+
+1. **The full path to `fuze`**, the one `command -v fuze` prints (with a clone: `~/.fuze-venv/bin/fuze`, written out).
+2. **`FUZE_HOME`**, the folder your agent uses, written out in full, set in the server's environment.
+
+Run `fuze mcp-config` the way you run the agent (the same `fuze`, the same `FUZE_HOME`):
 
 ```sh
-~/.fuze-venv/bin/fuze mcp-config                  # every tool
-~/.fuze-venv/bin/fuze mcp-config --tool codex     # one: claude-code, codex, copilot, vscode or cursor
+fuze mcp-config                  # every tool
+fuze mcp-config --tool codex     # one: claude-code, codex, copilot, vscode or cursor
 ```
 
 It prints the JSON or TOML for each tool's settings file and the one-line `claude mcp add ...` and `codex mcp add ...`
 commands, with the full path of the `fuze` you ran and your FUZE folder filled in. It warns when that folder has no
-agent set up. The pages below show the same settings with `/Users/you` in place of your home folder.
+agent set up.
 
 If the server looks in a folder with no agent, `pause`, `flatten` and `lower_limits` answer an error that names the
 folder, and nothing is written; `status` says the same.
 
 > **Warning:** after connecting, ask your AI tool for the agent's status and check that it shows your balance and mode.
 > If it says no agent is set up in a folder, or "No status yet" while `fuze run` is running, the settings point at the
-> wrong folder: run `fuze mcp-config` again and replace them.
-
-The snippets shipped in the repository's `integrations/` folder have the same shape with placeholder paths
-(`/ABSOLUTE/PATH/TO/...`); `fuze mcp-config` fills them in for you.
+> wrong folder: run `fuze mcp-config` and replace them with what it prints.
 
 ## Per tool
 

@@ -62,19 +62,21 @@ DOCS = {
     "safety": "PAUSE holds positions and places no new orders. FLATTEN closes everything and stays out. Both can be "
               "set here. Only the user can undo them, in a terminal, typing the word: `fuze resume`, `fuze "
               "unflatten`. Never paste a private key or API key into a chat. " + HONEST,
-    "setup": "Install from a checkout of the FUZE repository: python3 -m venv ~/.fuze-venv, then in the checkout "
-             "~/.fuze-venv/bin/pip install '.[mcp]' (add lighter for testnet and mainnet: '.[mcp,lighter]'). FUZE is "
-             "not on PyPI yet: never pip install fuze-agent by name; a package of that name on PyPI today is not "
-             "ours. Then fuze init; fuze run (in its own terminal); `fuze check`. To connect an AI tool, the user "
+    "setup": "Install FUZE only from github.com/robert-schmidt/fuze. The usual way puts `fuze` on the PATH: uv tool "
+             "install \"fuze-agent[mcp] @ git+https://github.com/robert-schmidt/fuze\" (or the same with pipx "
+             "install). For testnet and mainnet the user adds the lighter extra by running it again with "
+             "[mcp,lighter] (pipx needs --force). Or from a clone of the repository: python3 -m venv ~/.fuze-venv, "
+             "then in the clone ~/.fuze-venv/bin/pip install '.[mcp]'. Then fuze init; fuze run (in its own "
+             "terminal); `fuze check`. To connect an AI tool, the user "
              "runs `fuze mcp-config` and pastes what it prints (the full path of fuze and FUZE_HOME). `fuze init` asks the mode and "
              "the sizing questions in a terminal; on the user's instruction an AI tool may pass the sizing as flags "
              "instead: --size-mode percent|fixed, --percent, --fixed-usd, --max-position-usd, --max-x, --daily-loss "
              "(percent), --yes. Without a terminal it always saves mode simulation. It never replaces an existing "
              "config without --force, and replacing one with more risk needs the user to type RAISE. The mode and "
              "the keys are the user's own terminal actions (see the modes topic).",
-    "modes": "Three modes. simulation (default): a simulated account on this computer, no money, proven end to end. "
-             "testnet: Lighter's test exchange, test money. mainnet: Lighter, real money. The testnet and mainnet "
-             "code is new and not yet proven against the real exchange: start on testnet. Only the user changes the "
+    "modes": "Three modes. simulation (default): a simulated account on this computer, no money. testnet: Lighter's "
+             "test exchange, test money. mainnet: Lighter, real money. Start in simulation, then testnet with small "
+             "sizes, then mainnet. Only the user changes the "
              "mode, in a terminal: `fuze mode testnet` (type RAISE), `fuze mode mainnet` (type RAISE and REAL MONEY; "
              "only after `fuze rehearse` passed on this machine with this version: it opens the smallest Bitcoin "
              "position on testnet, places its take profit and stop loss, cancels them and closes it, each step "
@@ -85,8 +87,9 @@ DOCS = {
              "what the user can lose. Any mode follows any signal source (our paper, testnet or mainnet account), "
              "since x is a ratio; status says when the user's mode is more real than ours. The same limits apply "
              "in every mode, and the scalp part rests under its take profit and stop loss on the exchange.",
-    "status": "Simulation is proven end to end. Testnet and mainnet trade on Lighter with code that is new and has "
-              "not yet been proven against the real exchange: start on testnet with small sizes.",
+    "status": "Simulation needs nothing and risks no money. Testnet trades Lighter's test money; mainnet trades real "
+              "money and stays locked on each machine until that machine passed `fuze rehearse` on testnet with this "
+              "version. Start in simulation, then testnet with small sizes.",
     "risks": "This mirrors one account's trading. Most tested scalping rules lose money after costs. Past results "
              "promise nothing. You can lose everything you put in. This is not financial advice.",
 }

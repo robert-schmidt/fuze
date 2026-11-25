@@ -222,8 +222,27 @@ def test_missing_keys_block_the_mode(monkeypatch, capsys):
     answers(monkeypatch, "RAISE")
     assert cli.main(["mode", "testnet"]) == 2
     out = capsys.readouterr().out
-    assert "-m pip install '.[mcp,lighter]'" in out and "not on PyPI yet" in out and "fuze keys testnet" in out
-    assert 'pip install "fuze-agent' not in out  # never by name from PyPI: that name is not registered by us
+    assert "[mcp,lighter]" in out and "fuze keys testnet" in out
+    assert "fuze-agent" not in out.replace(f'"fuze-agent[mcp,lighter] @ git+{config.REPO}"', "")  # never by bare name
+
+
+@pytest.mark.parametrize("route,marker", [("uv", "uv-receipt.toml"), ("pipx", "pipx_metadata.json")])
+def test_install_hint_for_tool_installs(route, marker, tmp_path, monkeypatch):
+    (tmp_path / marker).write_text("")
+    monkeypatch.setattr(sys, "prefix", str(tmp_path))
+    hint = config.pip_hint("mcp,lighter")
+    spec = f'"fuze-agent[mcp,lighter] @ git+https://github.com/robert-schmidt/fuze"'
+    assert hint == (f"run: uv tool install {spec}" if route == "uv" else f"run: pipx install --force {spec}")
+
+
+def test_install_hint_for_a_checkout_and_for_pip(tmp_path, monkeypatch):
+    monkeypatch.setattr(sys, "prefix", str(tmp_path))
+    monkeypatch.setattr(config, "install_route", lambda: ("checkout", "/src/my fuze", False))
+    assert config.pip_hint("mcp,lighter").endswith("cd '/src/my fuze' && " + sys.executable +
+                                                   " -m pip install '.[mcp,lighter]'")
+    monkeypatch.setattr(config, "install_route", lambda: ("pip", "", False))
+    assert config.pip_hint("mcp,lighter") == (f"run: {sys.executable} -m pip install "
+                                              f'"fuze-agent[mcp,lighter] @ git+{config.REPO}"')
 
 
 def test_init_asks_the_mode(exchanges, monkeypatch, capsys):

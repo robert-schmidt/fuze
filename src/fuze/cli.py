@@ -402,8 +402,8 @@ def switch_mode(cfg, target: str) -> int:
         if modes.RANK[target] > modes.RANK[cur]:
             print(f"You are moving toward real money: {modes.NAMES[cur]} -> {modes.NAMES[target]}.")
             if target == "mainnet":
-                print("FUZE's Lighter code is new: the rehearsal on testnet passed on this machine, but you can lose "
-                      "everything you put on this account. Keep only what you can lose there.")
+                print("The rehearsal on testnet passed on this machine. On mainnet you can lose everything you put on "
+                      "this account. Keep only what you can lose there.")
             if input("Type RAISE to confirm: ").strip() != "RAISE":
                 print("Not changed.")
                 return 1

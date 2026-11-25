@@ -3,8 +3,7 @@
 This page explains what the agent protects you against, how, and where its protection ends. It is the plain-words
 version of the repository's `SECURITY.md`.
 
-> **Warning:** the agent has had **no independent security review**. Its Lighter code had not sent a real order when it
-> was released. Start in simulation, then testnet.
+> **Warning:** the agent has had **no independent security review**. Start in simulation, then testnet.
 
 ## What it protects against
 

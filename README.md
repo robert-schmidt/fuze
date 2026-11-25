@@ -1,5 +1,7 @@
 # FUZE agent
 
+<!-- mcp-name: trade.fuze/fuze -->
+
 **F**utures signals, **U**ser-side, **Z**ero-custody **E**xecution.
 
 **Vibe trading, with your limits.** Tell your AI coding tool (Claude Code, Codex, GitHub Copilot in VS Code, Cursor),
@@ -17,16 +19,16 @@ controls the agent through an MCP server that can only make things safer.
 
 FUZE is not affiliated with Lighter or with any exchange or AI tool named here.
 
-## Status today
+## Where it trades
 
-| Mode | Where it trades | State |
+| Mode | Where it trades | How it unlocks |
 |---|---|---|
-| `simulation` (default) | a simulated $1,000 account on your computer, no money | **proven end to end** |
-| `testnet` | Lighter's test exchange, test money | **new code, not yet proven against the real exchange** |
-| `mainnet` | Lighter, real money | **new code, not yet proven against the real exchange**; locked until your testnet rehearsal passed |
+| `simulation` (default) | a simulated $1,000 account on your computer, no money | on from the start |
+| `testnet` | Lighter's test exchange, test money | your testnet API key (`fuze keys testnet`), then `fuze mode testnet` |
+| `mainnet` | Lighter, **real money** | locked on each machine until that machine passed `fuze rehearse` on testnet, for each new version |
 
-The Lighter code has never sent an order to the real exchange: it is tested only against a fake exchange. Start on
-testnet, with small sizes, and watch it. The signal server is https://fuze.trade (`/v1/signal`, `/v1/stream`).
+Start in simulation, then testnet with small sizes, and watch it; mainnet after that. The signal server is
+https://fuze.trade (`/v1/signal`, `/v1/stream`); the code is at https://github.com/robert-schmidt/fuze.
 
 ## Three modes
 
@@ -38,7 +40,7 @@ your mode risks more real money than the account you follow, for example real mo
 | | simulation | testnet | mainnet |
 |---|---|---|---|
 | Money | none | Lighter test money | **real** |
-| Needs | nothing | `pip install '.[mcp,lighter]'` in your checkout, a Lighter testnet account and API key | the same on mainnet, plus a passed testnet rehearsal on this machine, confirmed by Lighter testnet |
+| Needs | nothing | the `lighter` extra (below), a Lighter testnet account and API key | the same on mainnet, plus a passed testnet rehearsal on this machine, confirmed by Lighter testnet |
 | Switch to it | `fuze mode simulation` | `fuze mode testnet`, type `RAISE` | `fuze mode mainnet`, type `RAISE` and `REAL MONEY` |
 
 - **Choosing**: `fuze init` asks the mode (Enter keeps simulation). Later, `fuze mode` shows it and `fuze mode testnet`
@@ -76,27 +78,40 @@ your mode risks more real money than the account you follow, for example real mo
 
 Or just ask your AI coding tool to do this for you; [AGENTS.md](AGENTS.md) tells it how, safely.
 
+Install FUZE only from github.com/robert-schmidt/fuze. With [uv](https://docs.astral.sh/uv/) or
+[pipx](https://pipx.pypa.io), one command puts `fuze` on your PATH (Python 3.10 or newer, macOS or Linux):
+
 ```sh
-# in a clone of this repository. FUZE is not on PyPI yet: do not `pip install fuze-agent` by name; a package of
-# that name on PyPI today is NOT ours. See SECURITY.md for an install with pinned hashes.
-python3 -m venv ~/.fuze-venv && ~/.fuze-venv/bin/pip install '.[mcp]'   # [mcp] adds the server AI coding tools talk to
-~/.fuze-venv/bin/fuze init        # ~/.fuze; asks the mode and how big your positions should be (Enter keeps the safe default)
-~/.fuze-venv/bin/fuze run         # in its own terminal; Ctrl+C to stop
-~/.fuze-venv/bin/fuze status      # what it holds and why
-~/.fuze-venv/bin/fuze check       # checks your setup
-~/.fuze-venv/bin/fuze ui --open   # a page with all of it, on this computer: http://127.0.0.1:3893
-~/.fuze-venv/bin/fuze mcp-config  # the settings to paste into Claude Code, Codex, Copilot / VS Code or Cursor
+uv tool install "fuze-agent[mcp] @ git+https://github.com/robert-schmidt/fuze"   # [mcp] adds the server AI coding tools talk to
+# or: pipx install "fuze-agent[mcp] @ git+https://github.com/robert-schmidt/fuze"
+fuze init        # ~/.fuze; asks the mode and how big your positions should be (Enter keeps the safe default)
+fuze run         # in its own terminal; Ctrl+C to stop
+fuze status      # what it holds and why
+fuze check       # checks your setup
+fuze ui --open   # a page with all of it, on this computer: http://127.0.0.1:3893
+fuze mcp-config  # the settings to paste into Claude Code, Codex, Copilot / VS Code or Cursor
 ```
 
-Later, on Lighter testnet (macOS or Linux: the SDK's signer ships for those):
+To read the code before you run it, install from a clone instead (and see SECURITY.md for an install with pinned
+hashes); then `fuze` is `~/.fuze-venv/bin/fuze`:
 
 ```sh
-~/.fuze-venv/bin/pip install '.[mcp,lighter]'
-~/.fuze-venv/bin/fuze keys testnet     # account index, key index, then the API key (hidden)
-~/.fuze-venv/bin/fuze check            # reads the account, sends nothing
-~/.fuze-venv/bin/fuze rehearse         # optional on testnet, required before mainnet
-~/.fuze-venv/bin/fuze mode testnet     # type RAISE
-~/.fuze-venv/bin/fuze run
+git clone https://github.com/robert-schmidt/fuze && cd fuze
+python3 -m venv ~/.fuze-venv && ~/.fuze-venv/bin/pip install '.[mcp]'
+```
+
+Later, on Lighter testnet (macOS or Linux: the SDK's signer ships for those), add the `lighter` extra the way you
+installed:
+
+```sh
+uv tool install "fuze-agent[mcp,lighter] @ git+https://github.com/robert-schmidt/fuze"
+# or: pipx install --force "fuze-agent[mcp,lighter] @ git+https://github.com/robert-schmidt/fuze"
+# or, in your clone: ~/.fuze-venv/bin/pip install '.[mcp,lighter]'
+fuze keys testnet     # account index, key index, then the API key (hidden)
+fuze check            # reads the account, sends nothing
+fuze rehearse         # optional on testnet, required before mainnet
+fuze mode testnet     # type RAISE
+fuze run
 ```
 
 Files live in `~/.fuze` (or `$FUZE_HOME`), private to your user: `config.json`, the simulated account `dry.json`, the
@@ -207,19 +222,21 @@ or shows a key, places an order, or touches files outside `~/.fuze`. `status` re
 account's public explorer link and whether keys are "set" or "missing"; `setup_check` covers what testnet and mainnet
 need; `docs` has a `modes` topic.
 
-AI tools start MCP servers without your shell's `PATH` and with a filtered environment, so the settings need the full
-path of `fuze` and your `FUZE_HOME`. **`fuze mcp-config` prints them ready to paste** for every tool below (with the
-one-line `claude mcp add ...` and `codex mcp add ...` forms); `fuze mcp-config --tool cursor` prints one. The files in
-`integrations/` show the same shape with placeholder paths.
+With `fuze` installed by `uv tool install` or `pipx install` and the default folder `~/.fuze`, the settings are just
+the command `fuze` with the argument `mcp`, as in the files in `integrations/` and the forms below. AI tools start MCP
+servers with a filtered environment and not always with your shell's `PATH`; for a virtualenv install, another
+folder (`FUZE_HOME`), or a tool that does not find `fuze`, **`fuze mcp-config` prints the settings with the full path
+of `fuze` and your `FUZE_HOME` filled in**, ready to paste for every tool below (`fuze mcp-config --tool cursor`
+prints one).
 
-| Tool | File | Snippet |
+| Tool | Setup | Snippet |
 |---|---|---|
-| Claude Code | `claude mcp add fuze --scope user -e FUZE_HOME=... -- /full/path/to/fuze mcp`, or `.mcp.json` in your project | [integrations/claude-code.mcp.json](integrations/claude-code.mcp.json) |
-| Claude Code plugin | `claude plugin marketplace add <this repo>` then `claude plugin install fuze@fuze`; works only with `fuze` on Claude Code's PATH and the default folder `~/.fuze` | [plugins/fuze](plugins/fuze/.claude-plugin/plugin.json) |
-| Codex CLI | `codex mcp add fuze --env FUZE_HOME=... -- /full/path/to/fuze mcp`, or `~/.codex/config.toml` | [integrations/codex-config.toml](integrations/codex-config.toml) |
+| Claude Code plugin | `claude plugin install fuze --marketplace robert-schmidt/fuze`, or on any version `claude plugin marketplace add robert-schmidt/fuze` then `claude plugin install fuze@fuze` | [plugins/fuze](plugins/fuze/.claude-plugin/plugin.json) |
+| Claude Code | `claude mcp add fuze --scope user -- fuze mcp`, or `.mcp.json` in your project | [integrations/claude-code.mcp.json](integrations/claude-code.mcp.json) |
+| Codex CLI | `codex mcp add fuze -- fuze mcp`, or `~/.codex/config.toml` | [integrations/codex-config.toml](integrations/codex-config.toml) |
 | VS Code / Copilot | `.vscode/mcp.json` | [integrations/vscode-mcp.json](integrations/vscode-mcp.json) |
 | VS Code / Copilot (newer format) | `.mcp.json` at the workspace root | [integrations/copilot.mcp.json](integrations/copilot.mcp.json) |
-| Cursor | `.cursor/mcp.json` or `~/.cursor/mcp.json` | [integrations/cursor-mcp.json](integrations/cursor-mcp.json) |
+| Cursor | the [Add to Cursor](docs/agent/ai-tools/cursor.md) link, or `.cursor/mcp.json` / `~/.cursor/mcp.json` | [integrations/cursor-mcp.json](integrations/cursor-mcp.json) |
 
 [AGENTS.md](AGENTS.md) tells any coding agent how to help you set FUZE up safely.
 
@@ -242,8 +259,7 @@ holds a mainnet key.**
 - Most scalping rules we have tested lose money after trading costs. Past results promise nothing about the future.
 - Futures use leverage. You can lose everything you put in, and faster than you expect.
 - Software, servers, exchanges and networks fail. Limits and stop losses reduce losses; they do not prevent them.
-- FUZE's Lighter code is new and has not yet traded on the real exchange. A stop loss can fill worse than its price
-  in a fast market, or not at all.
+- A stop loss can fill worse than its price in a fast market, or not at all.
 - Only use money you can afford to lose completely. This is not financial advice.
 
 ## More

@@ -2,9 +2,8 @@
 
 This page covers following with real money on Lighter. Read it to the end before you type anything.
 
-> **Warning:** the agent has had no independent security review, and its Lighter code had never sent a real order when
-> it was released. You can lose everything on the account it trades. Today the account it follows trades practice
-> money: its results cost it nothing, yours cost real money. This is not financial advice.
+> **Warning:** you can lose everything on the account it trades. Today the account it follows trades practice money:
+> its results cost it nothing, yours cost real money. This is not financial advice. See [Risks, plainly](../../risks.md).
 
 ## Before you start
 

@@ -7,8 +7,8 @@ This page lists messages and situations you may meet, what they mean, and what t
 
 | You see | Meaning | Do this |
 |---|---|---|
-| `command not found: fuze` | The virtual environment is not on your PATH | Use `~/.fuze-venv/bin/fuze`, or link it (see [Install](start/install.md)) |
-| `The MCP server needs one extra package` | Installed without `[mcp]` | `~/.fuze-venv/bin/pip install '.[mcp]'` from the checkout |
+| `command not found: fuze` | `~/.local/bin` (uv, pipx) or the virtual environment is not on your PATH | `uv tool update-shell` or `pipx ensurepath` and a new terminal; with a clone, use `~/.fuze-venv/bin/fuze` or link it (see [Install](start/install.md)) |
+| `The MCP server needs one extra package` | Installed without `[mcp]` | Run the command the message names: the same install with `[mcp]` (see [The extras](start/install.md#the-extras)) |
 | `... already exists; leaving it as it is` (from `fuze init`) | You already have a config | See it with `fuze limits`; change it with `fuze limits` |
 | `Another agent is already running on this FUZE folder.` | `fuze run` is already running | Use the running one, or stop it first |
 | `[NO] Agent is running` (from `fuze check`) | The agent is not running, or has not stepped for 30 seconds | Start `fuze run` in its own terminal |
@@ -43,7 +43,7 @@ This page lists messages and situations you may meet, what they mean, and what t
 | You see | Meaning | Do this |
 |---|---|---|
 | `... needs you at a terminal; refusing because input is not a terminal` | A risk-raising action, `fuze resume` or `fuze unflatten` was run by a script or AI tool | Type it yourself in a terminal |
-| `the Lighter SDK is not installed` | Installed without `[lighter]` | `~/.fuze-venv/bin/pip install '.[mcp,lighter]'` from the checkout |
+| `the Lighter SDK is not installed` | Installed without `[lighter]` | Run the command the message names: the same install with `[mcp,lighter]` (see [The extras](start/install.md#the-extras)) |
 | `that is not a Lighter API private key: those are 80 hexadecimal characters ...` | What you pasted has the wrong length or is not hexadecimal; nothing was saved | Paste the API private key (80 hex characters), never a wallet key |
 | `the stored ... API key is not a Lighter API private key` or `the Lighter SDK could not use the stored ... API key` | A key stored earlier has the wrong shape | Enter it again with `fuze keys testnet` (or `mainnet`) |
 | `Lighter does not accept this API key for account ... at key index ...` | The account index, key index or key do not match on Lighter | Check all three with `fuze keys testnet`; see [Lighter account and API key](../lighter-setup.md) |

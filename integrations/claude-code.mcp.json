@@ -2,13 +2,10 @@
   "mcpServers": {
     "fuze": {
       "type": "stdio",
-      "command": "/ABSOLUTE/PATH/TO/.fuze-venv/bin/fuze",
+      "command": "fuze",
       "args": [
         "mcp"
-      ],
-      "env": {
-        "FUZE_HOME": "/ABSOLUTE/PATH/TO/.fuze"
-      }
+      ]
     }
   }
 }

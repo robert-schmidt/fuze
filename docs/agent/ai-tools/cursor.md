@@ -1,10 +1,19 @@
 # Cursor
 
-This page connects the FUZE MCP server to Cursor. Replace `/Users/you` with your own home folder (see
-[the setup that works](README.md#the-setup-that-works)).
+This page connects the FUZE MCP server to Cursor.
 
-The quickest way: run `fuze mcp-config --tool cursor` and paste what it prints; it fills in the full path of your
-`fuze` and your FUZE folder.
+## Add to Cursor
+
+With `fuze` on your PATH (installed with `uv tool install` or `pipx install`) and the default folder `~/.fuze`, open
+this link and confirm in Cursor:
+
+[Add FUZE to Cursor](cursor://anysphere.cursor-deeplink/mcp/install?name=fuze&config=eyJjb21tYW5kIjoiZnV6ZSIsImFyZ3MiOlsibWNwIl19)
+
+```text
+cursor://anysphere.cursor-deeplink/mcp/install?name=fuze&config=eyJjb21tYW5kIjoiZnV6ZSIsImFyZ3MiOlsibWNwIl19
+```
+
+It adds the server `fuze` with the settings `{"command":"fuze","args":["mcp"]}`.
 
 ## In `.cursor/mcp.json` or `~/.cursor/mcp.json`
 
@@ -15,13 +24,15 @@ Use the project file for one project, or the one in your home folder for every p
   "mcpServers": {
     "fuze": {
       "type": "stdio",
-      "command": "/Users/you/.fuze-venv/bin/fuze",
-      "args": ["mcp"],
-      "env": {"FUZE_HOME": "/Users/you/.fuze"}
+      "command": "fuze",
+      "args": ["mcp"]
     }
   }
 }
 ```
+
+For a virtualenv install or another folder, run `fuze mcp-config --tool cursor` and paste what it prints instead: it
+fills in the full path of your `fuze` and your `FUZE_HOME`.
 
 ## Check it
 

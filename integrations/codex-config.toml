@@ -1,11 +1,10 @@
-# Easiest: run `fuze mcp-config --tool codex` and paste what it prints: it fills in both paths for you.
-# AI tools start MCP servers without your shell's PATH and with a filtered environment, so the command must be the
-# full path of fuze, and FUZE_HOME must name the folder your agent uses (default: your home folder's .fuze).
-# Add to ~/.codex/config.toml (or a trusted project's .codex/config.toml).
-# Same as: codex mcp add fuze --env FUZE_HOME=/ABSOLUTE/PATH/TO/.fuze -- /ABSOLUTE/PATH/TO/.fuze-venv/bin/fuze mcp
+# For FUZE installed with `uv tool install` or `pipx install` (the command `fuze` on your PATH) and the default folder
+# ~/.fuze. Add to ~/.codex/config.toml (or a trusted project's .codex/config.toml), or run once:
+#   codex mcp add fuze -- fuze mcp
+# For a virtualenv install or another folder, run `fuze mcp-config --tool codex` and paste what it prints: the full
+# path of fuze and FUZE_HOME, which AI tools do not take from your shell.
 # Then ask, for example: "what is FUZE doing?", "pause FUZE", "open the FUZE page" (the `ui` tool gives the address
 # of the read-only page on this computer; start it with `fuze ui --open`).
 [mcp_servers.fuze]
-command = "/ABSOLUTE/PATH/TO/.fuze-venv/bin/fuze"
+command = "fuze"
 args = ["mcp"]
-env = { FUZE_HOME = "/ABSOLUTE/PATH/TO/.fuze" }

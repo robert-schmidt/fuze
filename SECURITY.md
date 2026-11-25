@@ -1,13 +1,15 @@
 # Security
 
 Users' money is at stake in mode `mainnet`, so security decides every trade-off in this project. Three modes:
-`simulation` (no exchange, no keys, no money), `testnet` and `mainnet` (Lighter, with an API key you type in). The
-Lighter code is new and has not yet been proven against the real exchange; it is tested against a fake one.
+`simulation` (no exchange, no keys, no money), `testnet` and `mainnet` (Lighter, with an API key you type in). Mainnet
+stays locked on each machine until that machine has passed `fuze rehearse` on testnet, for each new version. The agent
+has had no independent security review.
 
 ## Reporting a vulnerability
 
-Email **security@fuze.trade (not live yet)**. Until that address works, open a GitHub security advisory on this
-repository ("Report a vulnerability"); please do not open a public issue for a security problem.
+Report it privately: open a GitHub security advisory at
+https://github.com/robert-schmidt/fuze/security/advisories/new ("Report a vulnerability"). Please do not open a
+public issue for a security problem.
 
 ## Threat model
 
@@ -44,16 +46,16 @@ give an AI tool unattended shell access on a machine that holds a mainnet key.**
 
 ## Install with pinned hashes
 
-FUZE is **not on PyPI yet**. Install it from a checkout of this repository, never with `pip install fuze-agent`: a
-package of that name on PyPI today is **not ours**. A plain `pip install` of the dependencies trusts whatever the
+Install FUZE only from `github.com/robert-schmidt/fuze`. A plain install of the dependencies trusts whatever the
 package index serves today. To install exactly what you reviewed:
 
 ```sh
-# once, on a machine you trust, in the checkout at the commit or tag you reviewed: exact versions with hashes
+# once, on a machine you trust, in a clone (git clone https://github.com/robert-schmidt/fuze) at the commit or tag
+# you reviewed: exact versions with hashes
 echo "setuptools>=77" > build.in                       # the build backend, so nothing unpinned is fetched to build
 uv pip compile --generate-hashes --extra mcp --extra lighter pyproject.toml build.in -o requirements.txt
 #   (drop --extra lighter for simulation only; pip-compile --generate-hashes --extra mcp ... works too)
-# every install: pip refuses any file whose hash does not match, then FUZE itself from the reviewed checkout
+# every install: pip refuses any file whose hash does not match, then FUZE itself from the reviewed clone
 python3 -m venv ~/.fuze-venv
 ~/.fuze-venv/bin/pip install --require-hashes --no-deps -r requirements.txt
 ~/.fuze-venv/bin/pip install --no-deps --no-build-isolation .

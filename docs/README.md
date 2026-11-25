@@ -42,9 +42,8 @@ situation.
 - **Our own tests say the short-term trades lose a little after costs.** On three years of history no short-term rule
   we tried beat trading costs. Only the slow trend position made money in those tests. Past results promise nothing.
 - **Futures use leverage.** You can lose everything you put in, and faster than you expect.
-- **The real-exchange code is new and unaudited.** Following on Lighter (test money or real money) has not yet been
-  proven against the real exchange, and the agent has had no independent security review. Start in simulation, then
-  testnet.
+- **Start small, in order.** Simulation first, then Lighter testnet with small sizes; mainnet stays locked on each
+  machine until that machine has passed the testnet rehearsal.
 
 The full list is on [Risks, plainly](risks.md). Read it before anything else.
 

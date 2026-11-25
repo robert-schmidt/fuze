@@ -1,5 +1,5 @@
-"""Lighter (lighter.xyz), modes "testnet" and "mainnet". UNVERIFIED AGAINST THE REAL EXCHANGE: no order has been sent by
-this code yet. The testnet rehearsal (`fuze rehearse`) is the first time it meets Lighter.
+"""Lighter (lighter.xyz), modes "testnet" and "mainnet". The testnet rehearsal (`fuze rehearse`) runs this order path
+end to end before mainnet unlocks on a machine.
 
 Two layers:
   LighterClient  the raw calls, in the exchange's integer units. Reads use Lighter's REST API over the standard library;

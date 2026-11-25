@@ -9,6 +9,7 @@ import tempfile
 from pathlib import Path
 from urllib.parse import urlsplit
 
+REPO = "https://github.com/robert-schmidt/fuze"  # the only place FUZE is installed from
 DEFAULTS = {
     "server": "https://fuze.trade",
     "mode": "simulation",  # "simulation" (no money), "testnet" (Lighter, test money), "mainnet" (Lighter, real money)
@@ -52,11 +53,44 @@ def no_agent_here() -> str:
             "restart the tool. If FUZE is not set up yet, run `fuze init`.")
 
 
-def pip_hint(extra: str) -> str:
-    """How to add an optional part. FUZE is not on PyPI yet: install from the repository checkout, never by name."""
+def install_route() -> tuple[str, str, bool]:
+    """How this copy of FUZE was installed: ("uv" | "pipx" | "checkout" | "pip", checkout folder, editable)."""
     import sys
-    return (f"in your FUZE checkout run: {sys.executable} -m pip install '.[{extra}]' (FUZE is not on PyPI yet; a "
-            "package named fuze-agent there today is not ours)")
+    prefix = Path(sys.prefix)
+    if (prefix / "uv-receipt.toml").is_file():
+        return "uv", "", False
+    if (prefix / "pipx_metadata.json").is_file():
+        return "pipx", "", False
+    try:  # PEP 610: pip records where a package came from; a local folder is a checkout
+        from importlib.metadata import distribution
+        info = json.loads(distribution("fuze-agent").read_text("direct_url.json") or "{}")
+    except Exception:
+        info = {}
+    url = info.get("url") or ""
+    if url.startswith("file://") and "dir_info" in info:
+        from urllib.parse import unquote
+        return "checkout", unquote(urlsplit(url).path), bool(info["dir_info"].get("editable"))
+    return "pip", "", False
+
+
+def pip_hint(extra: str) -> str:
+    """How to add an optional part, in the form that matches how FUZE was installed. Always from the repository,
+    never by a bare package name (that name on the package index is not FUZE's)."""
+    import importlib.util
+    import shlex
+    import sys
+    want = set(extra.split(",")) | {x for x in ("mcp", "lighter") if importlib.util.find_spec(x)}  # keep what is there
+    extras = ",".join(x for x in ("mcp", "lighter") if x in want)
+    spec = f'"fuze-agent[{extras}] @ git+{REPO}"'
+    route, folder, editable = install_route()
+    if route == "uv":
+        return f"run: uv tool install {spec}"
+    if route == "pipx":
+        return f"run: pipx install --force {spec}"
+    if route == "checkout":
+        return (f"in your FUZE checkout run: cd {shlex.quote(folder)} && {sys.executable} -m pip install "
+                f"{'-e ' if editable else ''}'.[{extras}]'")
+    return f"run: {sys.executable} -m pip install {spec}"
 
 
 def ensure_home() -> Path:

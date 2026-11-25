@@ -1,23 +1,19 @@
 # GitHub Copilot in VS Code
 
-This page connects the FUZE MCP server to GitHub Copilot's agent mode in VS Code. Replace `/Users/you` with your own home
-folder (see [the setup that works](README.md#the-setup-that-works)).
-
-The quickest way: run `fuze mcp-config --tool vscode` and paste what it prints; it fills in the full path of your
-`fuze` and your FUZE folder.
+This page connects the FUZE MCP server to GitHub Copilot's agent mode in VS Code.
 
 ## In `.vscode/mcp.json`
 
-In the workspace you open in VS Code:
+In the workspace you open in VS Code, with `fuze` on your PATH (installed with `uv tool install` or `pipx install`) and
+the default folder `~/.fuze`:
 
 ```json
 {
   "servers": {
     "fuze": {
       "type": "stdio",
-      "command": "/Users/you/.fuze-venv/bin/fuze",
-      "args": ["mcp"],
-      "env": {"FUZE_HOME": "/Users/you/.fuze"}
+      "command": "fuze",
+      "args": ["mcp"]
     }
   }
 }
@@ -25,6 +21,9 @@ In the workspace you open in VS Code:
 
 Some setups read a `.mcp.json` at the workspace root instead, with the key `mcpServers` in place of `servers` and the
 same contents otherwise.
+
+For a virtualenv install or another folder, run `fuze mcp-config --tool vscode` (or `--tool copilot` for the
+`.mcp.json` form) and paste what it prints instead: it fills in the full path of your `fuze` and your `FUZE_HOME`.
 
 ## Check it
 

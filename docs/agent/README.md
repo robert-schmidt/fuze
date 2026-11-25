@@ -21,14 +21,14 @@ time of writing), and, if you use one, your AI tool's subscription.
 
 ## Where it trades
 
-| Mode | Where | Money | State |
+| Mode | Where | Money | How it unlocks |
 |---|---|---|---|
-| `simulation` (default) | A simulated $1,000 account on your computer | None | Proven end to end |
-| `testnet` | Lighter's test exchange | Test money | New code, not yet proven against the real exchange |
-| `mainnet` | Lighter | **Real** | New code, not yet proven against the real exchange; locked until your testnet rehearsal passes |
+| `simulation` (default) | A simulated $1,000 account on your computer | None | On from the start |
+| `testnet` | Lighter's test exchange | Test money | Your testnet API key, then `fuze mode testnet` |
+| `mainnet` | Lighter | **Real** | Locked on each machine until that machine passed `fuze rehearse` on testnet, for each new version |
 
-> **Warning:** the agent has had **no independent security review**. Mainnet ships behind a rehearsal lock that Lighter
-> testnet must confirm, not behind an audit. Start in simulation, then testnet, with small sizes, and watch it.
+> **Warning:** start in simulation, then testnet with small sizes, and watch it. Mainnet comes after that, with only
+> money you can afford to lose.
 
 ## What stays yours
 
@@ -38,11 +38,10 @@ time of writing), and, if you use one, your AI tool's subscription.
   you, in your own terminal. That stops your AI tool's MCP server and mistakes; it is not a barrier against a program
   that runs with your own shell access (see [Security model](security.md)).
 
-## Status
+## Version
 
-Version 0.3.0. It runs on macOS and Linux with Python 3.10 or newer (on Windows, use WSL). It is installed from the
-repository checkout. The release on PyPI, the Python package index, is not out yet: a package called `fuze-agent` on
-PyPI today is not ours.
+Version 0.3.0. It runs on macOS and Linux with Python 3.10 or newer (on Windows, use WSL). It is installed from its
+repository, https://github.com/robert-schmidt/fuze: see [Install](start/install.md).
 
 ## Where to go next
 

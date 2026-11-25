@@ -1,49 +1,40 @@
 # Claude Code
 
-This page connects the FUZE MCP server to Claude Code, either per project or as a plugin. Replace `/Users/you` with your
-own home folder (see [the setup that works](README.md#the-setup-that-works)).
+This page connects the FUZE MCP server to Claude Code, as a plugin or as an MCP server you add yourself.
 
-The quickest way: run `fuze mcp-config --tool claude-code` and paste what it prints; it fills in the full path of your
-`fuze` and your FUZE folder.
+## Option 1: the plugin
 
-## Option 1: a project's `.mcp.json`
-
-Create `.mcp.json` in the project folder you open Claude Code in:
-
-```json
-{
-  "mcpServers": {
-    "fuze": {
-      "type": "stdio",
-      "command": "/Users/you/.fuze-venv/bin/fuze",
-      "args": ["mcp"],
-      "env": {"FUZE_HOME": "/Users/you/.fuze"}
-    }
-  }
-}
-```
-
-Or let Claude Code write it:
+The repository is also a Claude Code plugin marketplace with one plugin, `fuze`. In one step:
 
 ```sh
-claude mcp add fuze --scope project -e FUZE_HOME=/Users/you/.fuze -- /Users/you/.fuze-venv/bin/fuze mcp
+claude plugin install fuze --marketplace robert-schmidt/fuze
 ```
 
-Claude Code asks you to approve a project's MCP server the first time. Check it with `claude mcp list`, or `/mcp` inside
-Claude Code.
-
-## Option 2: the plugin
-
-The repository is also a Claude Code plugin marketplace with one plugin, `fuze`:
+Or in two steps, which works on every version of Claude Code:
 
 ```sh
-claude plugin marketplace add /path/to/your/fuze/checkout
+claude plugin marketplace add robert-schmidt/fuze
 claude plugin install fuze@fuze
 ```
 
-The plugin starts the command `fuze mcp` with no `FUZE_HOME`, so it works only when `fuze` is on the PATH Claude Code
-sees and your agent uses the default folder `~/.fuze`. Otherwise use option 1 (`fuze mcp-config --tool claude-code`
-prints it with `--scope user`, for every project).
+The plugin starts the command `fuze mcp` with no `FUZE_HOME`: it is made for `fuze` installed with `uv tool install` or
+`pipx install` (on the PATH Claude Code sees) and the default folder `~/.fuze`. For a virtualenv install or another
+folder, use option 2.
+
+## Option 2: add the server yourself
+
+With `fuze` on your PATH and the default folder:
+
+```sh
+claude mcp add fuze --scope user -- fuze mcp
+```
+
+For any other install, run `fuze mcp-config --tool claude-code` and paste what it prints: the same `claude mcp add`
+command with the full path of your `fuze` and your `FUZE_HOME` filled in, and the JSON for a project's `.mcp.json`.
+`--scope user` makes the server available in every project; `--scope project` writes it to the `.mcp.json` of the
+project you are in, which Claude Code asks you to approve the first time.
+
+Check it with `claude mcp list`, or `/mcp` inside Claude Code.
 
 ## Check it
 

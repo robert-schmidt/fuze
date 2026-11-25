@@ -2,15 +2,18 @@
 
 This page takes you from simulation to Lighter's test exchange, where the agent sends real orders with test money.
 
-> **Warning:** this is the first time FUZE's Lighter code meets a real exchange. It has only been tested against a fake
-> one. Use small sizes and watch every step.
+> **Warning:** testnet is where you watch the agent place real orders before any real money is at stake. Use small
+> sizes and watch every step.
 
 ## Steps
 
-1. **Install the Lighter extra** (macOS or Linux; Lighter's SDK ships its signing library for those):
+1. **Install the Lighter extra** (macOS or Linux; Lighter's SDK ships its signing library for those), the way you
+   installed FUZE:
 
    ```sh
-   cd fuze && ~/.fuze-venv/bin/pip install '.[mcp,lighter]'
+   uv tool install "fuze-agent[mcp,lighter] @ git+https://github.com/robert-schmidt/fuze"
+   # pipx: pipx install --force "fuze-agent[mcp,lighter] @ git+https://github.com/robert-schmidt/fuze"
+   # a clone: cd fuze && ~/.fuze-venv/bin/pip install '.[mcp,lighter]'
    ```
 
 2. **Make a Lighter testnet account and API key.** Use a sub-account of its own, and a key restricted to the BTC and ETH

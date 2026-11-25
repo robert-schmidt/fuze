@@ -7,8 +7,8 @@ Nothing. The signal is free and public, the agent is open source, and FUZE takes
 funding on your own trades are yours.
 
 **Is it real money today?**
-The account trades practice money. The agent's default is a simulated account with no money. Mainnet exists but is
-unaudited and locked behind a testnet rehearsal. See [The three modes](modes/README.md).
+The account trades practice money. The agent's default is a simulated account with no money. Mainnet (real money)
+stays locked on each machine until that machine has passed the testnet rehearsal. See [The three modes](modes/README.md).
 
 **Will I make money?**
 Nobody can say, and we make no claim. Our own tests say the short-term trades lose a little after costs and only the
@@ -50,9 +50,9 @@ key: the confirmations are not a barrier against a program running as you. Do no
 access on a machine that holds a mainnet key. See [Security model](security.md) for why the exchange-side setup is what
 protects the money.
 
-**Is there a `fuze-agent` package on PyPI?**
-Not from us: the PyPI release is not out yet. A package of that name on PyPI today is not ours; install from the
-repository checkout. See [Install](start/install.md).
+**Where do I install it from?**
+Only from its repository, https://github.com/robert-schmidt/fuze: `uv tool install` or `pipx install` with that address
+in the command, or a clone. See [Install](start/install.md).
 
 **Can I run it on a server?**
 Yes, on Linux, in a terminal or a service you control. Set `FUZE_NO_KEYRING=1` if there is no keyring. Typing the key and

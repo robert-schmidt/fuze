@@ -1,0 +1,29 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "trade.fuze/fuze",
+  "title": "FUZE agent",
+  "description": "Status and risk-reducing controls (pause, flatten, lower limits) for the FUZE signal-following agent",
+  "version": "0.3.0",
+  "websiteUrl": "https://fuze.trade",
+  "repository": {
+    "url": "https://github.com/robert-schmidt/fuze",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "pypi",
+      "registryBaseUrl": "https://pypi.org",
+      "identifier": "fuze-agent",
+      "version": "0.3.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "packageArguments": [
+        {
+          "type": "positional",
+          "value": "mcp"
+        }
+      ]
+    }
+  ]
+}

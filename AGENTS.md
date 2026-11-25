@@ -52,10 +52,11 @@ mainnet comes from the running agent or from `fuze rehearse` that the user start
 
 ## Setting up
 
-1. Check Python 3.10 or newer. Create a virtual environment and install FUZE **from the checkout of this repository**:
+1. Check Python 3.10 or newer. Install FUZE only from `github.com/robert-schmidt/fuze`, with the repository address
+   in the command, never by a bare package name. With uv (or pipx, the same with `pipx install`):
+   `uv tool install "fuze-agent[mcp] @ git+https://github.com/robert-schmidt/fuze"`, which puts `fuze` on the PATH.
+   When the user wants to read the code first: `git clone https://github.com/robert-schmidt/fuze`, then in the clone
    `python3 -m venv ~/.fuze-venv && ~/.fuze-venv/bin/pip install '.[mcp]'`, or hash-pinned as `SECURITY.md` shows.
-   FUZE is not on PyPI yet: never run `pip install fuze-agent` (or any name) from PyPI; a package called `fuze-agent`
-   there today is NOT ours.
 2. `fuze init` creates `~/.fuze` and sets how big the user's positions are. Ask the user, in plain words, which
    they want: **a share of their balance** (default 10%; grows and shrinks with the balance) or **a fixed amount**
    (the size their position has when ours equals our whole balance; does not grow), an optional cap per position in
@@ -70,10 +71,12 @@ mainnet comes from the running agent or from `fuze rehearse` that the user start
    with the same `FUZE_HOME` as the agent and use what it prints: the full path of `fuze` and `FUZE_HOME`, which AI
    tools do not inherit from the shell. Then call the `status` tool: it must show their mode and balance. If it says
    no agent is set up in a folder, the settings point at the wrong folder.
-5. Start in `simulation`. When the user wants test money: tell them to install the extra from the checkout
-   (`~/.fuze-venv/bin/pip install '.[mcp,lighter]'`), follow `docs/lighter-setup.md` for a testnet account and an API key
-   restricted to the BTC and ETH markets, then type `fuze keys testnet` and `fuze mode testnet` themselves. Say
-   plainly that the Lighter code is new and not yet proven against the real exchange.
+5. Start in `simulation`. When the user wants test money: add the `lighter` extra the way FUZE was installed
+   (`uv tool install "fuze-agent[mcp,lighter] @ git+https://github.com/robert-schmidt/fuze"`; pipx: the same with
+   `pipx install --force`; a clone: `~/.fuze-venv/bin/pip install '.[mcp,lighter]'`; `fuze mode testnet` names the
+   right one when it is missing). Have them follow `docs/lighter-setup.md` for a testnet account and an API key
+   restricted to the BTC and ETH markets, then type `fuze keys testnet` and `fuze mode testnet` themselves. Suggest
+   small sizes on testnet and that they watch it trade.
 6. Mainnet only after the user ran `fuze rehearse` on testnet on this machine and watched it work. Tell them the
    commands; they type them. If status says their mode is more real than the account they follow (for example real
    money following our practice account), repeat that to them in plain words.

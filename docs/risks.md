@@ -31,8 +31,9 @@ install anything.
 
 - Software, servers, exchanges and networks fail. When the signal stops, the agent holds what it has and opens nothing
   new; it does not know what the account would have done.
-- FUZE's Lighter code (test money and real money) is new and has not yet traded on the real exchange. It is tested
-  against a fake exchange only, and the agent has had no independent security review. A stop loss can fill worse than its price in a fast market, or not at all.
+- The agent has had no independent security review. Start in simulation, then testnet with small sizes; mainnet
+  stays locked on each machine until that machine has passed the testnet rehearsal, for each new version.
+- A stop loss can fill worse than its price in a fast market, or not at all.
 
 ## You and your situation
 

@@ -3,9 +3,8 @@
 This page walks you through what the agent needs on Lighter: a wallet, an account (or sub-account), an API key and the
 two numbers that go with it. FUZE's modes `testnet` and `mainnet` trade on Lighter (lighter.xyz).
 
-**This code is new and has not yet been proven against the real exchange**: it is tested against a fake one, and it has
-had no independent security review. Start on testnet with small sizes and watch it. FUZE is not affiliated with
-Lighter. Lighter's own documentation is the authority; facts below were checked against https://docs.lighter.xyz (which
+Start on testnet with small sizes and watch it; mainnet stays locked on each machine until that machine has passed
+`fuze rehearse` on testnet, for each new version of FUZE. FUZE is not affiliated with Lighter. Lighter's own documentation is the authority; facts below were checked against https://docs.lighter.xyz (which
 https://apidocs.lighter.xyz now redirects to) and Lighter's official Python SDK on 2026-11-25. The few steps we could
 not verify are listed once, at the end.
 
@@ -89,12 +88,20 @@ paste the key into a chat or an AI tool.
 
 ## 5. Give FUZE the key (your terminal, never a chat)
 
-From your checkout of the agent's repository (it is not on PyPI yet):
+First add the `lighter` extra (Lighter's SDK, which signs orders on your machine, macOS and Linux, and `keyring`), the
+way you installed FUZE (see [Install](agent/start/install.md#the-extras)):
 
 ```sh
-~/.fuze-venv/bin/pip install '.[mcp,lighter]'   # Lighter's SDK (signs orders on your machine; macOS and Linux) and keyring
-fuze keys testnet                               # asks: account index, API key index, then the API key, hidden as you type
-fuze check                                      # reads the account with it: balance, positions, protective orders. No order
+uv tool install "fuze-agent[mcp,lighter] @ git+https://github.com/robert-schmidt/fuze"
+# pipx: pipx install --force "fuze-agent[mcp,lighter] @ git+https://github.com/robert-schmidt/fuze"
+# a clone: ~/.fuze-venv/bin/pip install '.[mcp,lighter]'
+```
+
+Then:
+
+```sh
+fuze keys testnet      # asks: account index, API key index, then the API key, hidden as you type
+fuze check             # reads the account with it: balance, positions, protective orders. No order
 ```
 
 The key is stored in your OS keyring, or, without one, in `~/.fuze/lighter-testnet.key` readable only by you (set
@@ -132,8 +139,6 @@ fuze run
 
 Warnings, plainly:
 
-- This code had never sent a real order when it was released, and it has had no independent security review. The
-  rehearsal is the first time it meets Lighter.
 - A stop loss is a trigger order: in a fast market it can fill worse than its price, or not at all.
 - When FUZE's own account is a practice (`paper`) account, its results cost it nothing; yours cost real money.
   `fuze status` says when this is the case.
