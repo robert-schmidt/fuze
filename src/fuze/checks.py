@@ -8,6 +8,7 @@ import time
 
 from fuze import config
 from fuze.protocol import PINNED
+from fuze.sizing import fmt
 
 
 def setup_report() -> list:
@@ -29,8 +30,11 @@ def setup_report() -> list:
         add(mode & 0o077 == 0, "config.json is private to you", oct(mode))
     try:
         cfg = config.load()
-        add(True, "config.json is valid", f"mode {cfg['mode']}, scale {cfg['scale']:g}, cap {cfg['max_x']:g}x, "
-                                          f"daily loss stop {cfg['daily_loss_frac']:.0%}")
+        fixed = cfg["size_mode"] == "fixed"
+        size = f"a fixed ${cfg['fixed_usd']:,.0f}" if fixed else f"{cfg['percent']:g}% of the balance"
+        add(True, "config.json is valid", f"mode {cfg['mode']}, {size} follows the signal, "
+                                          f"cap per position {fmt('max_position_usd', cfg['max_position_usd'])}, "
+                                          f"cap {cfg['max_x']:g}x, daily loss stop {cfg['daily_loss_frac']:.0%}")
     except (ValueError, OSError) as e:
         add(False, "config.json is valid", str(e))
     add(set(PINNED) == {"k1"}, "Signal key pinned in the code", ", ".join(PINNED))

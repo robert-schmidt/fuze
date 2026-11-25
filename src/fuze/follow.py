@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from fuze.protocol import COINS
+from fuze.sizing import base_usd, fit
 
 MIN_DIFF_USD = 10.0  # ignore changes smaller than this ...
 MIN_DIFF_FRAC = 0.02  # ... or than 2% of the balance, unless the target is zero
@@ -84,7 +85,7 @@ def decide(signal, received_at, now, account, cfg, flags, memory) -> Decision:
     if signal["state"] == "flat":
         return close("The signal is flat: everything is closed and we stay out.")
 
-    rev, scale = signal["rev"], cfg["scale"]
+    rev, base = signal["rev"], base_usd(cfg, bal)
     tol = max(MIN_DIFF_USD, MIN_DIFF_FRAC * bal)
     px = {c: t["px"] for c, t in signal["targets"].items()}
     last = m.get("set") or {}
@@ -94,33 +95,31 @@ def decide(signal, received_at, now, account, cfg, flags, memory) -> Decision:
         return hold(f"Following revision {rev}; nothing to change.")
 
     notes = ["Resync: the held position no longer matched what we last set."] if m.get("rev") == rev else []
-    xs = {c: t["x"] * scale for c, t in signal["targets"].items()}
-    sc, scalp_x = signal["scalp"], 0.0
+    usd = {c: t["x"] * base for c, t in signal["targets"].items()}  # position value in dollars, before caps
+    sc, scalp_usd = signal["scalp"], 0.0
     if sc:
         problem = "it already closed at its stop loss or take profit" if sc["id"] == m.get("scalp_done") \
             else scalp_problem(sc, px[sc["coin"]])
         if problem:
-            xs[sc["coin"]] -= sc["x"] * scale
+            usd[sc["coin"]] -= sc["x"] * base
             notes.append(f"The scalp part is not opened: {problem}.")
         else:
-            scalp_x = sc["x"] * scale
-    total = sum(abs(x) for x in xs.values())
-    k = cfg["max_x"] / total if total > cfg["max_x"] else 1.0
-    if k < 1:
-        notes.append(f"Scaled down to your exposure cap of {cfg['max_x']:g} times the balance.")
+            scalp_usd = sc["x"] * base
+    k, cut = fit(usd, cfg, bal)  # the caps: one factor per coin, the scalp part shrinks with its coin
+    notes += cut
 
     targets = {}
     for c in COINS:
-        want = xs.get(c, 0.0) * k * bal / px[c] if c in px else 0.0
+        want = usd.get(c, 0.0) * k[c] / px[c] if c in px else 0.0
         h = held.get(c, 0.0)
         targets[c] = want if want == 0 or abs(want - h) * px[c] >= tol else h
     bracket = None
-    if scalp_x and targets[sc["coin"]] * scalp_x > 0:
-        units = scalp_x * k * bal / px[sc["coin"]]
+    if scalp_usd and targets[sc["coin"]] * scalp_usd > 0:
+        units = scalp_usd * k[sc["coin"]] / px[sc["coin"]]
         units = min(abs(units), abs(targets[sc["coin"]])) * (1 if units > 0 else -1)
         bracket = {"coin": sc["coin"], "units": units, "tp": sc["tp"], "sl": sc["sl"], "id": sc["id"]}
     m.update(rev=rev, set=targets, scalp={"id": sc["id"], "coin": sc["coin"]} if bracket else None)
     head = f"Following revision {rev}: " + (", ".join(
-        f"{c} {'short' if x < 0 else 'long'} {abs(x * k):.2f} times your balance" for c, x in xs.items() if x)
-        or "no position")
+        f"{c} {'short' if v < 0 else 'long'} ${abs(v * k[c]):,.0f} ({abs(v * k[c]) / bal:.2f} times your balance)"
+        for c, v in usd.items() if v) or "no position")
     return Decision(True, targets, bracket, px, " ".join([head + "."] + notes), m)

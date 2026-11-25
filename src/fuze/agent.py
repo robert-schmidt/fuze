@@ -15,7 +15,7 @@ import urllib.request
 from pathlib import Path
 
 from fuze import __version__
-from fuze.config import ensure_home, load, read_json, write_json
+from fuze.config import LIMITS, ensure_home, load, read_json, write_json
 from fuze.dry import DryExchange
 from fuze.follow import decide
 from fuze.protocol import COINS, PINNED, Guard
@@ -153,7 +153,7 @@ class Agent:
             "t": now, "pid": os.getpid(), "version": __version__, "mode": self.cfg["mode"], "server": self.server,
             "reason": d.reason, "flags": flags, "account": self.ex.account(), "signal": self.signal,
             "received_at": self.received_at, "last_drop": self.guard.why,
-            "limits": {k: self.cfg[k] for k in ("scale", "max_x", "daily_loss_frac", "stale_flat_min")},
+            "limits": {k: self.cfg[k] for k in LIMITS},
             "day_start": self.memory.get("day_start"), "stopped_day": self.memory.get("stopped_day")})
 
     def apply(self, d, acct) -> None:

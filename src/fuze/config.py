@@ -13,13 +13,19 @@ DEFAULTS = {
     "server": "https://fuze.trade",
     "mode": "dry",
     "dry_balance": 1000.0,
-    "scale": 0.1,
+    "size_mode": "percent",  # "percent": a share of the balance follows the signal; "fixed": a fixed amount does
+    "percent": 10.0,
+    "fixed_usd": 100.0,
+    "max_position_usd": None,
     "max_x": 3.0,
     "daily_loss_frac": 0.1,
     "stale_flat_min": None,
 }
-RANGES = {"scale": (0.01, 1.0), "max_x": (0.1, 25.0), "daily_loss_frac": (0.01, 0.5),
-          "dry_balance": (10.0, 1e9), "stale_flat_min": (1.0, 10080.0)}
+RANGES = {"percent": (1.0, 100.0), "fixed_usd": (10.0, 1e6), "max_position_usd": (10.0, 1e6),
+          "max_x": (0.1, 25.0), "daily_loss_frac": (0.01, 0.5), "dry_balance": (10.0, 1e9),
+          "stale_flat_min": (1.0, 10080.0)}
+SIZE_MODES = ("percent", "fixed")
+LIMITS = ("size_mode", "percent", "fixed_usd", "max_position_usd", "max_x", "daily_loss_frac", "stale_flat_min")
 LOCAL_HOSTS = ("localhost", "127.0.0.1")
 DRY_ONLY = ('Only "dry" mode exists in FUZE v0.1: it follows the signal on a simulated account. '
             "Following on Lighter testnet comes later, and real money only after that.")
@@ -86,6 +92,12 @@ def _number(name, value) -> float:
 def validate(cfg) -> dict:
     if not isinstance(cfg, dict):
         raise ValueError("config must be a JSON object")
+    if "scale" in cfg:  # files written before sizing modes: scale 0.1 meant 10% of the balance
+        cfg = dict(cfg)
+        scale = cfg.pop("scale")
+        if isinstance(scale, bool) or not isinstance(scale, (int, float)):
+            raise ValueError("scale must be a number")
+        cfg.setdefault("percent", round(scale * 100, 6))
     unknown = set(cfg) - set(DEFAULTS)
     if unknown:
         raise ValueError(f"unknown config fields: {', '.join(sorted(unknown))}")
@@ -93,10 +105,13 @@ def validate(cfg) -> dict:
     out["server"] = check_server(out["server"])
     if out["mode"] != "dry":
         raise ValueError(DRY_ONLY)
-    for name in ("dry_balance", "scale", "max_x", "daily_loss_frac"):
+    if out["size_mode"] not in SIZE_MODES:
+        raise ValueError('size_mode must be "percent" (a share of your balance) or "fixed" (a fixed amount)')
+    for name in ("dry_balance", "percent", "fixed_usd", "max_x", "daily_loss_frac"):
         out[name] = _number(name, out[name])
-    if out["stale_flat_min"] is not None:
-        out["stale_flat_min"] = _number("stale_flat_min", out["stale_flat_min"])
+    for name in ("max_position_usd", "stale_flat_min"):
+        if out[name] is not None:
+            out[name] = _number(name, out[name])
     return out
 
 
@@ -108,3 +123,13 @@ def save(cfg) -> dict:
     cfg = validate(cfg)
     write_json(ensure_home() / "config.json", cfg)
     return cfg
+
+
+def current_balance(cfg) -> float:
+    """The balance the agent last reported, or the simulated starting balance if it has not run yet."""
+    try:
+        bal = ((read_json(home() / "status.json") or {}).get("account") or {}).get("balance")
+    except (ValueError, OSError, AttributeError):
+        bal = None
+    ok = isinstance(bal, (int, float)) and not isinstance(bal, bool) and math.isfinite(bal) and bal > 0
+    return float(bal) if ok else cfg["dry_balance"]

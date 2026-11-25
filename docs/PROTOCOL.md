@@ -60,8 +60,10 @@ Anything that fails is dropped without acting. With no valid message for 60 s th
 
 ## Following
 
-A follower's position for a coin is `x × its own scale × its own balance / price`, inside its own limits. The limits are
-local and the signal cannot loosen them. The scalp part should rest under a stop loss and take profit **on the exchange**,
+A follower's position value for a coin is `x × percent/100 × its own balance` (a share of its balance) or
+`x × fixed_usd` (a fixed amount), then cut to its own cap per position and exposure cap; units = value / price. The
+limits are local and the signal cannot loosen them. A follower must not hold a constant dollar size regardless of `x`:
+when a scalp closes, `x` shrinks but keeps its sign, and such a follower would never exit that part. The scalp part should rest under a stop loss and take profit **on the exchange**,
 so it stays protected when the agent or the signal is down.
 
 ## Test vectors
