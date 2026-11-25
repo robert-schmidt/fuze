@@ -14,6 +14,7 @@ that your AI tool runs on your machine. Through it the tool can read the agent's
 | Your AI tool can | Your AI tool cannot |
 |---|---|
 | Read status, the latest signal, recent trades, a setup check and short built-in docs | Place an order |
+| Give you the address of the [local page](../local-page.md): say "open the FUZE page" | Change anything through that page: it only reads |
 | Pause the agent | Resume it |
 | Flatten (close everything and stay out) | Unflatten |
 | Lower your share, fixed amount, cap per position, exposure cap and daily loss stop; add a cap per position | Raise any limit, remove a cap, or switch between a share and a fixed amount |

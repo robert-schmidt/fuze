@@ -17,6 +17,9 @@ claude plugin marketplace add robert-schmidt/fuze
 claude plugin install fuze@fuze
 ```
 
+Install FUZE itself first ([Install](../start/install.md)): the plugin only tells Claude Code how to start it. Without
+it, Claude Code lists the server as failed with "Executable not found in $PATH".
+
 The plugin starts the command `fuze mcp` with no `FUZE_HOME`: it is made for `fuze` installed with `uv tool install` or
 `pipx install` (on the PATH Claude Code sees) and the default folder `~/.fuze`. For a virtualenv install or another
 folder, use option 2.

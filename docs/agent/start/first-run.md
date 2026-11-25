@@ -20,11 +20,11 @@ It prints your sizing in words, with a worked example:
 
 ```text
 Your sizing, shown on a $1,000 balance:
-  10% of your balance follows the signal. Your positions grow and shrink with your balance.
-  Largest position on one coin: no cap.
-  Most you hold across coins: 3 times your balance.
-  Daily loss stop: 10% of the balance in a UTC day closes everything.
-  With $1,000 and our position at 1.8 times our balance, yours would be $180 of Bitcoin. With $2,000 it would be $360.
+  5% of your balance follows the signal. Your positions grow and shrink with your balance.
+  Largest position on one coin: $300.
+  Most you hold across coins: 2 times your balance.
+  Daily loss stop: 5% of the balance in a UTC day closes everything.
+  With $1,000 and our position at 1.8 times our balance, yours would be $90 of Bitcoin. With $2,000 it would be $180.
 ```
 
 What the choices mean: [Sizing](../sizing.md) and [Limits and safety switches](../limits.md).

@@ -151,3 +151,23 @@ def test_status_shows_what_is_asked_and_what_is_held_in_dollars(fuze_home):
     assert btc["asked_usd"] == -17.0 and btc["held_usd"] == 0.0 and btc["under_min_change"]
     words = " ".join(st["positions_in_words"])
     assert "asks for short $17, you hold none" in words and "under $20" in words and "stays unfollowed" in words
+
+
+def test_a_refused_raise_names_the_command_to_type(fuze_home):
+    """A newcomer's AI tool said "run fuze --help" because the refusal gave no flag (new-user test, 2026-11-25)."""
+    config.save(dict(config.DEFAULTS))
+    for asked, command in (({"max_x": 5.0}, "`fuze limits --max-x 5`"), ({"percent": 20.0}, "`fuze limits --percent 20`"),
+                           ({"daily_loss_frac": 0.2}, "`fuze limits --daily-loss 20`")):
+        with pytest.raises(ToolError) as e:
+            call("lower_limits", **asked)
+        assert command in str(e.value) and "RAISE" in str(e.value)
+    from fuze.mcp_server import DOCS
+    assert "ui tool" in DOCS["status"] and "Testnet trades" not in DOCS["status"]
+
+
+def test_setup_check_does_not_call_a_missing_config_valid(fuze_home):
+    from fuze import checks
+    rows = {r["check"]: r for r in checks.setup_report()}
+    assert not rows["config.json is valid"]["ok"] and "fuze init" in rows["config.json is valid"]["detail"]
+    config.save(dict(config.DEFAULTS))
+    assert {r["check"]: r for r in checks.setup_report()}["config.json is valid"]["ok"]

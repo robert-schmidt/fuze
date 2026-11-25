@@ -33,7 +33,9 @@ def setup_report(read_account: bool = False) -> list:
         mode = stat.S_IMODE(cfg_path.stat().st_mode)
         add(mode & 0o077 == 0, "config.json is private to you", oct(mode))
     try:
-        cfg = config.load()
+        cfg = config.load() if cfg_path.exists() else None
+        if cfg is None:
+            raise ValueError("there is none yet: run `fuze init`")
         fixed = cfg["size_mode"] == "fixed"
         size = f"a fixed ${cfg['fixed_usd']:,.0f}" if fixed else f"{cfg['percent']:g}% of the balance"
         add(True, "config.json is valid", f"mode {cfg['mode']}, {size} follows the signal, "

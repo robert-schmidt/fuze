@@ -19,11 +19,11 @@ the default folder `~/.fuze`:
 }
 ```
 
-Some setups read a `.mcp.json` at the workspace root instead, with the key `mcpServers` in place of `servers` and the
-same contents otherwise.
+For a virtualenv install or another folder, run `fuze mcp-config --tool vscode` and paste what it prints instead: it
+fills in the full path of your `fuze` and your `FUZE_HOME`.
 
-For a virtualenv install or another folder, run `fuze mcp-config --tool vscode` (or `--tool copilot` for the
-`.mcp.json` form) and paste what it prints instead: it fills in the full path of your `fuze` and your `FUZE_HOME`.
+GitHub Copilot CLI (the terminal tool, not VS Code) reads `~/.copilot/mcp-config.json`, with the key `mcpServers` in
+place of `servers`: `fuze mcp-config --tool copilot` prints that form.
 
 ## Check it
 

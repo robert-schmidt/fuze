@@ -106,8 +106,9 @@ docs(topic="safety")
 
 ## ui
 
-Gives the address of the [local page](local-page.md) and whether it is running. It does not start the page: you start
-it with `fuze ui --open`.
+Gives the address of the [local page](local-page.md) and whether it is running. The tool itself does not start the
+page or open a browser. If the page is not running, start it with `fuze ui --open`, or let your AI tool run that command
+for you: the page only reads.
 
 ## pause
 

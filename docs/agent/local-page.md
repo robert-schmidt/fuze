@@ -11,7 +11,8 @@ fuze ui --open
 
 It serves the page at **http://127.0.0.1:3893** (3893 spells F-U-Z-E on a phone keypad). `--port` picks another port,
 `--open` opens your browser. It works whether or not `fuze run` is running; when the agent is stopped it says so and
-reads the public signal itself. Your AI tool can give you the address too: ask it to "open the FUZE page".
+reads the public signal itself. Your AI tool can give you the address too: ask it to "open the FUZE page". It answers with the link to click, and
+starts the page first if it is not running.
 
 ## What it shows
 

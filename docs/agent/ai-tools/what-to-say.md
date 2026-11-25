@@ -18,6 +18,7 @@ the tools; the AI picks them.
 | "What is FUZE holding right now, and why?" | `status` |
 | "What does the latest signal say?" | `signal` |
 | "Show me the last 10 trades." | `trades` with n = 10 |
+| "Open the FUZE page." | `ui`: it gives you the address of the [local page](../local-page.md), http://127.0.0.1:3893, and starts the page first if needed |
 | "Is my setup ready for testnet?" | `setup_check` |
 | "How does sizing work?" | `docs` with topic `sizing` |
 

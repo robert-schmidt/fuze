@@ -124,7 +124,7 @@ function positions(d) {
         h("div", null, h("dt", {text: "Result"}), h("dd", {className: tone(p.result) || null}, signed(p.result), p.result == null ? null : h("small", {text: pct(p.result_pct)}))))));
   });
   const asked = (d.asked && d.asked.lines) || [];  // what the signal asks for next to what is held, in dollars
-  put($("pos-asked"), asked, () => asked.length ? [h("b", {text: "The signal and you: "}), asked.join(" ")] : []);
+  put($("pos-asked"), asked, () => asked.length ? [h("b", {text: "The signal and you"}), ...asked.map(t => h("span", {text: t}))] : []);
   $("pos-asked").hidden = !asked.length;
   const s = d.short, box = $("short");
   box.hidden = !s;

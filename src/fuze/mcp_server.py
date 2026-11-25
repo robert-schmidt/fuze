@@ -30,6 +30,8 @@ HONEST = ("What the confirmations protect against: the typed words (RAISE, REAL 
           "access on a machine that holds a mainnet key.")
 SECRETISH = re.compile(r"mode|key|secret|private|seed|mnemonic|phrase|password|token|wallet|server|resume|unflatten",
                        re.I)
+FLAG = {"percent": "--percent", "fixed_usd": "--fixed-usd", "max_position_usd": "--max-position-usd", "max_x": "--max-x",
+        "daily_loss_frac": "--daily-loss"}  # the `fuze limits` flag for each limit, for the refusal that names the command
 DOCS = {
     "following": "FUZE publishes the position its own account holds, signed: per coin, x = our position value "
                  "divided by our balance (negative is short). Your agent copies it on your account at your sizing "
@@ -87,9 +89,12 @@ DOCS = {
              "what the user can lose. Any mode follows any signal source (our paper, testnet or mainnet account), "
              "since x is a ratio; status says when the user's mode is more real than ours. The same limits apply "
              "in every mode, and the scalp part rests under its take profit and stop loss on the exchange.",
-    "status": "Simulation needs nothing and risks no money. Testnet trades Lighter's test money; mainnet trades real "
-              "money and stays locked on each machine until that machine passed `fuze rehearse` on testnet with this "
-              "version. Start in simulation, then testnet with small sizes.",
+    "status": "The status tool says whether the agent is running, its mode, the balance, each position next to what "
+              "the signal asks for at the user's limits, the signal's revision and why, whether pause or flatten is "
+              "on, and the limits in words. The same is shown on a read-only page on the user's computer: the ui tool "
+              "gives its address (http://127.0.0.1:3893 once `fuze ui --open` runs). To raise a limit the user types "
+              "`fuze limits` with a flag in a terminal (--percent, --fixed-usd, --max-position-usd, --max-x, "
+              "--daily-loss) and confirms with RAISE.",
     "risks": "This mirrors one account's trading. Most tested scalping rules lose money after costs. Past results "
              "promise nothing. You can lose everything you put in. This is not financial advice.",
 }
@@ -247,10 +252,11 @@ def build() -> MCPServer:
             raise ToolError(str(e)) from None
         up = raised(cfg, new, config.current_balance(cfg))
         if up:
+            flags = " ".join(f"{FLAG[k]} {asked[k] * 100 if k == 'daily_loss_frac' else asked[k]:g}" for k in up if k in asked)
             raise ToolError("This would raise " + "; ".join(f"{LABELS[k]} from {fmt(k, cfg[k])} to {fmt(k, new[k])}"
                                                             for k in up) +
-                            ". This server can only lower limits; to raise one the user runs `fuze limits` in a "
-                            "terminal.")
+                            f". This server can only lower limits; to raise one the user types `fuze limits {flags}`"
+                            " in a terminal, which asks them to type RAISE.")
         saved = config.save(new)
         return {**{k: saved[k] for k in asked}, "sizing": describe(saved, config.current_balance(saved)),
                 "applies": "A running agent resizes the held position to these limits within seconds; check with "

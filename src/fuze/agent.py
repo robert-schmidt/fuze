@@ -240,7 +240,7 @@ class Agent:
         full = abs(got - p["units"]) <= max(1e-9, 0.001 * abs(p["units"]))
         what = "filled" if full else "filled in part" if got * p["units"] > 0 else "did not fill"
         if self.ex.live:
-            with open(self.home / "trades.jsonl", "a", encoding="utf-8") as f:
+            with open(os.open(self.home / "trades.jsonl", os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600), "a", encoding="utf-8") as f:
                 f.write(json.dumps({"t": now, "mode": self.mode, "coin": p["coin"], "asked": p["units"],
                                     "units": round(got, 12), "worst": p["worst"], "reduce_only": p["reduce_only"],
                                     "kind": "market", "result": what, "tx": p.get("tx"),

@@ -145,7 +145,7 @@ def _lock():
     """The agent's lock on this FUZE folder, or None when an agent holds it. Close the file to release it."""
     import fcntl
 
-    f = open(config.ensure_home() / "agent.lock", "w")
+    f = open(os.open(config.ensure_home() / "agent.lock", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "w")
     try:
         fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
         return f

@@ -291,3 +291,13 @@ def test_mcp_config_without_a_fuze_on_path_uses_this_python(fuze_home, monkeypat
     cli.main(["mcp-config", "--tool", "cursor"])
     out = capsys.readouterr().out
     assert "WARNING: No FUZE agent is set up in" in out and "## Cursor" in out and "## Codex" not in out
+
+
+def test_the_lock_file_is_private(fuze_home):
+    import stat
+    from fuze import cli, config
+    lock = cli._lock()
+    try:
+        assert stat.S_IMODE((config.home() / "agent.lock").stat().st_mode) == 0o600
+    finally:
+        lock.close()
