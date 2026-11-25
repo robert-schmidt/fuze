@@ -39,7 +39,7 @@ def test_guard_sequence_replay_and_restart(tmp_path):
     v = VECTORS["valid"]
     assert [g.accept(e, 1010.0)["seq"] for e in v] == [1, 2, 3]
     assert g.accept(v[0], 1010.0) is None and "replay" in g.why
-    g2 = Guard(tmp_path / "guard.json", TEST_KEYS)  # restart: the last seq comes from disk
+    g2 = Guard(tmp_path / "guard.json", TEST_KEYS)  # restart: the last time stamp comes from disk
     assert g2.accept(v[2], 1010.0) is None
 
 
@@ -49,6 +49,14 @@ def test_guard_time_checks(tmp_path, signer):
     assert g.accept(signer.envelope(payload(seq=2, ts=1100.0, expires=1160.0)), 1069.0) is None
     assert "future" in g.why
     assert g.accept(signer.envelope(payload(seq=3, ts=1100.0, expires=1160.0)), 1070.0)  # 30 s ahead is fine
+
+
+@pytest.mark.parametrize("life,ok", [(60.0, True), (59.0, True), (60.5, False), (61.0, False), (120.0, False)])
+def test_lifetime_is_at_most_60_s_as_the_protocol_says(tmp_path, signer, life, ok):
+    g = Guard(tmp_path / "g.json", signer.keys)
+    ts = 1795605183.449  # real-looking times: the difference of two such floats is not exactly 60
+    msg = g.accept(signer.envelope(payload(ts=ts, expires=round(ts + life, 3))), ts + 1)
+    assert bool(msg) == ok and (ok or "shape" in g.why)
 
 
 def test_unknown_version_dropped(tmp_path, signer):

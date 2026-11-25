@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fuze-agent"
-version = "0.2.0"
+version = "0.3.0"
 description = "Vibe trading, with your limits: tell your AI coding tool to follow the signed FUZE position signal, and it sets up this agent on your own account (simulation, Lighter testnet or mainnet). No promise of profit."
 keywords = ["vibe trading", "trading agent", "copy trading", "signal", "perpetual futures", "bitcoin", "ether", "lighter", "mcp", "ai coding tool", "claude code", "codex", "self-custody"]
 readme = "README.md"
@@ -28,6 +28,9 @@ Homepage = "https://fuze.trade"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+fuze = ["static/*"]  # the local page (`fuze ui`): HTML, CSS, JS, the Archivo font and its licence (SIL OFL 1.1)
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

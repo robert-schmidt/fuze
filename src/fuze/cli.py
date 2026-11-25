@@ -5,11 +5,37 @@ from __future__ import annotations
 
 import argparse
 import getpass
+import json
+import os
+import shlex
 import sys
+import time
+from pathlib import Path
 
 from fuze import __version__, config, keys, modes
 from fuze.checks import setup_report
 from fuze.sizing import LABELS, describe, example, fmt, raised
+
+
+UNDO = {"PAUSE": ("resume", "The agent follows the signal again: it may open or add to positions at once."),
+        "FLATTEN": ("unflatten", "The agent follows the signal again: it may open positions at once.")}
+
+
+def _undo_flag(name: str) -> int:
+    """resume / unflatten: like raising risk, only by you at a terminal, typed."""
+    word, what = UNDO[name]
+    if not (config.home() / name).exists():
+        print(f"{name} is off.")
+        return 0
+    if not sys.stdin.isatty():
+        print(f"`fuze {word}` needs you at a terminal; refusing because input is not a terminal. {name} stays on.")
+        return 2
+    print(what)
+    if input(f"Type {word.upper()} to confirm: ").strip() != word.upper():
+        print(f"Not changed: {name} stays on.")
+        return 1
+    print(_flag(name, False))
+    return 0
 
 
 def _flag(name: str, on: bool) -> str:
@@ -62,6 +88,9 @@ def _confirm_raise(cur, new, up, bal: float) -> int:
         print("Raising risk needs you at a terminal; refusing because input is not a terminal. Nothing was changed.")
         return 2
     print("You are RAISING: " + "; ".join(f"{LABELS[k]} {fmt(k, cur[k])} -> {fmt(k, new[k])}" for k in up))
+    if "size_mode" in up:
+        k = "percent" if new["size_mode"] == "percent" else "fixed_usd"
+        print(f"  ({LABELS[k]} after the change: {fmt(k, new[k])})")
     print("After the change: " + example(new, bal))
     print("This lets the agent take more risk with your money.")
     if input("Type RAISE to confirm: ").strip() != "RAISE":
@@ -88,7 +117,28 @@ def cmd_limits(args) -> int:
     config.save(new)
     print("Saved: " + ", ".join(f"{LABELS[k]} {fmt(k, new[k])}" for k in asked))
     _show(new, bal)
+    _warn_too_small(new, bal)
+    if _agent_running():
+        print("The running agent resizes to this within seconds.")
     return 0
+
+
+def _agent_running() -> bool:
+    s = config.read_json(config.home() / "status.json") or {}
+    return isinstance(s.get("t"), (int, float)) and time.time() - s["t"] < 30
+
+
+def _warn_too_small(cfg, bal: float) -> None:
+    """Say so when, at the current signal, these settings ask for changes the agent never makes (under its band)."""
+    from fuze.follow import asked_usd, min_change
+    sig = (config.read_json(config.home() / "status.json") or {}).get("signal")
+    asked = {c: v for c, v in asked_usd(sig, cfg, bal).items() if abs(v) >= 0.005}
+    tol = min_change(bal)
+    if asked and all(abs(v) < tol for v in asked.values()):
+        print("Warning: at the current signal this asks for " + ", ".join(f"{c} ${abs(v):,.0f}" for c, v in
+                                                                         asked.items())
+              + f", each under ${tol:,.0f}, the smallest change the agent makes (the larger of $10 and 2% of your "
+              "balance). Nothing would be opened at this size.")
 
 
 def _lock():
@@ -166,6 +216,7 @@ def _mode_lines(cfg, status=None) -> list:
 
 
 def cmd_status(args) -> int:
+    from fuze.follow import describe_compare, from_status
     s = config.read_json(config.home() / "status.json")
     if not s:
         print("No status yet. Start the agent with `fuze run`.")
@@ -176,14 +227,36 @@ def cmd_status(args) -> int:
         print(line)
     if s.get("mode") != cfg["mode"]:
         print(f"The agent last ran in {s.get('mode')}; restart it to trade in {cfg['mode']}.")
-    print(f"Balance: ${a.get('balance') or 0:,.2f}   Positions: {a.get('positions')}")
-    print(f"Signal: revision {sig['rev']}, {sig['state']}, source {sig['source']}: {sig['why']}" if sig
-          else "Signal: none received yet")
-    print(f"Agent: {s.get('reason')}")
-    print(f"Flags: {s.get('flags')}")
+    age = time.time() - s["t"] if isinstance(s.get("t"), (int, float)) else None
+    print("Agent: " + ("running" if age is not None and age < 30 else "NOT running (start it with `fuze run`)")
+          + (f", last step {age:,.0f} s ago" if age is not None else ""))
+    print(f"Balance: ${a.get('balance') or 0:,.2f}")
+    rows, tol = from_status(s)
+    if rows:
+        print("Positions (what the signal asks for at your limits, and what you hold):")
+        for line in describe_compare(rows, tol):
+            print("  " + line)
+    else:
+        held = {c: u for c, u in (a.get("positions") or {}).items() if u}
+        print("Positions: " + (", ".join(f"{c} {u:+g}" for c, u in held.items()) or "none"))
+    if sig:
+        src = modes.SOURCE_NAMES.get(sig.get("source"), sig.get("source"))
+        print(f"Signal: revision {sig['rev']}, {sig['state']}, from our {src} account. Why (data from the server): "
+              f"{sig['why']}")
+    else:
+        print("Signal: none received yet")
+    print(f"Last step: {s.get('reason')}")
+    flags = s.get("flags") or {}
+    print(f"Pause: {'ON (undo with `fuze resume`)' if flags.get('pause') else 'off'}. "
+          f"Flatten: {'ON (undo with `fuze unflatten`)' if flags.get('flatten') else 'off'}.")
     print("Sizing:")
     _show(cfg, a.get("balance") or cfg["dry_balance"])
     return 0
+
+
+def cmd_ui(args) -> int:
+    from fuze.ui import serve
+    return serve(args.port, args.open)
 
 
 def cmd_check(args) -> int:
@@ -211,6 +284,8 @@ def _keys_prompt(cfg, net: str, account=None, key_index=None) -> dict:
           "Never your wallet's private key or recovery phrase.")
     keep = " (Enter keeps the stored one)" if keys.state(net) == "set" else ""
     secret = getpass.getpass(f"Lighter {net} API private key{keep}: ")
+    if secret.strip():
+        keys.clean(secret)  # a wrong key saves nothing, the account index included
     config.save(new)
     if secret.strip():
         where = keys.save(net, secret)
@@ -286,6 +361,9 @@ def switch_mode(cfg, target: str) -> int:
             for m in missing:
                 print("  - " + m)
             return 2
+        if target == "mainnet" and (why := _confirm_rehearsal(cfg)):
+            print(f"{modes.NAMES[target]} stays locked: {why}. Nothing was changed.")
+            return 2
         try:
             a = _venue(cfg).account(fresh=True)
         except Exception as e:
@@ -343,6 +421,25 @@ def switch_mode(cfg, target: str) -> int:
         lock.close()
 
 
+def _confirm_rehearsal(cfg) -> str:
+    """Ask Lighter testnet to confirm the rehearsal record (reads only). Empty when confirmed."""
+    from fuze import lighter_venue
+    print("Asking Lighter testnet to confirm your rehearsal's orders (reads only, sends nothing) ...")
+    try:
+        client = lighter_venue.connect(cfg, "testnet")
+    except Exception as e:
+        return f"could not open Lighter testnet with your testnet key to confirm the rehearsal ({_plain(e)})"
+    try:
+        why = modes.confirm_on_testnet(cfg, client)
+    finally:
+        close = getattr(client, "close", None)
+        if close:
+            close()
+    if not why:
+        print("Confirmed by Lighter testnet: the rehearsal's orders were sent from your testnet account with your key.")
+    return why
+
+
 def cmd_mode(args) -> int:
     cfg = config.load()
     if args.target:
@@ -351,7 +448,8 @@ def cmd_mode(args) -> int:
         print(line)
     if cfg["mode"] != "mainnet":
         why = modes.rehearsal_problem()
-        print("Testnet rehearsal: " + ("passed on this machine" if not why else why))
+        print("Testnet rehearsal: " + ("recorded as passed on this machine with this version (`fuze mode mainnet` "
+                                       "asks Lighter testnet to confirm it)" if not why else why))
     print("Change with `fuze mode simulation|testnet|mainnet` in a terminal. Moving toward real money asks you to "
           f"type RAISE (and {modes.PHRASE} for mainnet); mainnet needs the testnet rehearsal first.")
     return 0
@@ -499,6 +597,59 @@ def cmd_init(args) -> int:
     return 0
 
 
+TOOLS = ("claude-code", "codex", "copilot", "vscode", "cursor")
+
+
+def fuze_command() -> list:
+    """The command that starts this very fuze, as an absolute path: AI tools start MCP servers without your PATH."""
+    argv0 = Path(sys.argv[0])
+    if argv0.name in ("fuze", "fuze.exe"):
+        found = argv0 if argv0.is_absolute() or os.sep in str(argv0) else None
+        import shutil
+        path = found or shutil.which(str(argv0))
+        if path:
+            return [os.path.abspath(path)]
+    return [sys.executable, "-m", "fuze"]
+
+
+def mcp_config(tool: str | None = None) -> str:
+    """Ready-to-paste MCP settings: the absolute command and FUZE_HOME, which AI tools do not inherit."""
+    cmd, home = fuze_command(), str(config.home().resolve())
+    args, env = cmd[1:] + ["mcp"], {"FUZE_HOME": home}
+    server = {"type": "stdio", "command": cmd[0], "args": args, "env": env}
+    shell = " ".join(shlex.quote(x) for x in cmd + ["mcp"])
+    q = shlex.quote(f"FUZE_HOME={home}")
+    toml = "\n".join(["[mcp_servers.fuze]", f"command = {json.dumps(cmd[0])}", f"args = {json.dumps(args)}",
+                      f"env = {{ FUZE_HOME = {json.dumps(home)} }}"])
+    parts = {
+        "claude-code": ("Claude Code: run this once (or put the JSON in a project's .mcp.json)",
+                        f"claude mcp add fuze --scope user -e {q} -- {shell}\n\n"
+                        + json.dumps({"mcpServers": {"fuze": server}}, indent=2)),
+        "codex": ("Codex: run this once, or add the TOML to ~/.codex/config.toml",
+                  f"codex mcp add fuze --env {q} -- {shell}\n\n{toml}"),
+        "copilot": ("GitHub Copilot CLI (~/.copilot/mcp-config.json) or a workspace .mcp.json",
+                    json.dumps({"mcpServers": {"fuze": {**server, "tools": ["*"]}}}, indent=2)),
+        "vscode": ("VS Code with Copilot: .vscode/mcp.json in your workspace",
+                   json.dumps({"servers": {"fuze": server}}, indent=2)),
+        "cursor": ("Cursor: ~/.cursor/mcp.json (every project) or .cursor/mcp.json (one project)",
+                   json.dumps({"mcpServers": {"fuze": server}}, indent=2)),
+    }
+    out = [f"# FUZE MCP server settings. Command: {shell}", f"# FUZE folder (FUZE_HOME): {home}"]
+    if (why := config.no_agent_here()):
+        out.append("# WARNING: " + why)
+    out.append("# The server can only read and reduce risk. After adding it, restart the tool and ask for the FUZE "
+               "status: it must show your mode and balance.")
+    for name in ([tool] if tool else TOOLS):
+        title, text = parts[name]
+        out += ["", f"## {title}", text]
+    return "\n".join(out)
+
+
+def cmd_mcp_config(args) -> int:
+    print(mcp_config(args.tool))
+    return 0
+
+
 def _sizing_args(p) -> None:
     p.add_argument("--size-mode", dest="size_mode", choices=config.SIZE_MODES,
                    help="percent: a share of your balance follows the signal (default); fixed: a fixed amount does")
@@ -516,7 +667,7 @@ def main(argv=None) -> int:
                                                          "Lighter mainnet.")
     p.add_argument("--version", action="version", version=__version__)
     sub = p.add_subparsers(dest="cmd", required=True)
-    init = sub.add_parser("init", help="create ~/.fuze and set how big your positions are")
+    init = sub.add_parser("init", help=f"create {config.home()} and set how big your positions are")
     _sizing_args(init)
     init.add_argument("--yes", action="store_true", help="ask no questions; use the flags and the safe defaults")
     init.add_argument("--force", action="store_true", help="replace an existing config.json")
@@ -533,30 +684,41 @@ def main(argv=None) -> int:
     kp.add_argument("--delete", action="store_true", help="delete the stored key from this machine")
     sub.add_parser("rehearse", help="the testnet rehearsal that unlocks mainnet on this machine (test orders)")
     sub.add_parser("status", help="what the agent holds and why")
-    for name, text in (("pause", "hold, no new orders"), ("resume", "undo pause"),
-                       ("flatten", "close everything and stay out"), ("unflatten", "undo flatten")):
+    for name, text in (("pause", "hold, no new orders"), ("resume", "undo pause (terminal only, type RESUME)"),
+                       ("flatten", "close everything and stay out"),
+                       ("unflatten", "undo flatten (terminal only, type UNFLATTEN)")):
         sub.add_parser(name, help=text)
     lim = sub.add_parser("limits", help="show or change your sizing and limits (raising asks you to type RAISE)")
     _sizing_args(lim)
     lim.add_argument("--stale-flat-min", dest="stale_flat_min", help='minutes, or "off"')
     sub.add_parser("check", help="check the local setup")
+    from fuze.ui import PORT
+    ui = sub.add_parser("ui", help=f"a read-only page about the agent, on this computer only (http://127.0.0.1:{PORT})")
+    ui.add_argument("--port", type=int, default=PORT, help=f"port on 127.0.0.1 (default {PORT})")
+    ui.add_argument("--open", action="store_true", help="open it in your browser")
     sub.add_parser("mcp", help="start the MCP server (for AI coding tools)")
+    mc = sub.add_parser("mcp-config", help="print the MCP settings for Claude Code, Codex, Copilot / VS Code and Cursor, "
+                                           "with this fuze's full path and this FUZE folder")
+    mc.add_argument("--tool", choices=TOOLS, help="print only this tool's settings")
     args = p.parse_args(argv)
     try:
         if args.cmd == "mcp":
             try:
                 from fuze.mcp_server import main as mcp_main
             except ImportError:
-                sys.exit("The MCP server needs one extra package: pip install 'fuze-agent[mcp]'")
+                sys.exit("The MCP server needs one extra package: " + config.pip_hint("mcp"))
             mcp_main()
             return 0
-        flags = {"pause": ("PAUSE", True), "resume": ("PAUSE", False),
-                 "flatten": ("FLATTEN", True), "unflatten": ("FLATTEN", False)}
-        if args.cmd in flags:
-            print(_flag(*flags[args.cmd]))
+        if args.cmd in ("pause", "flatten"):
+            if (why := config.no_agent_here()):
+                print("Note: " + why)
+            print(_flag(args.cmd.upper(), True))
             return 0
+        if args.cmd in ("resume", "unflatten"):
+            return _undo_flag({"resume": "PAUSE", "unflatten": "FLATTEN"}[args.cmd])
         return {"init": cmd_init, "run": cmd_run, "status": cmd_status, "check": cmd_check,
-                "limits": cmd_limits, "mode": cmd_mode, "keys": cmd_keys, "rehearse": cmd_rehearse}[args.cmd](args)
+                "limits": cmd_limits, "mode": cmd_mode, "keys": cmd_keys, "rehearse": cmd_rehearse,
+                "ui": cmd_ui, "mcp-config": cmd_mcp_config}[args.cmd](args)
     except ValueError as e:
         print(f"Error: {e}")
         return 2

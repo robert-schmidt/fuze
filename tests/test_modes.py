@@ -122,6 +122,66 @@ def test_mainnet_after_the_rehearsal_needs_raise_and_the_phrase(exchanges, monke
     assert "app.lighter.xyz/explorer/accounts/5" in capsys.readouterr().out
 
 
+def test_mainnet_unlock_asks_testnet_to_confirm_the_rehearsal(exchanges, monkeypatch, capsys):
+    rec = rehearsed(exchanges)
+    assert rec["account"] == 77 and rec["key_index"] == 4
+    assert {s["step"]: s["tx"] for s in rec["steps"]}["open"] in exchanges["testnet"].txs
+    answers(monkeypatch, "RAISE", "REAL MONEY")
+    assert cli.main(["mode", "mainnet"]) == 0
+    assert "Confirmed by Lighter testnet" in capsys.readouterr().out
+    assert [s[0] for s in exchanges["mainnet"].sent] == []  # mainnet: read only
+
+
+FORGED = {"ok": True, "net": "testnet", "account": 77, "key_index": 4, "steps": [
+    {"step": s, "ok": True, "tx": None} for s in modes.STEPS]}
+
+
+@pytest.mark.parametrize("forge,why", [
+    (lambda rec: {**FORGED, "machine": rec["machine"], "version": rec["version"], "t": rec["t"]},
+     "no transaction for its open order"),
+    (lambda rec: {**rec, "steps": [{**s, "tx": "12" * 40} if s["tx"] else s for s in rec["steps"]]},
+     "does not confirm"),
+    (lambda rec: {**rec, "t": rec["t"] - 86400 * 30}, "at another time"),
+    (lambda rec: {**rec, "account": 99}, "account 99"),
+])
+def test_a_forged_rehearsal_record_does_not_unlock_mainnet(exchanges, monkeypatch, capsys, forge, why):
+    """Every local field can be written by hand; Lighter testnet's own record of the orders cannot."""
+    rec = rehearsed(exchanges)
+    assert modes.rehearsal_problem() == ""  # the old, local-only check
+    config.write_json(config.home() / "rehearsal.json", forge(rec))
+    answers(monkeypatch, "RAISE", "REAL MONEY")
+    assert cli.main(["mode", "mainnet"]) == 2 and config.load()["mode"] == "simulation"
+    out = capsys.readouterr().out
+    assert "stays locked" in out and why in out
+
+
+def test_orders_from_another_testnet_account_do_not_unlock_mainnet(exchanges, monkeypatch, capsys):
+    rehearsed(exchanges)
+    for t in exchanges["testnet"].txs.values():
+        t["account_index"] = 12345  # someone else's rehearsal, copied into this record
+    answers(monkeypatch, "RAISE", "REAL MONEY")
+    assert cli.main(["mode", "mainnet"]) == 2 and "another account or API key" in capsys.readouterr().out
+
+
+def test_mainnet_stays_locked_when_testnet_cannot_be_reached(exchanges, monkeypatch, capsys):
+    rehearsed(exchanges)
+    exchanges["testnet"].down = True
+    answers(monkeypatch, "RAISE", "REAL MONEY")
+    assert cli.main(["mode", "mainnet"]) == 2 and config.load()["mode"] == "simulation"
+    out = capsys.readouterr().out
+    assert "could not reach Lighter testnet" in out and "try again later" in out
+    monkeypatch.setattr(lighter_venue, "connect", lambda cfg, net: (_ for _ in ()).throw(OSError("no route")))
+    answers(monkeypatch, "RAISE", "REAL MONEY")
+    assert cli.main(["mode", "mainnet"]) == 2 and "could not open Lighter testnet" in capsys.readouterr().out
+
+
+def test_a_new_version_needs_a_new_rehearsal_and_says_why(exchanges):
+    rec = rehearsed(exchanges)
+    config.write_json(config.home() / "rehearsal.json", {**rec, "version": "0.2.0"})
+    why = modes.rehearsal_problem()
+    assert "0.2.0" in why and "changes code that sends orders" in why
+
+
 def test_mode_change_refused_while_positions_are_open(exchanges, monkeypatch, capsys):
     answers(monkeypatch, "RAISE")
     cli.main(["mode", "testnet"])
@@ -162,7 +222,8 @@ def test_missing_keys_block_the_mode(monkeypatch, capsys):
     answers(monkeypatch, "RAISE")
     assert cli.main(["mode", "testnet"]) == 2
     out = capsys.readouterr().out
-    assert "fuze-agent[lighter]" in out and "fuze keys testnet" in out
+    assert "-m pip install '.[mcp,lighter]'" in out and "not on PyPI yet" in out and "fuze keys testnet" in out
+    assert 'pip install "fuze-agent' not in out  # never by name from PyPI: that name is not registered by us
 
 
 def test_init_asks_the_mode(exchanges, monkeypatch, capsys):
@@ -208,6 +269,54 @@ def test_keys_are_typed_hidden_at_a_terminal_only(monkeypatch, capsys):
     assert KEY[2:] not in capsys.readouterr().out + json.dumps(config.load())
     answers(monkeypatch, "", "", secret="not a key")
     assert cli.main(["keys", "testnet"]) == 2 and keys.load("testnet") == KEY[2:]  # a bad key changes nothing
+
+
+@pytest.mark.parametrize("bad,why", [("ab" * 36, "it has 72 hexadecimal characters"),
+                                     ("0x" + "ab" * 41, "it has 82 hexadecimal characters"),
+                                     ("not a key", "it is not hexadecimal text")])
+def test_a_key_of_the_wrong_shape_saves_nothing_not_even_the_account(monkeypatch, capsys, bad, why):
+    monkeypatch.setenv("FUZE_NO_KEYRING", "1")
+    config.save(dict(config.DEFAULTS))
+    answers(monkeypatch, "999999999999", "", secret=bad)
+    assert cli.main(["keys", "testnet"]) == 2
+    out = capsys.readouterr().out
+    assert "80 hexadecimal characters" in out and why in out and "Nothing was saved" in out and bad not in out
+    assert config.load()["testnet_account"] is None and keys.state("testnet") == "missing"
+
+
+def test_a_stored_key_of_the_wrong_length_fails_in_plain_words_before_the_sdk(monkeypatch):
+    monkeypatch.setenv("FUZE_NO_KEYRING", "1")
+    config.save({**config.DEFAULTS, "testnet_account": 77})
+    config.atomic_write(config.home() / "lighter-testnet.key", "ab" * 36)  # stored by an older version
+    config.write_json(config.home() / "keys.json", {"testnet": "file"})
+    monkeypatch.setitem(sys.modules, "lighter", None)  # the SDK is never reached
+    with pytest.raises(RuntimeError) as e:
+        lighter_venue.connect(config.load(), "testnet")
+    assert "80 hexadecimal characters" in str(e.value) and "fuze keys testnet" in str(e.value)
+    assert "abab" not in str(e.value)
+
+
+def test_a_refused_key_closes_the_sdk_session(monkeypatch):
+    sdk = types.ModuleType("lighter")
+    sc = types.ModuleType("lighter.signer_client")
+    sc.CreateOrderTxReq = object
+    closed = []
+
+    class Session:
+        async def close(self):
+            closed.append(True)
+
+    class Refuses:
+        def __init__(self, **kw):
+            self.api_client = Session()  # like the SDK: the HTTP session exists before the key is checked
+            raise ValueError("invalid private key length. expected: 40 got: 36")
+
+    sdk.SignerClient = Refuses
+    monkeypatch.setitem(sys.modules, "lighter", sdk)
+    monkeypatch.setitem(sys.modules, "lighter.signer_client", sc)
+    with pytest.raises(RuntimeError) as e:
+        lighter_venue.LighterClient("testnet", 77, 4, KEY)
+    assert closed == [True] and "80 hexadecimal characters" in str(e.value) and "fuze keys testnet" in str(e.value)
 
 
 def test_os_keyring_is_used_when_available(monkeypatch):

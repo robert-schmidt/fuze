@@ -1,7 +1,7 @@
 {
   "name": "fuze",
-  "version": "0.2.0",
-  "description": "MCP server for the FUZE agent: status, the verified signal, and tools that can only reduce risk. Runs the `fuze` command you installed yourself.",
+  "version": "0.3.0",
+  "description": "MCP server for the FUZE agent: status, the verified signal, the address of the local read-only page (`fuze ui`), and tools that can only reduce risk. Starts the command `fuze`, so it works only when fuze (installed from the repository checkout; not on PyPI yet) is on the PATH Claude Code sees and the agent uses the default folder ~/.fuze. Otherwise use `fuze mcp-config`.",
   "author": {
     "name": "FUZE"
   },

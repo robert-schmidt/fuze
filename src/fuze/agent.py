@@ -85,6 +85,7 @@ class Agent:
         self.pending = read_json(self.home / "pending.json")  # an order sent just before the agent stopped
         self.signal = self.received_at = self.last_error = self.last_reason = None
         self.acct, self.notes = None, []
+        self.started = clock()  # for `fuze ui`: running since
         self.http = opener()
         self.headers = {"User-Agent": f"fuze-agent/{__version__}"}
 
@@ -161,7 +162,9 @@ class Agent:
         now = self.clock()
         if not self.fixed_cfg:
             try:
-                self.cfg = {**load(), "server": self.server, "mode": self.mode}  # lowered limits apply at once
+                # changed limits (lowered, or raised by the user at a terminal) reach decide() on this step, which
+                # resizes the held position to them; see follow.decide
+                self.cfg = {**load(), "server": self.server, "mode": self.mode}
             except (ValueError, OSError) as e:
                 log.error("config.json is not valid (%s); keeping the last good limits.", e)
         flags = {"pause": (self.home / "PAUSE").exists(), "flatten": (self.home / "FLATTEN").exists()}
@@ -175,8 +178,17 @@ class Agent:
             "account_link": self.ex.link(), "note": realer_note(self.mode, src) if src else "",
             "reason": reason, "flags": flags, "account": self.acct, "signal": self.signal,
             "received_at": self.received_at, "last_drop": self.guard.why, "pending": self.pending,
-            "limits": {k: self.cfg[k] for k in LIMITS},
-            "day_start": self.memory.get("day_start"), "stopped_day": self.memory.get("stopped_day")})
+            "limits": {k: self.cfg[k] for k in LIMITS}, "started": self.started, "book": self.book(),
+            "protected": self.memory.get("prot"), "day": self.memory.get("day"),
+            "day_start": self.memory.get("day_start"), "stopped_day": self.memory.get("stopped_day"),
+            "wanted": self.memory.get("wanted"), "min_change_usd": self.memory.get("min_change")})
+
+    def book(self) -> dict:
+        """Entry and mark price per held coin, for `fuze ui`. Never stops a step."""
+        try:
+            return self.ex.book() or {}
+        except Exception:
+            return {}
 
     def step(self, now: float, flags: dict) -> str:
         """Read the account, settle an order left in flight, decide, trade. Returns the reason in plain words."""

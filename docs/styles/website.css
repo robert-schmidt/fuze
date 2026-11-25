@@ -1,0 +1,9 @@
+/* FUZE docs: the stock GitBook look, plus readable tables and warnings. Amber is FUZE's signal colour. */
+.markdown-section table { display: block; width: 100%; overflow-x: auto; }
+.markdown-section table th { background: #edf0f2; }
+.markdown-section table td, .markdown-section table th { vertical-align: top; }
+.markdown-section blockquote { border-left: 4px solid #b87f00; background: #fbf6ea; color: #161d24; padding: 8px 15px; }
+.markdown-section blockquote p { margin: 0.4em 0; }
+.book-summary ul.summary li.header { color: #b87f00; font-weight: 600; }
+.book.color-theme-2 .markdown-section blockquote { background: #182027; color: #e7ebee; border-left-color: #ffb81f; }
+.book.color-theme-2 .markdown-section table th { background: #182027; }

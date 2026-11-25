@@ -8,7 +8,7 @@
     {
       "name": "fuze",
       "source": "./plugins/fuze",
-      "description": "Read the FUZE agent's status and reduce its risk (pause, flatten, lower limits). Needs `fuze` installed."
+      "description": "Read the FUZE agent's status, open its local page (`fuze ui`), and reduce its risk (pause, flatten, lower limits). Needs `fuze` installed from the repository checkout and on your PATH; `fuze mcp-config` prints a setup that does not."
     }
   ]
 }

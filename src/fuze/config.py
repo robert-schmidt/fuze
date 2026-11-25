@@ -39,6 +39,26 @@ def home() -> Path:
     return Path(os.environ.get("FUZE_HOME") or Path.home() / ".fuze")
 
 
+def no_agent_here() -> str:
+    """Empty when this FUZE folder has a config.json; otherwise why nothing here can reach an agent, in plain words."""
+    h = home()
+    if (h / "config.json").is_file():
+        return ""
+    how = ("FUZE_HOME is set to it" if os.environ.get("FUZE_HOME") else
+           "FUZE_HOME is not set, so the default folder is used")
+    return (f"No FUZE agent is set up in {h} (there is no config.json there; {how}). An agent you run uses the folder "
+            "of the terminal it was started from. If this is an AI tool's MCP server, point it at the right folder: "
+            "run `fuze mcp-config` in that terminal and paste what it prints into the tool's MCP settings, then "
+            "restart the tool. If FUZE is not set up yet, run `fuze init`.")
+
+
+def pip_hint(extra: str) -> str:
+    """How to add an optional part. FUZE is not on PyPI yet: install from the repository checkout, never by name."""
+    import sys
+    return (f"in your FUZE checkout run: {sys.executable} -m pip install '.[{extra}]' (FUZE is not on PyPI yet; a "
+            "package named fuze-agent there today is not ours)")
+
+
 def ensure_home() -> Path:
     h = home()
     h.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -84,12 +104,17 @@ def check_server(url) -> str:
     return url.rstrip("/")
 
 
+def plain_number(v: float) -> str:
+    """1000000 as 1,000,000 (never 1e+06), 0.01 as 0.01."""
+    return f"{v:,.0f}" if float(v).is_integer() else f"{v:,g}"
+
+
 def _number(name, value) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
         raise ValueError(f"{name} must be a number")
     lo, hi = RANGES[name]
     if not lo <= value <= hi:
-        raise ValueError(f"{name} must be between {lo:g} and {hi:g}")
+        raise ValueError(f"{name} must be between {plain_number(lo)} and {plain_number(hi)}")
     return float(value)
 
 

@@ -1,0 +1,63 @@
+# Security model
+
+This page explains what the agent protects you against, how, and where its protection ends. It is the plain-words
+version of the repository's `SECURITY.md`.
+
+> **Warning:** the agent has had **no independent security review**. Its Lighter code had not sent a real order when it
+> was released. Start in simulation, then testnet.
+
+## What it protects against
+
+| Threat | How it is handled |
+|---|---|
+| A forged signal | Every message is signed (Ed25519) and checked against a key built into the agent's code. The key is never fetched from the server; a new one comes only in a new release |
+| A replayed or delayed signal | The timestamp of the newest accepted message is kept on disk (`guard.json`); anything not newer is dropped, also after a restart. Expired messages, messages that claim to live longer than 60 seconds, and messages from the future are dropped |
+| A malformed signal | After the signature, every field is checked: types, finite numbers, sizes within 50 times the balance, only BTC and ETH, known states. A short-term part whose stop is on the wrong side or more than 1.5% away is not opened |
+| A compromised FUZE server or signing key | A valid signature proves who signed, not that the trade is wise. Your limits bound the damage: sizing, cap per position, exposure cap against your real balance, daily loss stop. The signal cannot loosen them. The server takes no input from agents and cannot read your account |
+| A network attacker | HTTPS with certificate checks always on; redirects refused; responses size-limited |
+| The signal goes quiet | No valid message for 60 seconds: hold and open nothing new; optionally close everything after `stale_flat_min`. On Lighter the short-term part rests under its take profit and stop loss on the exchange |
+| Prompt injection through your AI tool | The MCP server can only read and reduce risk. A tool refuses arguments it does not take (it never silently ignores `mode` or `api_key`, and never repeats a value). A switch sent to a folder with no agent is an error naming the folder, not a false success. The signal's `why` text is marked as data, stripped of control characters and length-limited |
+| A leaked key | Only a Lighter API key, typed hidden at a terminal, never an argument, its shape checked as you type it; kept in the OS keyring or a private file; never printed, logged or shown to the MCP server |
+| Real money by mistake | The mode changes only with `fuze mode` at a terminal, agent stopped, nothing open. Mainnet needs `RAISE`, `REAL MONEY` and a rehearsal on testnet that Lighter testnet itself confirms (see [The rehearsal and the mainnet lock](modes/rehearsal.md)) |
+| The local page framed by another site | The page refuses to be shown in a frame (`frame-ancestors 'none'`, `X-Frame-Options: DENY`) |
+| Orders that go wrong | Account read back after every order; no blind second order; the order in flight written to disk first; reduce-only reductions; a worst price on every market order |
+| Two agents on one folder | A lock; the second refuses to start |
+| Supply chain | One runtime dependency (`cryptography`); the MCP SDK and Lighter's SDK (pinned exactly) only when you install those extras |
+
+## Where the protection ends
+
+**The typed confirmations and the rehearsal lock protect against the MCP tools, non-interactive callers and mistakes.**
+Raising a limit, resuming, unflattening, changing the mode, entering a key and the rehearsal all refuse when input is
+not a terminal and ask you to type a word (`RAISE`, `RESUME`, `UNFLATTEN`, `REAL MONEY`, `yes`), and the MCP server has
+no route to them at all. A hand-written rehearsal record does not unlock mainnet: Lighter testnet must confirm its
+orders.
+
+**They are not a barrier against a program that already runs as you.** Your AI coding tool, when you let it run
+commands, is such a program. It can do whatever you can: drive a pseudo-terminal that types `RAISE` for it (a one-line
+`expect` script does), edit the files in your FUZE folder, change FUZE's own code, run a real rehearsal, and equally
+read your API key from the keyring or the key file. The repository's `AGENTS.md` forbids coding agents to do any of
+this, and well-behaved ones follow it; it is a rule, not a barrier.
+
+> **Warning:** do not give an AI tool unattended shell access on a machine that holds a mainnet key.
+
+**The real protection for your money is on the exchange side:**
+
+- a Lighter **sub-account of its own**, holding only what you can afford to lose;
+- an API key **restricted to the BTC and ETH markets**. Per Lighter's documentation such a key can only create, modify
+  and cancel orders in those markets; withdrawals and transfers fail;
+- never your wallet's private key or recovery phrase anywhere near FUZE or a chat.
+
+With that setup, the worst a misbehaving program on your machine can do is trade that sub-account's money away in
+Bitcoin and Ether. It cannot send it anywhere.
+
+## Other honest limits
+
+- A stop loss is a trigger order: in a fast market it can fill worse than its price, or not at all.
+- Your limits bound the size of a loss; they do not prevent one.
+- The rehearsal lock checks that the order path worked on testnet from your account, confirmed by Lighter testnet. It
+  cannot prove that this copy or version of FUZE sent those orders, and `fuze run` re-checks only the local record at
+  each start.
+
+## Reporting a vulnerability
+
+Do not open a public issue. The repository's `SECURITY.md` says how to report one privately.

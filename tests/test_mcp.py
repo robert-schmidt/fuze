@@ -8,7 +8,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 
 from fuze import config
 
-TOOLS = {"status", "signal", "trades", "setup_check", "docs", "pause", "flatten", "lower_limits"}
+TOOLS = {"status", "signal", "trades", "setup_check", "docs", "pause", "flatten", "lower_limits", "ui"}
 
 
 def test_mcp_server_over_stdio(fuze_home):
@@ -97,3 +97,57 @@ def test_no_tool_switches_the_mode_or_removes_a_cap():
     props = set(tools["lower_limits"].input_schema["properties"])
     assert props == {"percent", "fixed_usd", "max_position_usd", "max_x", "daily_loss_frac"}
     assert not any("size_mode" in t.input_schema.get("properties", {}) for t in tools.values())
+
+
+# --- unknown arguments, and a server pointed at a folder with no agent ----------------------------------------------
+
+@pytest.mark.parametrize("tool,args", [("lower_limits", {"max_x": 0.5, "size_mode": "percent"}),
+                                       ("status", {"verbose": True}), ("pause", {"now": 1})])
+def test_unknown_arguments_are_refused_and_change_nothing(fuze_home, tool, args):
+    config.save(dict(config.DEFAULTS))
+    with pytest.raises(ToolError, match="does not take") as e:
+        call(tool, **args)
+    assert "Nothing was changed" in str(e.value)
+    assert config.load()["max_x"] == 3.0 and not (fuze_home / "PAUSE").exists()
+
+
+@pytest.mark.parametrize("name", ["mode", "api_key", "key", "private_key", "secret", "server", "seed_phrase"])
+def test_mode_or_key_arguments_get_the_terminal_answer_and_are_never_echoed(fuze_home, name, caplog):
+    config.save(dict(config.DEFAULTS))
+    value = "5e" * 40
+    with pytest.raises(ToolError) as e:
+        call("lower_limits", max_x=0.4, **{name: value})
+    text = str(e.value)
+    assert "in a terminal" in text and "never be pasted into a chat" in text and value not in text
+    assert value not in caplog.text and config.load()["max_x"] == 3.0
+    assert not any(value in p.read_text(errors="ignore") for p in fuze_home.rglob("*") if p.is_file())
+
+
+def test_switches_without_an_agent_in_the_folder_are_errors(fuze_home):
+    """An MCP client that passes no FUZE_HOME looks in another folder: success there would reach nobody."""
+    for tool, args in (("pause", {}), ("flatten", {}), ("lower_limits", {"max_x": 1.0})):
+        with pytest.raises(ToolError, match="No FUZE agent is set up in") as e:
+            call(tool, **args)
+        assert str(fuze_home) in str(e.value) and "fuze mcp-config" in str(e.value)
+    assert not fuze_home.exists()  # nothing written, not even the folder
+    st = call("status")
+    assert st["agent_found"] is False and "fuze mcp-config" in st["problem"]
+    from fuze.mcp_server import build
+    res = asyncio.run(build().call_tool("setup_check", {}))
+    first = json.loads(res.content[0].text)
+    first = first[0] if isinstance(first, list) else first
+    assert first["ok"] is False and "No FUZE agent is set up" in first["detail"]
+
+
+def test_status_shows_what_is_asked_and_what_is_held_in_dollars(fuze_home):
+    config.save({**config.DEFAULTS, "size_mode": "fixed", "fixed_usd": 10.0})
+    config.write_json(fuze_home / "status.json", {
+        "t": 0, "account": {"balance": 1000.0, "positions": {}, "brackets": []}, "min_change_usd": 20.0,
+        "wanted": {"BTC": -10 * 1.7 / 58000, "ETH": -10 * 0.33 / 1600},
+        "signal": {"rev": 5, "state": "live", "source": "paper", "why": "", "scalp": None,
+                   "targets": {"BTC": {"x": -1.7, "px": 58000.0}, "ETH": {"x": -0.33, "px": 1600.0}}}})
+    st = call("status")
+    btc = next(r for r in st["positions_usd"] if r["coin"] == "BTC")
+    assert btc["asked_usd"] == -17.0 and btc["held_usd"] == 0.0 and btc["under_min_change"]
+    words = " ".join(st["positions_in_words"])
+    assert "asks for short $17, you hold none" in words and "under $20" in words and "stays unfollowed" in words

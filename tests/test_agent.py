@@ -121,3 +121,22 @@ def test_tls_certificate_is_checked(tmp_path):
     with pytest.raises(urllib.error.URLError, match="CERTIFICATE_VERIFY_FAILED"):
         opener().open(f"https://localhost:{s.httpd.server_address[1]}/v1/signal", timeout=5)
     s.httpd.shutdown()
+
+
+def test_lowering_a_limit_shrinks_the_held_position_on_the_next_step(fuze_home, signer):
+    """`fuze limits` / MCP lower_limits write config.json; the running agent resizes on its next step (seconds), on
+    the same signal revision, and writes what the signal asks for next to what is held."""
+    from conftest import payload
+    config.save(dict(config.DEFAULTS))
+    now = [1010.0]
+    agent = Agent(home=config.ensure_home(), keys=signer.keys, clock=lambda: now[0])
+    agent.handle(json.dumps(signer.envelope(payload(seq=1))))
+    btc = agent.acct["positions"]["BTC"]
+    assert btc == pytest.approx(-0.003)
+    config.save({**config.load(), "percent": 5.0})  # what `fuze limits --percent 5` does
+    now[0] = 1015.0
+    agent.handle(json.dumps(signer.envelope(payload(seq=2, ts=1015.0, expires=1075.0))))  # same revision
+    assert agent.acct["positions"]["BTC"] == pytest.approx(btc / 2, rel=1e-3)  # the balance moved by slippage
+    st = config.read_json(fuze_home / "status.json")
+    assert "limits changed" in st["reason"] and st["wanted"]["BTC"] == pytest.approx(btc / 2, rel=1e-3)
+    assert st["min_change_usd"] == pytest.approx(20.0, rel=1e-3)

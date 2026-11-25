@@ -1,7 +1,7 @@
 import pytest
 
 from conftest import payload
-from fuze.follow import decide
+from fuze.follow import RECHECK_S, compare, decide
 from fuze.protocol import clean
 
 CFG = {"size_mode": "percent", "percent": 10.0, "fixed_usd": 100.0, "max_position_usd": None, "max_x": 3.0,
@@ -187,3 +187,81 @@ def test_scalp_closing_shrinks_but_keeps_the_rest():
     d2 = run(after, pos=dict(d.targets), brackets=[7], memory=d.memory,
              cfg={"size_mode": "fixed", "fixed_usd": 500.0})
     assert usd(d2, "BTC", 60000) == pytest.approx(-300) and d2.bracket is None
+
+
+# --- changed limits and the slow re-check act on the same revision ---------------------------------------------------
+
+def test_lowered_limits_resize_on_the_same_revision():
+    d = run(sig())
+    held = dict(d.targets)
+    d2 = run(sig(seq=2), now=DAY + 1015.0, pos=held, brackets=[7], memory=d.memory, cfg={"percent": 5.0})
+    assert d2.act and "limits changed" in d2.reason
+    assert d2.targets["BTC"] == pytest.approx(held["BTC"] / 2) and d2.bracket["units"] == pytest.approx(-0.001)
+    d3 = run(sig(seq=3), now=DAY + 1020.0, pos=dict(d2.targets), brackets=[7], memory=d2.memory,
+             cfg={"percent": 5.0})
+    assert not d3.act  # once resized, nothing more to do
+
+
+def test_a_confirmed_raise_also_applies_without_a_restart():
+    d = run(sig(), cfg={"percent": 5.0})
+    d2 = run(sig(seq=2), pos=dict(d.targets), brackets=[7], memory=d.memory, cfg={"percent": 10.0})
+    assert d2.act and d2.targets["BTC"] == pytest.approx(2 * d.targets["BTC"])
+
+
+def test_a_cap_added_later_cuts_the_held_position():
+    d = run(sig())
+    d2 = run(sig(seq=2), pos=dict(d.targets), brackets=[7], memory=d.memory, cfg={"max_position_usd": 50.0})
+    assert d2.act and d2.targets["BTC"] * 60000 == pytest.approx(-50.0)
+
+
+def test_slow_recheck_corrects_a_large_gap_but_not_price_drift():
+    d = run(sig())  # $1,000 balance: BTC -$180
+    held = dict(d.targets)
+    later = DAY + 1010.0 + RECHECK_S
+
+    def at(**kw):
+        return clean(payload(ts=later - 5, expires=later + 55, **kw))
+
+    drift = at(seq=3, targets={"BTC": {"x": -1.9, "px": 63000.0}, "ETH": {"x": -0.41, "px": 1950.0}})
+    r = run(drift, now=later, received=later - 1, pos=held, brackets=[7], memory=d.memory)
+    assert not r.act and r.reason == "Following revision 1; nothing to change."
+    r = run(at(seq=4), now=later, received=later - 1, bal=1050.0, pos=held, brackets=[7], memory=d.memory)
+    assert not r.act and r.reason == "Following revision 1; nothing to change."  # 5%: inside the 10% band
+    d2 = run(at(seq=5), now=later, received=later - 1, bal=2000.0, pos=held, brackets=[7], memory=d.memory)
+    assert d2.act and "Re-check" in d2.reason and d2.targets["BTC"] == pytest.approx(2 * held["BTC"])
+    early = run(sig(seq=6), now=DAY + 1020.0, bal=2000.0, pos=held, brackets=[7], memory=d.memory)
+    assert not early.act  # before the re-check is due, a balance change alone does nothing
+
+
+def test_resizing_keeps_an_open_scalp_whose_stop_is_now_far_from_the_price():
+    d = run(sig())
+    moved = sig(seq=2, targets={"BTC": {"x": -1.7, "px": 59000.0}, "ETH": {"x": -0.4, "px": 2000.0}})
+    d2 = run(moved, pos=dict(d.targets), brackets=[7], memory=d.memory, cfg={"percent": 5.0})
+    assert d2.act and d2.bracket is not None and "not opened" not in d2.reason
+
+
+def test_reason_says_when_a_change_is_too_small_to_trade():
+    d = run(sig(), cfg={"size_mode": "fixed", "fixed_usd": 10.0})
+    assert d.targets == {"BTC": 0.0, "ETH": 0.0} or all(abs(v) < 1e-12 for v in d.targets.values())
+    assert "asks for BTC short $18, ETH short $4" in d.reason and "under $20" in d.reason
+    assert d.memory["wanted"]["BTC"] * 60000 == pytest.approx(-18.0) and d.memory["min_change"] == 20.0
+    rows = compare(d.memory["wanted"], {}, {"BTC": 60000.0, "ETH": 2000.0}, 20.0)
+    assert rows[0] == {"coin": "BTC", "asked_usd": -18.0, "held_usd": 0.0, "difference_usd": -18.0,
+                       "under_min_change": True}
+
+
+def test_lowered_limits_shrink_a_coin_even_by_less_than_the_dead_band():
+    d = run(sig())  # ETH -$40
+    d2 = run(sig(seq=2), pos=dict(d.targets), brackets=[7], memory=d.memory, cfg={"percent": 6.0})
+    assert d2.targets["ETH"] * 2000 == pytest.approx(-24.0)  # a $16 reduction, under the $20 step, still applied
+    d3 = run(sig(seq=3), pos=dict(d.targets), brackets=[7], memory=d.memory, cfg={"percent": 11.0})
+    assert d3.targets["ETH"] == d.targets["ETH"]  # a raise of $4 on ETH stays inside the band
+
+
+def test_cents_of_difference_are_not_reported_as_too_small_to_trade():
+    d = run(sig())
+    held = {c: v * 1.0001 for c, v in d.targets.items()}  # a few cents off
+    d2 = run(sig(seq=2), pos=held, brackets=[7], memory=d.memory, cfg={"max_x": 2.9})
+    assert "under $20" not in d2.reason
+    assert not any(r["under_min_change"] for r in compare(d.memory["wanted"], held, {"BTC": 60000.0, "ETH": 2000.0},
+                                                          20.0))

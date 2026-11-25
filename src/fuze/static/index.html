@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en" data-money="none">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta name="color-scheme" content="light dark">
+<title>FUZE agent</title>
+<meta name="description" content="Your FUZE agent on this computer: running or not, the mode, balance, positions, the signal it follows and your limits. Read-only.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/app.css">
+<link rel="preload" href="/archivo.woff2" as="font" type="font/woff2" crossorigin>
+</head>
+<body>
+<a class="skip" href="#main">Skip to the content</a>
+<div class="realbar" id="realbar" hidden>Real money: this agent trades a real Lighter account</div>
+<header class="top">
+  <div class="bar">
+    <a class="mark cold" id="mark" href="/" aria-label="FUZE agent, this page"><svg class="logo" viewBox="40 -12 3563.0 810" aria-hidden="true" focusable="false"><path fill="currentColor" d="M74 688V0H770V171H321V287H714V458H321V688ZM1321.0 700Q1179.0 700 1086.0 660.5Q993.0 621 947.0 544.5Q901.0 468 901.0 357V0H1148.0V346Q1148.0 432 1193.5 480.0Q1239.0 528 1321.0 528Q1404.0 528 1449.5 480.0Q1495.0 432 1495.0 346V0H1742.0V357Q1742.0 468 1696.0 544.5Q1650.0 621 1556.5 660.5Q1463.0 700 1321.0 700ZM1860.0 688V617L2259.0 171H1890.0V0H2672.0V71L2272.0 517H2196.0V688ZM2807.0 688V0H3542.0V171H3055.0V260H3475.0V422H3055.0V517H3550.0V688Z"/><path class="lg-burn" fill="currentColor" d="M2195.0 633H2436.0V572H2195.0Z"/><path class="lg-spark" fill="currentColor" d="M2551.0 407.5Q2590.0 563.5 2746.0 602.5Q2590.0 641.5 2551.0 797.5Q2512.0 641.5 2356.0 602.5Q2512.0 563.5 2551.0 407.5Z"/></svg></a>
+    <span class="where">Your agent, on this computer</span>
+    <nav class="nav" aria-label="FUZE on the web">
+      <a href="https://fuze.trade" target="_blank" rel="noopener noreferrer">Public record<span class="ext" aria-hidden="true"> ↗</span><span class="sr"> (fuze.trade, opens in a new tab)</span></a>
+      <a href="https://docs.fuze.trade" target="_blank" rel="noopener noreferrer">Docs<span class="ext" aria-hidden="true"> ↗</span><span class="sr"> (docs.fuze.trade, opens in a new tab)</span></a>
+    </nav>
+  </div>
+  <div class="beat cold" id="beat" aria-hidden="true"><i></i></div>
+</header>
+
+<main id="main">
+<section class="hero" id="hero" aria-labelledby="state">
+  <p class="lead" id="lead">Reading your agent</p>
+  <h1 id="state" aria-live="polite">&nbsp;</h1>
+  <p class="plate" id="plate"><b id="plate-name"></b><span id="plate-words"></span></p>
+  <p class="since" id="since"></p>
+  <p class="doing" id="doing"></p>
+  <p class="warn" id="mismatch" hidden></p>
+  <p class="do" id="state-do"></p>
+  <dl class="panel" id="panel"></dl>
+  <p class="down" id="down" role="alert" hidden>This page lost its connection to <code>fuze ui</code>. Start it again in a terminal: <code>fuze ui</code>.</p>
+</section>
+
+<div class="cols">
+  <div class="col">
+    <section class="card s-pos" aria-labelledby="h-pos">
+      <h2 id="h-pos">What you hold</h2>
+      <p class="cap stale" id="pos-when" hidden></p>
+      <div id="positions"></div>
+      <p class="cap" id="pos-asked"></p>
+      <div id="short" class="fuse" hidden>
+        <h3 id="short-h">The short-term part</h3>
+        <svg viewBox="0 0 1000 132" role="img" aria-labelledby="fuse-t"><title id="fuse-t">Where the price sits between this part's take profit and stop loss</title>
+          <line class="wire" x1="20" y1="66" x2="980" y2="66"/>
+          <line class="burnt" id="burnt" x1="20" y1="66" x2="20" y2="66"/>
+          <circle class="end" cx="20" cy="66" r="9"/><circle class="end" cx="980" cy="66" r="9"/>
+          <g id="spark"><circle class="glow" r="22" cy="66"/><circle class="core" r="8" cy="66"/></g>
+          <text id="f-now" class="f-now" y="30" text-anchor="middle"></text>
+          <text id="f-lo" class="f-end" x="20" y="112"></text><text id="f-hi" class="f-end" x="980" y="112" text-anchor="end"></text>
+        </svg>
+        <p class="cap" id="short-cap"></p>
+      </div>
+      <p class="do" id="pos-do"></p>
+    </section>
+    <section class="card s-ord" aria-labelledby="h-ord">
+      <h2 id="h-ord">Recent orders</h2>
+      <ol class="orders" id="orders"></ol>
+    </section>
+    <section class="card s-set" aria-labelledby="h-set">
+      <h2 id="h-set">Setup</h2>
+      <div id="checks"></div>
+      <dl class="kv" id="keys"></dl>
+      <div class="do" id="set-do"></div>
+    </section>
+  </div>
+  <div class="col">
+    <section class="card s-sig" aria-labelledby="h-sig">
+      <h2 id="h-sig">The signal you follow</h2>
+      <p class="warn" id="sig-peek" hidden></p>
+      <dl class="kv" id="signal"></dl>
+      <p class="note-real" id="sig-note" hidden></p>
+      <p class="why" id="sig-why" hidden></p>
+      <p class="out"><a href="https://fuze.trade" target="_blank" rel="noopener noreferrer">See our account's full record on fuze.trade<span aria-hidden="true"> ↗</span><span class="sr"> (opens in a new tab)</span></a></p>
+    </section>
+    <section class="card s-lim" aria-labelledby="h-lim">
+      <h2 id="h-lim">Your limits</h2>
+      <ul class="lines" id="sizing"></ul>
+      <div class="meter" id="daily"></div>
+      <div class="do" id="lim-do"></div>
+    </section>
+  </div>
+</div>
+</main>
+
+<footer>
+  <p><b>This page only reads.</b> It runs on this computer (127.0.0.1), never trades and never changes a setting: every change is a command you type, shown next to it. FUZE never sees your account.</p>
+  <p>FUZE copies one account's trading. That account can lose, and so can you: you can lose everything you put in. Not financial advice. <a href="https://docs.fuze.trade" target="_blank" rel="noopener noreferrer">Documentation<span class="sr"> (opens in a new tab)</span></a> · <a href="https://fuze.trade" target="_blank" rel="noopener noreferrer">fuze.trade<span class="sr"> (opens in a new tab)</span></a> · <span id="version"></span></p>
+</footer>
+<script src="/app.js" defer></script>
+</body>
+</html>

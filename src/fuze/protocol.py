@@ -22,7 +22,8 @@ SOURCES = ("paper", "testnet", "mainnet")
 MAX_PAYLOAD = 16_384  # bytes; a real payload is well under 1 KB
 MAX_X = 50.0
 MAX_FUTURE_S = 30.0
-MAX_LIFETIME_S = 120.0  # PROTOCOL.md says 60 s; anything much longer is not ours
+MAX_LIFETIME_S = 60.0  # PROTOCOL.md: a message is valid until `expires`, 60 s after `ts`; a longer life is dropped
+LIFETIME_SLACK_S = 0.001  # float rounding of two unix times with milliseconds
 
 
 def _b64(text) -> bytes | None:
@@ -68,7 +69,7 @@ def clean(msg: dict) -> dict | None:
     if not (_int(msg.get("seq")) and _int(msg.get("rev"))):
         return None
     ts, exp = msg.get("ts"), msg.get("expires")
-    if not (_num(ts, 0) and _num(exp, 0) and 0 < exp - ts <= MAX_LIFETIME_S):
+    if not (_num(ts, 0) and _num(exp, 0) and 0 < exp - ts <= MAX_LIFETIME_S + LIFETIME_SLACK_S):
         return None
     if msg.get("source") not in SOURCES or msg.get("state") not in STATES:
         return None

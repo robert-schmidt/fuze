@@ -16,6 +16,7 @@ import asyncio
 import json
 import math
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -38,7 +39,8 @@ class LighterClient:
             import lighter
             from lighter.signer_client import CreateOrderTxReq
         except ImportError:
-            raise RuntimeError('trading on Lighter needs its SDK: pip install "fuze-agent[lighter]"') from None
+            from fuze.config import pip_hint
+            raise RuntimeError("trading on Lighter needs its SDK: " + pip_hint("mcp,lighter")) from None
         from fuze.agent import opener as tls_opener
 
         self.url, self.account_index, self.key_index = HOSTS[net], account, key_index
@@ -52,7 +54,10 @@ class LighterClient:
             self.c = self.loop.run_until_complete(make())
             err = self.c.check_client()
         except Exception as e:  # never the text: it could quote the key
-            raise RuntimeError(f"the Lighter SDK refused the key ({type(e).__name__})") from None
+            self._close_partial(e)
+            raise RuntimeError(f"the Lighter SDK could not use the stored {net} API key ({type(e).__name__}). A Lighter "
+                               f"API private key is 80 hexadecimal characters; enter it again with `fuze keys {net}`, "
+                               "or register a new key on Lighter (docs/lighter-setup.md).") from None
         if err:
             self.close()
             raise RuntimeError(f"Lighter does not accept this API key for account {account} at key index {key_index}. "
@@ -63,6 +68,35 @@ class LighterClient:
             self.loop.run_until_complete(self.c.close())
         except Exception:
             pass
+
+    def _close_partial(self, e: Exception) -> None:
+        """The SDK opens its HTTP session before it checks the key; when its constructor fails, close that session
+        (found on the failed constructor's frame) so no "unclosed client session" warning is left behind."""
+        tb = e.__traceback__
+        while tb:
+            obj = tb.tb_frame.f_locals.get("self")
+            api = getattr(obj, "api_client", None)
+            if api is not None and hasattr(api, "close"):
+                try:
+                    self.loop.run_until_complete(api.close())
+                except Exception:
+                    pass
+                return
+            tb = tb.tb_next
+
+    def tx(self, tx_hash: str) -> dict:
+        """One transaction as Lighter shows it (public: no key, no order), or RuntimeError in plain words."""
+        try:
+            r = self.get("tx", by="hash", value=tx_hash)
+        except urllib.error.HTTPError as e:
+            try:
+                msg = json.loads(e.read(4096)).get("message") or f"HTTP {e.code}"
+            except Exception:
+                msg = f"HTTP {e.code}"
+            raise RuntimeError(f"Lighter answered: {str(msg)[:120]}") from None
+        if r.get("code") != 200:
+            raise RuntimeError(f"Lighter answered: {str(r.get('message') or r.get('code'))[:120]}")
+        return r
 
     def get(self, path: str, headers=None, **params) -> dict:
         url = f"{self.url}/api/v1/{path}?" + urllib.parse.urlencode(params)
@@ -128,6 +162,11 @@ def connect(cfg, net: str) -> LighterClient:
     key = keys.load(net)
     if not key:
         raise RuntimeError(f"no Lighter {net} API key is stored: run `fuze keys {net}` in a terminal")
+    try:
+        key = keys.clean(key)  # a key stored by an older version may have the wrong length: say so before the SDK
+    except ValueError:
+        raise RuntimeError(f"the stored {net} API key is not a Lighter API private key (those are 80 hexadecimal "
+                           f"characters): enter it again with `fuze keys {net}` in a terminal") from None
     return LighterClient(net, acct, cfg[f"{net}_key_index"], key)
 
 
@@ -145,7 +184,7 @@ class LighterVenue(Venue):
     def __init__(self, client, store: Path, clock=time.time, net="testnet", index=None):
         self.c, self.path, self.clock, self.net, self.index = client, Path(store), clock, net, index
         self.pairs = read_json(self.path, {}) or {}  # coin -> the protective pair we placed {"id", "units", "tp", "sl"}
-        self.m, self.m_t, self.cache, self.cache_t = {}, 0.0, None, 0.0
+        self.m, self.m_t, self.cache, self.cache_t, self.seen = {}, 0.0, None, 0.0, {}
         self._markets()
         self.client_index = int(clock() * 1000)  # unique per order, also across restarts
 
@@ -179,12 +218,15 @@ class LighterVenue(Venue):
             return self.cache
         a = self.c.account()
         ids = {v["id"]: c for c, v in self.m.items()}
-        pos = {}
+        pos, self.seen = {}, {}
         for p in a.get("positions") or []:
             coin = ids.get(p.get("market_id"))
             units = _num(p.get("position")) * (-1 if int(p.get("sign") or 1) < 0 else 1)
             if coin and units:
                 pos[coin] = units
+                value = _num(p.get("position_value"))  # display only: fields as Lighter's docs name them
+                self.seen[coin] = {"entry": _num(p.get("avg_entry_price")) or None,
+                                   "mark": value / abs(units) if value > 0 else self.m[coin]["px"]}
         brackets = []
         for coin in list(self.pairs):
             if self._ours(coin):
@@ -198,6 +240,9 @@ class LighterVenue(Venue):
 
     def link(self):
         return account_link(self.net, self.index)
+
+    def book(self) -> dict:
+        return dict(self.seen)
 
     # --- sizes --------------------------------------------------------------------------------------------------
     def _base(self, coin: str, units: float) -> int:

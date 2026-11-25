@@ -26,7 +26,7 @@ def test_describe_in_plain_words():
 @pytest.mark.parametrize("change,up", [
     ({"percent": 20}, ["percent"]),
     ({"percent": 5}, []),
-    ({"fixed_usd": 200}, ["fixed_usd"]),  # even while it is not the active mode
+    ({"fixed_usd": 200}, []),  # not in use: switching to it later is checked then (size_mode)
     ({"fixed_usd": 50}, []),
     ({"max_x": 4}, ["max_x"]),
     ({"max_x": 2}, []),
@@ -36,10 +36,16 @@ def test_describe_in_plain_words():
     ({"stale_flat_min": 30}, []),
     ({"size_mode": "fixed"}, []),  # $100 fixed = 10% of $1,000: not larger
     ({"size_mode": "fixed", "fixed_usd": 50}, []),
-    ({"size_mode": "fixed", "fixed_usd": 500}, ["fixed_usd", "size_mode"]),
+    ({"size_mode": "fixed", "fixed_usd": 500}, ["size_mode"]),
 ])
 def test_what_raises_risk(change, up):
     assert raised(BASE, cfg(**change), 1000.0) == up
+
+
+def test_the_amount_in_use_raises_in_fixed_mode():
+    fixed = cfg(size_mode="fixed", fixed_usd=100)
+    assert raised(fixed, cfg(size_mode="fixed", fixed_usd=200), 1000.0) == ["fixed_usd"]
+    assert raised(fixed, cfg(size_mode="fixed", fixed_usd=100, percent=90), 1000.0) == []
 
 
 def test_removing_or_raising_a_cap_raises_risk():

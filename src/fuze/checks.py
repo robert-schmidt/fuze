@@ -64,7 +64,7 @@ def _live(cfg, add, read_account: bool) -> None:
         return
     from fuze.venue import account_link
     problems = modes.blockers(cfg)
-    add(not any("SDK" in p for p in problems), "Lighter SDK installed", 'pip install "fuze-agent[lighter]"'
+    add(not any("SDK" in p for p in problems), "Lighter SDK installed", config.pip_hint("mcp,lighter")
         if any("SDK" in p for p in problems) else "")
     acct = cfg[f"{mode}_account"]
     add(acct is not None, f"Lighter {mode} account index set",

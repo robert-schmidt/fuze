@@ -14,7 +14,8 @@ import re
 from fuze import config
 
 SERVICE = "fuze-agent"
-SHAPE = re.compile(r"(?:0x)?[0-9a-fA-F]{32,200}")
+KEY_HEX = 80  # a Lighter API private key: 40 bytes, written as 80 hexadecimal characters (0x in front is allowed)
+SHAPE = re.compile(r"(?:0x)?[0-9a-fA-F]{%d}" % KEY_HEX)
 
 
 def _keyring():
@@ -41,7 +42,10 @@ def clean(text: str) -> str:
     """The key without spaces or 0x, or ValueError (whose text never contains the key)."""
     text = (text or "").strip()
     if not SHAPE.fullmatch(text):
-        raise ValueError("that is not a Lighter API private key (expected a long hexadecimal text). Nothing was saved.")
+        digits = len(text.removeprefix("0x")) if re.fullmatch(r"(?:0x)?[0-9a-fA-F]+", text) else None
+        what = f"it has {digits} hexadecimal characters" if digits is not None else "it is not hexadecimal text"
+        raise ValueError(f"that is not a Lighter API private key: those are {KEY_HEX} hexadecimal characters "
+                         f"(0x in front is allowed), and {what}. Nothing was saved.")
     return text.removeprefix("0x")
 
 

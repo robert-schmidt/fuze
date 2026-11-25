@@ -8,11 +8,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
+from fuze.config import LIMITS
 from fuze.protocol import COINS
 from fuze.sizing import base_usd, fit
 
 MIN_DIFF_USD = 10.0  # ignore changes smaller than this ...
 MIN_DIFF_FRAC = 0.02  # ... or than 2% of the balance, unless the target is zero
+NOISE_USD = 1.0  # a difference under a dollar (balance and price wiggle) is not worth a word
+RECHECK_S = 300.0  # on the same revision, compare what the signal asks for with what is held this often
+RECHECK_FRAC = 0.10  # ... and correct only a coin that is off by more than this share of its size (and the band
+#                      above): x drifting with the price alone must not cause small orders every few minutes
 STALE_S = 60.0  # no valid message for this long = offline
 SCALP_SL_MAX = 0.015  # a scalp stop loss further than 1.5% from the price is refused
 
@@ -25,6 +30,72 @@ class Decision:
     px: dict  # coin -> the signal price to trade at (missing = use the exchange's own price)
     reason: str
     memory: dict
+
+
+def min_change(bal: float) -> float:
+    """The smallest change in dollars the agent makes on a coin (except closing it): the larger of $10 and 2%."""
+    return max(MIN_DIFF_USD, MIN_DIFF_FRAC * bal)
+
+
+def asked_usd(signal, cfg, bal: float) -> dict:
+    """Coin -> the position value in dollars the signal asks for at these limits, caps included (scalp part as sent)."""
+    if not signal or signal.get("state") != "live":
+        return {}
+    base = base_usd(cfg, bal)
+    usd = {c: t["x"] * base for c, t in signal["targets"].items()}
+    k, _ = fit(usd, cfg, bal)
+    return {c: v * k[c] for c, v in usd.items()}
+
+
+def compare(wanted: dict, held: dict, px: dict, tol) -> list:
+    """Per coin, what the signal asks for and what is held, in dollars, and whether the difference is under the
+    smallest change the agent makes. For `fuze status`, the MCP status tool and `fuze ui`."""
+    out = []
+    for c in COINS:
+        p = px.get(c)
+        w, h = (wanted or {}).get(c), (held or {}).get(c, 0.0)
+        if not p or (w is None and not h):
+            continue
+        a, b = (w or 0.0) * p, h * p
+        under = bool(tol) and NOISE_USD <= abs(a - b) < tol and abs(w or 0.0) > 1e-12
+        out.append({"coin": c, "asked_usd": round(a, 2), "held_usd": round(b, 2), "difference_usd": round(a - b, 2),
+                    "under_min_change": under})
+    return out
+
+
+def from_status(s: dict) -> tuple:
+    """(rows, smallest change) from status.json as the agent writes it; ([], None) when it has nothing to compare."""
+    s = s if isinstance(s, dict) else {}
+    a = s.get("account") if isinstance(s.get("account"), dict) else {}
+    held = a.get("positions") if isinstance(a.get("positions"), dict) else {}
+    wanted = s.get("wanted") if isinstance(s.get("wanted"), dict) else {}
+    sig = s.get("signal") if isinstance(s.get("signal"), dict) else {}
+    px = {c: t.get("px") for c, t in (sig.get("targets") or {}).items() if isinstance(t, dict)}
+    book = s.get("book") if isinstance(s.get("book"), dict) else {}
+    for c, b in book.items():
+        if isinstance(b, dict) and b.get("mark") and c not in px:
+            px[c] = b["mark"]
+    num = (int, float)
+    wanted = {c: v for c, v in wanted.items() if isinstance(v, num) and not isinstance(v, bool)}
+    held = {c: v for c, v in held.items() if isinstance(v, num) and not isinstance(v, bool)}
+    px = {c: v for c, v in px.items() if isinstance(v, num) and not isinstance(v, bool) and v > 0}
+    tol = s.get("min_change_usd") if isinstance(s.get("min_change_usd"), num) else None
+    return compare(wanted, held, px, tol), tol
+
+
+def describe_compare(rows: list, tol) -> list:
+    """compare() in plain words, one line per coin, plus why nothing is traded when a difference is too small."""
+    def side(v):
+        return "none" if abs(v) < 0.005 else f"{'short' if v < 0 else 'long'} ${abs(v):,.0f}"
+
+    lines = [f"{r['coin']}: the signal asks for {side(r['asked_usd'])}, you hold {side(r['held_usd'])}" for r in rows]
+    small = [r["coin"] for r in rows if r["under_min_change"]]
+    if small:
+        lines.append(f"The difference on {' and '.join(small)} is under ${tol:,.0f}, the smallest change the agent "
+                     "makes (the larger of $10 and 2% of your balance), so it is not traded now.")
+    if any(r["under_min_change"] and abs(r["held_usd"]) < 0.005 for r in rows):
+        lines.append("A coin held at none because its size is under that step stays unfollowed at this size.")
+    return lines
 
 
 def utc_day(now: float) -> str:
@@ -55,7 +126,7 @@ def decide(signal, received_at, now, account, cfg, flags, memory) -> Decision:
         m["scalp_done"], m["scalp"] = m["scalp"]["id"], None  # its stop loss or take profit fired
 
     def close(reason):
-        m.update(rev=None, set={c: 0.0 for c in COINS}, scalp=None)
+        m.update(rev=None, set={c: 0.0 for c in COINS}, scalp=None, wanted={c: 0.0 for c in COINS})
         return Decision(True, {c: 0.0 for c in COINS}, None, {}, reason, m)
 
     def hold(reason):
@@ -86,20 +157,30 @@ def decide(signal, received_at, now, account, cfg, flags, memory) -> Decision:
         return close("The signal is flat: everything is closed and we stay out.")
 
     rev, base = signal["rev"], base_usd(cfg, bal)
-    tol = max(MIN_DIFF_USD, MIN_DIFF_FRAC * bal)
+    tol = min_change(bal)
+    m["min_change"] = tol
     px = {c: t["px"] for c, t in signal["targets"].items()}
     last = m.get("set") or {}
     drift = any(abs(held.get(c, 0.0) - last.get(c, 0.0)) * px.get(c, 1.0) > (tol if c in px else 1e-9)
                 for c in COINS)
-    if m.get("rev") == rev and not drift:
+    limits = {k: cfg.get(k) for k in LIMITS}
+    same = m.get("rev") == rev
+    changed = same and m.get("limits") not in (None, limits)  # `fuze limits` or the MCP tool changed them
+    recheck = same and not drift and not changed and now - m.get("checked", 0.0) >= RECHECK_S
+    if same and not drift and not changed and not recheck:
         return hold(f"Following revision {rev}; nothing to change.")
 
-    notes = ["Resync: the held position no longer matched what we last set."] if m.get("rev") == rev else []
+    notes = []
+    if changed:
+        notes.append("Your limits changed: resized to them.")
+    elif same and drift:
+        notes.append("Resync: the held position no longer matched what we last set.")
     usd = {c: t["x"] * base for c, t in signal["targets"].items()}  # position value in dollars, before caps
     sc, scalp_usd = signal["scalp"], 0.0
     if sc:
+        held_scalp = same and (m.get("scalp") or {}).get("id") == sc["id"]  # open and protected: keep it
         problem = "it already closed at its stop loss or take profit" if sc["id"] == m.get("scalp_done") \
-            else scalp_problem(sc, px[sc["coin"]])
+            else "" if held_scalp else scalp_problem(sc, px[sc["coin"]])
         if problem:
             usd[sc["coin"]] -= sc["x"] * base
             notes.append(f"The scalp part is not opened: {problem}.")
@@ -108,18 +189,36 @@ def decide(signal, received_at, now, account, cfg, flags, memory) -> Decision:
     k, cut = fit(usd, cfg, bal)  # the caps: one factor per coin, the scalp part shrinks with its coin
     notes += cut
 
+    wanted = {c: usd.get(c, 0.0) * k[c] / px[c] if c in px else 0.0 for c in COINS}
     targets = {}
     for c in COINS:
-        want = usd.get(c, 0.0) * k[c] / px[c] if c in px else 0.0
-        h = held.get(c, 0.0)
-        targets[c] = want if want == 0 or abs(want - h) * px[c] >= tol else h
+        want, h = wanted[c], held.get(c, 0.0)
+        band = max(tol, RECHECK_FRAC * abs(want) * px[c]) if recheck and c in px else tol
+        shrink = changed and want * h >= 0 and abs(want) < abs(h)  # lowered limits: every coin shrinks, however little
+        targets[c] = want if want == 0 or shrink or abs(want - h) * px.get(c, 0.0) >= band else h
+    m["checked"], m["wanted"] = now, wanted
+    if recheck:
+        if all(abs(targets[c] - held.get(c, 0.0)) < 1e-12 for c in COINS):
+            return hold(f"Following revision {rev}; nothing to change.")
+        notes.insert(0, "Re-check: the held position was further from what the signal asks for than the dead band.")
     bracket = None
     if scalp_usd and targets[sc["coin"]] * scalp_usd > 0:
         units = scalp_usd * k[sc["coin"]] / px[sc["coin"]]
         units = min(abs(units), abs(targets[sc["coin"]])) * (1 if units > 0 else -1)
         bracket = {"coin": sc["coin"], "units": units, "tp": sc["tp"], "sl": sc["sl"], "id": sc["id"]}
-    m.update(rev=rev, set=targets, scalp={"id": sc["id"], "coin": sc["coin"]} if bracket else None)
-    head = f"Following revision {rev}: " + (", ".join(
-        f"{c} {'short' if v < 0 else 'long'} ${abs(v * k[c]):,.0f} ({abs(v * k[c]) / bal:.2f} times your balance)"
-        for c, v in usd.items() if v) or "no position")
-    return Decision(True, targets, bracket, px, " ".join([head + "."] + notes), m)
+    m.update(rev=rev, set=targets, limits=limits,
+             scalp={"id": sc["id"], "coin": sc["coin"]} if bracket else None)
+
+    def words(v):
+        return "none" if abs(v) < 0.005 else f"{'short' if v < 0 else 'long'} ${abs(v):,.0f}"
+
+    asked = ", ".join(f"{c} {words(wanted[c] * px[c])}" for c in COINS if c in px)
+    after = ", ".join(f"{c} {words(targets[c] * px[c])}" for c in COINS if c in px)
+    head = f"Following revision {rev}: the signal asks for {asked} at your limits" + \
+        ("." if asked == after else f"; the agent aims for {after}.")
+    small = [c for c in COINS if c in px and wanted[c] and abs(targets[c] - wanted[c]) * px[c] >= NOISE_USD
+             and abs(targets[c] - held.get(c, 0.0)) < 1e-12]
+    if small:
+        notes.append(f"The change on {' and '.join(small)} is under ${tol:,.0f}, the smallest change the agent makes "
+                     "(the larger of $10 and 2% of your balance), so it is not traded.")
+    return Decision(True, targets, bracket, px, " ".join([head] + notes), m)

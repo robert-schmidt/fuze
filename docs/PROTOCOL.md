@@ -1,5 +1,8 @@
 # FUZE signal protocol, version 1
 
+This page is the authoritative specification of the signal. For the same thing in plain words, see
+[The signal](signal/README.md); to check a message yourself, see [Verifying a message yourself](signal/verify.md).
+
 FUZE publishes **the position its own account holds**, signed. It does not publish orders. An agent that starts late,
 reconnects, or misses a message still arrives at the same position.
 

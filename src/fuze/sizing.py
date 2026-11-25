@@ -9,6 +9,7 @@ Then two caps: `max_position_usd` on any one coin, and `max_x` × the real balan
 
 from __future__ import annotations
 
+SIZE_FIELD = {"percent": "percent", "fixed_usd": "fixed"}  # the field that sizes each mode
 EXAMPLE_X = 1.8  # our position, as a multiple of our balance, in the worked example
 LABELS = {"size_mode": "sizing", "percent": "share of your balance", "fixed_usd": "fixed amount",
           "max_position_usd": "cap per position", "max_x": "exposure cap", "daily_loss_frac": "daily loss stop",
@@ -84,7 +85,9 @@ def describe(cfg, bal: float) -> list:
 def raised(cur, new, bal: float) -> list:
     """Names of the settings whose change lets the agent take more risk. Anything listed needs the user's
     typed confirmation in a terminal; the MCP server refuses it outright."""
-    up = [k for k in ("percent", "fixed_usd", "max_x", "daily_loss_frac") if new[k] > cur[k]]
+    same = new["size_mode"] == cur["size_mode"]  # the amount of the mode not in use raises nothing by itself
+    up = [k for k in ("percent", "fixed_usd") if same and new["size_mode"] == SIZE_FIELD[k] and new[k] > cur[k]]
+    up += [k for k in ("max_x", "daily_loss_frac") if new[k] > cur[k]]
     for k in ("max_position_usd", "stale_flat_min"):  # None (no cap, never) is the riskiest setting
         if cur.get(k) is not None and (new.get(k) is None or new[k] > cur[k]):
             up.append(k)

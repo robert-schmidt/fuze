@@ -1,0 +1,158 @@
+/* FUZE agent, the local page. Same identity as fuze.trade: one typeface (Archivo, variable width and weight), the same tokens.
+   Colour has jobs, as on the public site: amber is only the live signal (the spark, the burning fuse); blue and red are only long and
+   short; green and red text are money made and lost, always with a sign. Real money is said by inverting the mode plate and a bar on top,
+   not by a new colour. */
+@font-face{font-family:Archivo;src:url(/archivo.woff2) format("woff2");font-weight:100 900;font-stretch:62% 125%;font-display:swap}
+:root{color-scheme:light dark;--bg:#edf0f2;--raise:#e2e7eb;--ink:#161d24;--soft:#4c5863;--wire:#9aa5ae;--rule:#cfd6dc;--grid:#d9dfe4;--spark:#e8a200;--burnt:#b87f00;
+  --long:#1f6fd0;--short:#cf3b38;--up:#17694d;--down:#b3261e;--focus:#1557b0;--head:76rem}
+@media (prefers-color-scheme:dark){:root{--bg:#10161b;--raise:#182027;--ink:#e7ebee;--soft:#a3afb9;--wire:#5d6a75;--rule:#28333c;--grid:#1f2830;--spark:#ffb81f;--burnt:#ffd166;
+  --long:#4b93ec;--short:#e5615c;--up:#6fd3a8;--down:#ff9d92;--focus:#9cc8ff}}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 1rem/1.55 Archivo,"Helvetica Neue",Arial,sans-serif;font-variant-numeric:lining-nums tabular-nums;overflow-x:hidden}
+:focus-visible{outline:3px solid var(--focus);outline-offset:3px}
+a{color:inherit;text-underline-offset:.18em}
+[hidden]{display:none!important}
+main,footer,.bar{max-width:var(--head);margin:0 auto;padding-left:1.25rem;padding-right:1.25rem}
+.skip{position:absolute;left:1rem;top:-4rem;background:var(--ink);color:var(--bg);padding:.5rem .8rem;z-index:20;border-radius:4px}
+.skip:focus{top:.75rem}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+code{font:500 .875em/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--raise);padding:.1em .4em;border-radius:4px;white-space:nowrap}
+
+/* real money: a bar above everything, in inverted colours */
+.realbar{background:var(--ink);color:var(--bg);text-align:center;font-weight:800;font-stretch:112%;letter-spacing:.02em;padding:.45rem 1rem;font-size:.9375rem}
+
+/* header: the mark, where this is, the two links out; under it the wire that each agent step relights */
+.top{position:sticky;top:0;z-index:10;background:var(--bg)}
+.bar{display:flex;align-items:center;gap:.4rem 1.5rem;flex-wrap:wrap;padding-top:.8rem;padding-bottom:.8rem}
+.mark{display:inline-flex;color:var(--ink);border-radius:3px}
+.logo{display:block;height:1.47rem;width:auto;overflow:visible}
+.lg-burn{fill:var(--burnt)}.lg-spark{fill:var(--spark);transform-box:fill-box;transform-origin:center}
+.mark.cold .lg-burn,.mark.cold .lg-spark{fill:var(--wire)}
+.mark.lit .lg-spark{animation:relight 1.4s ease-out}
+@keyframes relight{0%{transform:scale(1.9) rotate(45deg)}100%{transform:none}}
+.where{color:var(--soft);font-size:.9375rem;margin-right:auto}
+.nav{display:flex;gap:1.25rem;font-size:.9375rem}
+.nav a{color:var(--soft);text-decoration:none}.nav a:hover{color:var(--ink);text-decoration:underline}
+@media (max-width:30rem){.where{order:3;width:100%}}
+.beat{position:relative;height:2px;background:var(--rule)}
+.beat i{position:absolute;left:var(--burn,0%);top:-3px;width:8px;height:8px;margin-left:-4px;border-radius:50%;background:var(--spark);box-shadow:0 0 0 3px color-mix(in srgb,var(--spark) 25%,transparent)}
+.beat::before{content:"";position:absolute;left:0;top:0;height:2px;width:var(--burn,0%);background:var(--spark)}
+.beat i,.beat::before{transition:left 1s linear,width 1s linear}
+.beat.cold i{background:var(--bg);border:2px solid var(--wire);box-shadow:none}.beat.cold::before{background:var(--wire)}
+
+/* the hero: the state and the mode, readable from across the room */
+.hero{padding:clamp(1.75rem,6vw,4rem) 0 clamp(1.5rem,4vw,2.5rem)}
+.lead{margin:0 0 .35rem;color:var(--soft);font-size:1.125rem}
+h1{margin:0;font-weight:900;font-stretch:125%;font-size:clamp(3.4rem,12.5vw,8.5rem);line-height:.92;letter-spacing:-.03em;text-wrap:balance;border-left:.14em solid var(--wire);padding-left:.2em;margin-left:-.34em}
+h1.on{border-color:var(--spark)}
+@media (max-width:84rem){h1{margin-left:0}}
+.plate{display:inline-flex;flex-wrap:wrap;align-items:baseline;gap:.15rem .9rem;margin:1.1rem 0 0;padding:.45rem 1rem .5rem;border:3px solid var(--ink);border-radius:6px;max-width:100%}
+.plate b{font-weight:900;font-stretch:125%;font-size:clamp(1.6rem,5.6vw,3rem);line-height:1;letter-spacing:.01em;text-transform:uppercase}
+.plate span{font-size:clamp(1rem,2.2vw,1.25rem);font-weight:600}
+[data-money="test"] .plate{border-style:dashed}
+[data-money="real"] .plate{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.since{margin:.9rem 0 0;color:var(--soft);font-size:1.0625rem}
+.since b{color:var(--ink);font-weight:600}
+.doing{margin:.5rem 0 0;font-size:clamp(1.0625rem,2vw,1.25rem);font-weight:600;max-width:52rem}
+.warn{margin:.75rem 0 0;padding:.6rem .9rem;border-left:3px solid var(--ink);background:var(--raise);max-width:52rem;font-weight:600}
+.down{margin:1rem 0 0;padding:.6rem .9rem;border-left:3px solid var(--down);background:var(--raise);max-width:52rem}
+.panel{display:grid;grid-template-columns:repeat(auto-fill,minmax(9rem,1fr));gap:.9rem 1.25rem;margin:clamp(1.25rem,3vw,2rem) 0 0;padding:1rem 0;border-top:1.5px solid var(--ink);border-bottom:1px solid var(--rule)}
+.panel dt{color:var(--soft);font-size:.875rem}
+.panel dd{margin:.1rem 0 0;font-size:clamp(1.375rem,3vw,1.875rem);font-weight:800;font-stretch:110%;line-height:1.15}
+.panel small{display:block;font-size:.875rem;font-weight:400;font-stretch:100%;color:var(--soft)}
+.pos{color:var(--up)}.neg{color:var(--down)}
+
+/* commands: what to type (or say to your AI tool) to change the thing next to it */
+.do{margin:.9rem 0 0;color:var(--soft);font-size:.9375rem;max-width:52rem}
+.do p{margin:.3rem 0}
+.do b{color:var(--ink);font-weight:600}
+.do q{color:var(--ink);font-style:italic}
+
+/* the cards: two columns on a wide screen, one in a phone's order below */
+.cols{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:0 3rem;border-top:1px solid var(--rule)}
+.col{min-width:0}
+@media (max-width:60rem){.cols{display:flex;flex-direction:column;gap:0}.col{display:contents}.s-pos{order:1}.s-sig{order:2}.s-lim{order:3}.s-ord{order:4}.s-set{order:5}}
+.card{padding:1.75rem 0 1.5rem;border-bottom:1px solid var(--rule);min-width:0}
+h2{margin:0 0 .75rem;font-weight:800;font-stretch:118%;font-size:clamp(1.375rem,2.6vw,1.75rem);letter-spacing:-.01em;line-height:1.1}
+h3{margin:1.25rem 0 .25rem;font-weight:700;font-size:1.0625rem}
+.empty{color:var(--soft);margin:.25rem 0}
+
+/* positions */
+.posn{border-left:.3rem solid var(--wire);padding:.1rem 0 .1rem .9rem;margin:0 0 1.1rem}
+.posn.short{border-color:var(--short)}.posn.long{border-color:var(--long)}
+.posn h3{margin:0 0 .3rem;font-weight:900;font-stretch:118%;font-size:1.5rem;line-height:1.1}
+.posn h3 .s{color:var(--short)}.posn h3 .l{color:var(--long)}
+.nums{display:grid;grid-template-columns:repeat(auto-fit,minmax(6.5rem,1fr));gap:.4rem 1.25rem;margin:0}
+.nums dt{color:var(--soft);font-size:.8125rem}
+.nums dd{margin:0;font-weight:700;font-size:1.0625rem}
+.nums dd small{display:block;font-weight:400;font-size:.8125rem;color:var(--soft)}
+
+/* the fuse rail: the short-term part between its take profit and stop loss; the spark is the price now */
+.fuse{margin:.5rem 0 0}
+.fuse svg{display:block;width:100%;height:auto;overflow:visible;margin:.25rem 0 0}
+.wire{stroke:var(--wire);stroke-width:3;stroke-linecap:round}
+.burnt{stroke:var(--burnt);stroke-width:5;stroke-linecap:round}
+.end{fill:var(--bg);stroke:var(--wire);stroke-width:3}
+.core{fill:var(--spark)}
+.glow{fill:var(--spark);opacity:.28;transform-box:fill-box;transform-origin:center;animation:burn 1.6s ease-in-out infinite}
+@keyframes burn{50%{opacity:.1;transform:scale(1.35)}}
+.fuse.cold .core,.fuse.cold .glow{fill:var(--wire)}.fuse.cold .glow{animation:none}
+.f-now{fill:var(--ink);font-weight:700;font-size:26px}
+.f-end{fill:var(--soft);font-size:22px}
+@media (max-width:40rem){.f-now{font-size:44px}.f-end{font-size:36px}}
+.cap{margin:.5rem 0 0;color:var(--soft);font-size:.9375rem}
+.cap b{color:var(--ink);font-weight:600}
+
+/* key / value lists */
+.kv{display:grid;grid-template-columns:minmax(7.5rem,max-content) 1fr;gap:.4rem 1.25rem;margin:.25rem 0 0}
+.kv dt{color:var(--soft)}.kv dd{margin:0;min-width:0;overflow-wrap:anywhere;font-weight:600}
+.kv dd small{display:block;font-weight:400;color:var(--soft);font-size:.875rem}
+@media (max-width:30rem){.kv{grid-template-columns:1fr;gap:0}.kv dd{margin-bottom:.5rem}}
+.note-real{margin:1rem 0 0;padding:.6rem .9rem;border:2px solid var(--ink);border-radius:6px;font-weight:600}
+.why{margin:1rem 0 0;color:var(--soft);font-size:.9375rem}
+.why q{color:var(--ink)}
+.out{margin:1rem 0 0;font-weight:600}
+
+/* limits */
+.lines{list-style:none;margin:0;padding:0}
+.lines li{padding:.4rem 0;border-top:1px solid var(--rule)}
+.lines li:first-child{border-top:0;padding-top:0;font-weight:600}
+.lines li.ex{color:var(--soft)}
+.meter{margin:1rem 0 0}
+.meter p{margin:0 0 .35rem}
+.meter .trk{position:relative;height:.6rem;background:var(--raise);border-radius:999px;overflow:hidden}
+.meter .val{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--ink);border-radius:999px}
+.meter .val.hot{background:var(--down)}
+.meter small{display:block;color:var(--soft);font-size:.875rem;margin-top:.35rem}
+
+/* orders */
+.orders{list-style:none;margin:0;padding:0}
+.orders li{display:grid;grid-template-columns:6.5rem minmax(0,1fr) auto;gap:.15rem 1rem;padding:.55rem 0;border-top:1px solid var(--rule);align-items:baseline}
+.orders li:first-child{border-top:0}
+.orders time{color:var(--soft);font-size:.875rem}
+.orders .what{min-width:0}
+.orders .what small{display:block;color:var(--soft);font-size:.8125rem}
+.orders .res{text-align:right;font-weight:700}
+@media (max-width:30rem){.orders li{grid-template-columns:1fr auto}.orders time{grid-column:1/-1}}
+
+/* setup checks */
+.checks{list-style:none;margin:0;padding:0}
+#checks{margin:0 0 1rem}
+#checks details{margin:.25rem 0 0}
+#checks summary{cursor:pointer;font-weight:600;padding:.3rem 0}
+#checks summary::marker{color:var(--soft)}
+.checks li{display:grid;grid-template-columns:1.6rem minmax(0,1fr);gap:.5rem;padding:.3rem 0}
+.checks i{font-style:normal;font-weight:800;display:grid;place-items:center;width:1.35rem;height:1.35rem;border-radius:50%;border:2px solid var(--wire);font-size:.75rem;line-height:1;margin-top:.1rem}
+.checks li.no i{border-color:var(--down);color:var(--down)}
+.checks li.ok i{border-color:var(--up);color:var(--up)}
+.checks small{display:block;color:var(--soft);font-size:.8125rem;overflow-wrap:anywhere}
+
+footer{border-top:1px solid var(--rule);padding-top:1.25rem;padding-bottom:2.5rem;color:var(--soft);font-size:.875rem;margin-top:1rem}
+footer p{max-width:52rem;margin:.4rem 0}
+footer b{color:var(--ink)}
+
+@media (prefers-reduced-motion:reduce){.glow,.mark.lit .lg-spark{animation:none}.beat i,.beat::before{transition:none}}
+@media (forced-colors:active){.plate{border-color:CanvasText}}
+@media (min-width:40rem){.panel{grid-template-columns:repeat(auto-fill,minmax(12rem,1fr));gap:.9rem 2rem}}
+.cap.stale{margin:0 0 1rem}

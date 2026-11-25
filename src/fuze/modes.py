@@ -10,7 +10,9 @@ Changing the mode is a terminal action (`fuze mode`), never an MCP tool. See cli
 from __future__ import annotations
 
 import importlib.util
+import math
 import platform
+import re
 import time
 
 from fuze import __version__, config, keys
@@ -24,6 +26,8 @@ SOURCE_NAMES = {"paper": "practice money (paper)", "testnet": "test money (Light
                 "mainnet": "real money (Lighter mainnet)"}
 PHRASE = "REAL MONEY"  # typed, after RAISE, to switch to mainnet
 STEPS = ("open", "protect", "cancel", "close")
+SENT = ("open", "protect", "close")  # the steps that send a transaction; Lighter testnet must show each of them
+TX_WINDOW_S = 3600.0  # a rehearsal transaction must be this close to the time the record gives
 
 
 def realer_note(mode: str, source: str | None) -> str:
@@ -56,7 +60,51 @@ def rehearsal_problem() -> str:
     if r.get("machine") != machine():
         return "the rehearsal was done on another machine: run `fuze rehearse` here"
     if r.get("version") != __version__:
-        return f"the rehearsal was done with FUZE {r.get('version')}, this is {__version__}: run `fuze rehearse` again"
+        return (f"the rehearsal was done with FUZE {r.get('version')}, this is {__version__}. Each version changes code "
+                "that sends orders, so mainnet needs a rehearsal with the version that will trade: run `fuze rehearse` "
+                "again")
+    return ""
+
+
+def confirm_on_testnet(cfg, client) -> str:
+    """Empty when Lighter testnet itself shows the rehearsal's orders, else why not. Fails closed.
+
+    `client` is a Lighter testnet client made with the stored testnet key (lighter_venue.connect), so making it already
+    showed that Lighter accepts that key for this account and key index. Then each order the rehearsal sent (open,
+    take profit / stop loss, close) is read back by its transaction hash: it must exist on testnet, belong to this
+    account, be signed with this key index, and be from the time the record gives. Reads only; sends nothing."""
+    why = rehearsal_problem()
+    if why:
+        return why
+    r = config.read_json(config.home() / "rehearsal.json") or {}
+    acct, idx = cfg["testnet_account"], cfg["testnet_key_index"]
+    again = "run `fuze rehearse` again"
+    if r.get("account") != acct or r.get("key_index") != idx:
+        return (f"the rehearsal record is for testnet account {r.get('account')} key index {r.get('key_index')}, your "
+                f"settings say account {acct} key index {idx}: {again}")
+    t = r.get("t")
+    if isinstance(t, bool) or not isinstance(t, (int, float)) or not math.isfinite(t):
+        return f"the rehearsal record has no time: {again}"
+    txs = {s.get("step"): s.get("tx") for s in r.get("steps", [])}
+    for step in SENT:
+        tx = txs.get(step)
+        if not isinstance(tx, str) or not re.fullmatch(r"(?:0x)?[0-9a-fA-F]{16,256}", tx):
+            return f"the rehearsal record has no transaction for its {step} order, so Lighter cannot confirm it: {again}"
+        try:
+            info = client.tx(tx)
+        except RuntimeError as e:  # Lighter answered, and not with this transaction
+            from fuze.agent import _plain
+            return f"Lighter testnet does not confirm the rehearsal's {step} order ({_plain(e)}): {again}"
+        except Exception as e:  # network, testnet down: we cannot confirm, so we do not unlock
+            from fuze.agent import _plain
+            return (f"could not reach Lighter testnet to confirm the rehearsal ({_plain(e)}). Mainnet stays locked "
+                    "until it can be confirmed: try again later")
+        if not isinstance(info, dict) or info.get("account_index") != acct or info.get("api_key_index") != idx:
+            return (f"Lighter testnet shows the rehearsal's {step} order as sent by another account or API key "
+                    f"than testnet account {acct} key index {idx}: {again}")
+        when = info.get("queued_at") or info.get("executed_at")  # milliseconds
+        if isinstance(when, bool) or not isinstance(when, (int, float)) or abs(when / 1000 - t) > TX_WINDOW_S:
+            return f"Lighter testnet shows the rehearsal's {step} order at another time than the record: {again}"
     return ""
 
 
@@ -67,7 +115,7 @@ def blockers(cfg, mode: str | None = None) -> list:
         return []
     out = []
     if not sdk_installed():
-        out.append('the Lighter SDK is not installed: pip install "fuze-agent[lighter]"')
+        out.append("the Lighter SDK is not installed: " + config.pip_hint("mcp,lighter"))
     if cfg[f"{mode}_account"] is None:
         out.append(f"no Lighter {mode} account index: run `fuze keys {mode}`")
     if keys.state(mode) != "set":
@@ -88,6 +136,7 @@ def rehearse(ex, sleep=time.sleep, say=print, coin: str = "BTC") -> dict:
 
     steps = []
     rec = {"ok": False, "net": getattr(ex, "net", None), "account": getattr(ex, "index", None),
+           "key_index": getattr(getattr(ex, "c", None), "key_index", None),
            "machine": machine(), "version": __version__, "t": time.time(), "steps": steps}
 
     def read():

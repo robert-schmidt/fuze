@@ -14,6 +14,8 @@ Every venue has:
   flatten()               cancel everything and close every position, reduce-only
   mark(prices)            prices seen in the signal (the simulator uses them; a real exchange ignores them)
   link()                  the account's page on the exchange's public explorer, or None
+  book()                  {coin: {"entry", "mark"}} for held coins, from the last account read (no extra request);
+                          for display only (`fuze ui`), never for a decision
 """
 
 from __future__ import annotations
@@ -44,6 +46,9 @@ def worst_price(ref: float, units: float, reduce_only: bool) -> float:
 
 class Venue:
     live, settle_s = False, 0.0
+
+    def book(self) -> dict:
+        return {}
 
     def flatten(self) -> list:
         """Cancel every take profit / stop loss, then one reduce-only market order per open position. Returns the

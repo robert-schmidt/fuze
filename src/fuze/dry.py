@@ -52,6 +52,9 @@ class DryExchange(Venue):
                 "positions": {c: p["units"] for c, p in self.s["pos"].items() if p["units"]},
                 "brackets": [b["id"] for b in self.s["brackets"].values()]}
 
+    def book(self) -> dict:
+        return {c: {"entry": p["entry"], "mark": self.s["marks"].get(c)} for c, p in self.s["pos"].items() if p["units"]}
+
     def price(self, coin: str) -> float | None:
         return self.s["marks"].get(coin)
 
