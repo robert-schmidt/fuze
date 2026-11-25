@@ -1,0 +1,14 @@
+{
+  "name": "fuze",
+  "description": "FUZE agent tools for Claude Code",
+  "owner": {
+    "name": "FUZE"
+  },
+  "plugins": [
+    {
+      "name": "fuze",
+      "source": "./plugins/fuze",
+      "description": "Read the FUZE agent's status and reduce its risk (pause, flatten, lower limits). Needs `fuze` installed."
+    }
+  ]
+}

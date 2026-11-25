@@ -1,0 +1,5 @@
+# Add to ~/.codex/config.toml (or a trusted project's .codex/config.toml).
+# Same as: codex mcp add fuze -- fuze mcp
+[mcp_servers.fuze]
+command = "fuze"
+args = ["mcp"]

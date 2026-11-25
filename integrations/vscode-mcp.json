@@ -1,0 +1,9 @@
+{
+  "servers": {
+    "fuze": {
+      "type": "stdio",
+      "command": "fuze",
+      "args": ["mcp"]
+    }
+  }
+}

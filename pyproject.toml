@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fuze-agent"
+version = "0.1.0"
+description = "Follow the signed FUZE position signal on your own account (v0.1: dry run only)."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+dependencies = ["cryptography>=42"]  # the trading loop needs nothing else
+
+[project.optional-dependencies]
+mcp = ["mcp>=2.0,<3"]  # only for `fuze mcp` (the server AI coding tools talk to). MCP 2 renamed FastMCP to MCPServer
+test = ["pytest>=8", "mcp>=2.0,<3"]
+
+[project.scripts]
+fuze = "fuze.cli:main"
+
+[project.urls]
+Homepage = "https://fuze.trade"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,25 @@
+{
+ "public_key": "A6EHv/POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg=",
+ "valid": [
+  {
+   "payload": "{\"v\":1,\"seq\":1,\"rev\":1,\"ts\":1000.0,\"expires\":1060.0,\"source\":\"paper\",\"state\":\"live\",\"targets\":{\"BTC\":{\"x\":-1.8,\"px\":60000.0},\"ETH\":{\"x\":-0.4,\"px\":2000.0}},\"scalp\":{\"coin\":\"BTC\",\"x\":-1.2,\"tp\":59400.0,\"sl\":60420.0,\"id\":7},\"why\":\"We hold short 1.80 times the balance on Bitcoin and short 0.40 times the balance on Ether; the scalp part has its take profit at 59,400 and stop loss at 60,420.\"}",
+   "sig": "DYG8osx+yzGFUJYjhrIhzVo7gq3qZZwcvuygXwa2fn6v/OEBjG26ezZprd6IqWfTzcf0iRtzJlimx4ZH3cdSBQ==",
+   "kid": "test"
+  },
+  {
+   "payload": "{\"v\":1,\"seq\":2,\"rev\":1,\"ts\":1006.0,\"expires\":1066.0,\"source\":\"paper\",\"state\":\"live\",\"targets\":{\"BTC\":{\"x\":-1.8,\"px\":60000.0},\"ETH\":{\"x\":-0.4,\"px\":2000.0}},\"scalp\":{\"coin\":\"BTC\",\"x\":-1.2,\"tp\":59400.0,\"sl\":60420.0,\"id\":7},\"why\":\"We hold short 1.80 times the balance on Bitcoin and short 0.40 times the balance on Ether; the scalp part has its take profit at 59,400 and stop loss at 60,420.\"}",
+   "sig": "YH0rYl6eyODxCMkm3+pEYfVcVvMnonhW8WFgUGwRbJ9wFIkzoXH1Mr3wAyaAyYB80Y5H7WBrb8wgGB4KtfN7Bw==",
+   "kid": "test"
+  },
+  {
+   "payload": "{\"v\":1,\"seq\":3,\"rev\":2,\"ts\":1007.0,\"expires\":1067.0,\"source\":\"paper\",\"state\":\"live\",\"targets\":{\"BTC\":{\"x\":0.0,\"px\":60000.0},\"ETH\":{\"x\":-0.4,\"px\":2000.0}},\"scalp\":null,\"why\":\"We hold short 0.40 times the balance on Ether.\"}",
+   "sig": "kK6kLLwGm2iwFUBW7QJChKwNdzcqvY4iv1aBwJtuPsO2eLkcaYIL7ZAOQKjd3jQp4NJDLhpRc7fBUmx45FCGCA==",
+   "kid": "test"
+  }
+ ],
+ "tampered": {
+  "payload": "{\"v\":1,\"seq\":1,\"rev\":1,\"ts\":1000.0,\"expires\":1060.0,\"source\":\"paper\",\"state\":\"live\",\"targets\":{\"BTC\":{\"x\":-9.8,\"px\":60000.0},\"ETH\":{\"x\":-0.4,\"px\":2000.0}},\"scalp\":{\"coin\":\"BTC\",\"x\":-1.2,\"tp\":59400.0,\"sl\":60420.0,\"id\":7},\"why\":\"We hold short 1.80 times the balance on Bitcoin and short 0.40 times the balance on Ether; the scalp part has its take profit at 59,400 and stop loss at 60,420.\"}",
+  "sig": "DYG8osx+yzGFUJYjhrIhzVo7gq3qZZwcvuygXwa2fn6v/OEBjG26ezZprd6IqWfTzcf0iRtzJlimx4ZH3cdSBQ==",
+  "kid": "test"
+ }
+}

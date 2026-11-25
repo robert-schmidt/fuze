@@ -1,0 +1,18 @@
+{
+  "name": "fuze",
+  "version": "0.1.0",
+  "description": "MCP server for the FUZE agent: status, the verified signal, and tools that can only reduce risk. Runs the `fuze` command you installed yourself.",
+  "author": {
+    "name": "FUZE"
+  },
+  "homepage": "https://fuze.trade",
+  "license": "MIT",
+  "mcpServers": {
+    "fuze": {
+      "command": "fuze",
+      "args": [
+        "mcp"
+      ]
+    }
+  }
+}
