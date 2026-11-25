@@ -42,7 +42,7 @@ The signature covers the payload **text**. Verify first, parse after. Never re-s
 | `state` | `live`: follow `targets`. `flat`: we closed everything and are staying out; close and stay out. `offline`: we have no fresh reading; hold what you have, open nothing new (`targets` is empty) |
 | `targets[coin].x` | our position value divided by our balance. Negative is short. `0` means none |
 | `targets[coin].px` | the price `x` was computed at |
-| `scalp` | the part of that coin's position that has its own take profit `tp` and stop loss `sl` (prices). `null` when there is none. `x` is that part alone and is included in `targets`. `id` changes with every new scalp |
+| `scalp` | the part of that coin's position that has its own take profit `tp` and stop loss `sl` (prices). `null` when there is none. `x` is that part alone and is included in `targets`. `id` changes with every new scalp. It may also carry `lev` (the leverage that trade was opened with; its margin is its size divided by `lev`) and `entry` (its average entry price): both are for people reading the signal, and a follower sizes from `x` alone |
 | `why` | the same thing in plain words |
 
 ## What an agent must check, in this order
