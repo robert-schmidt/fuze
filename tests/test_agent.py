@@ -140,3 +140,16 @@ def test_lowering_a_limit_shrinks_the_held_position_on_the_next_step(fuze_home, 
     st = config.read_json(fuze_home / "status.json")
     assert "limits changed" in st["reason"] and st["wanted"]["BTC"] == pytest.approx(btc / 2, rel=1e-3)
     assert st["min_change_usd"] == pytest.approx(20.0, rel=1e-3)
+
+
+def test_log_lines_reach_only_the_scrubbing_handler():
+    """Lighter's SDK configures the root logger; a line passed on to it would print twice, the second time unscrubbed."""
+    import logging
+    from fuze import agent
+    before = list(agent.log.handlers)
+    try:
+        agent.setup_logging()
+        assert agent.log.propagate is False
+    finally:
+        agent.log.handlers[:] = before
+        agent.log.propagate = True

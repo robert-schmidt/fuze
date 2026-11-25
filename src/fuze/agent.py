@@ -55,6 +55,7 @@ def setup_logging(level=logging.INFO) -> None:
     handler.setFormatter(logging.Formatter("%(asctime)s %(message)s"))
     log.addHandler(handler)
     log.setLevel(level)
+    log.propagate = False  # Lighter's SDK sets up the root logger: without this every line prints twice, once unscrubbed
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
