@@ -9,7 +9,7 @@ from fake_lighter import FakeLighter
 from fuze import config
 from fuze.agent import INFLIGHT_WAIT_S, MISS_WAIT_S, Agent
 from fuze.lighter_venue import LighterVenue
-from fuze.venue import account_link, tx_link, worst_price
+from fuze.venue import TESTNET_SLIP, Venue, account_link, tx_link, worst_price
 
 
 class Clock:
@@ -27,7 +27,9 @@ def fake():
 
 def venue(fake, clock=None, home=None):
     home = home or config.ensure_home()
-    return LighterVenue(fake, home / "lighter-testnet.json", clock or Clock(), net="testnet", index=77)
+    v = LighterVenue(fake, home / "lighter-testnet.json", clock or Clock(), net="testnet", index=77)
+    v.slip = Venue.slip  # the numbers below are mainnet's price bound; testnet's wider one has its own test
+    return v
 
 
 def agent(fake, signer, clock, cfg=None):
@@ -58,6 +60,17 @@ def test_markets_decimals_and_minimums_come_from_the_exchange(fake):
     assert not v.tradable("ETH", 0.005, 1000.0)  # $5: under the $10 smallest order
     assert v.smallest("BTC", 60000.0) == pytest.approx(0.0002)
     assert v.smallest("ETH", 2000.0) == pytest.approx(0.0053)  # $10 x 1.05 / $2,000, up to the size step
+
+
+def test_testnet_gets_a_wider_price_bound_than_mainnet(fake):
+    """Lighter testnet's book is thin (best offer 1.4% over best bid on 2026-11-25): 0.5% did not fill there."""
+    home = config.ensure_home()
+    test, main = (LighterVenue(fake, home / f"lighter-{n}.json", Clock(), net=n, index=77) for n in ("testnet", "mainnet"))
+    assert test.slip == TESTNET_SLIP and max(TESTNET_SLIP) < 0.05  # under Lighter's own 5% price check
+    assert test.worst(60000.0, 0.001, False) == pytest.approx(61800.0) and test.worst(60000.0, -0.001, True) == pytest.approx(57600.0)
+    assert main.worst(60000.0, 0.001, False) == pytest.approx(60300.0) and main.worst(60000.0, -0.001, True) == pytest.approx(58800.0)
+    test.market("BTC", 0.001, 60000.0)  # no worst price given: the venue's own bound
+    assert fake.sent[-1] == ("market", 1, 100, 618000, False, False)
 
 
 def test_market_order_in_integer_units_with_a_worst_price(fake):

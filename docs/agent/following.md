@@ -84,6 +84,6 @@ your balance grows.
 - An order in flight is written to disk before it is sent; after a crash or restart the agent reads the account instead
   of sending it again.
 - Reductions are reduce-only, and every market order has a worst price: 0.5% past the signal's price to open or add, 2%
-  to reduce or close.
+  to reduce or close. On Lighter testnet, whose order book is thin, the bounds are 3% and 4%.
 - Sizes and prices are rounded to the decimals and smallest order Lighter publishes.
 - If the take profit and stop loss cannot be seen on the exchange after placing them, that part is closed.

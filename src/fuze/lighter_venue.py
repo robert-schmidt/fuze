@@ -13,6 +13,7 @@ Tests replace LighterClient with a fake; nothing in the tests talks to Lighter.
 from __future__ import annotations
 
 import asyncio
+import atexit
 import json
 import math
 import time
@@ -24,7 +25,7 @@ from pathlib import Path
 from fuze import keys
 from fuze.config import read_json, write_json
 from fuze.protocol import COINS
-from fuze.venue import CHAIN_ID, HOSTS, SLIP_ADD, SLIP_REDUCE, Venue, account_link
+from fuze.venue import CHAIN_ID, HOSTS, SLIP_ADD, SLIP_REDUCE, TESTNET_SLIP, Venue, account_link
 
 READ_EVERY_S = 5.0  # a standard Lighter account gets about 60 requests a minute, orders included
 TOKEN_S = 480.0  # the read token for open orders lasts 10 minutes; renew after 8
@@ -58,6 +59,7 @@ class LighterClient:
             raise RuntimeError(f"the Lighter SDK could not use the stored {net} API key ({type(e).__name__}). A Lighter "
                                f"API private key is 80 hexadecimal characters; enter it again with `fuze keys {net}`, "
                                "or register a new key on Lighter (docs/lighter-setup.md).") from None
+        atexit.register(self.close)  # a command that ends with the SDK's session open prints "unclosed client session"
         if err:
             self.close()
             raise RuntimeError(f"Lighter does not accept this API key for account {account} at key index {key_index}. "
@@ -183,6 +185,8 @@ class LighterVenue(Venue):
 
     def __init__(self, client, store: Path, clock=time.time, net="testnet", index=None):
         self.c, self.path, self.clock, self.net, self.index = client, Path(store), clock, net, index
+        if net == "testnet":
+            self.slip = TESTNET_SLIP
         self.pairs = read_json(self.path, {}) or {}  # coin -> the protective pair we placed {"id", "units", "tp", "sl"}
         self.m, self.m_t, self.cache, self.cache_t, self.seen = {}, 0.0, None, 0.0, {}
         self._markets()
@@ -271,8 +275,7 @@ class LighterVenue(Venue):
         if base <= 0:
             raise ValueError(f"{coin} order of {units} is smaller than Lighter's size step")
         if worst is None:
-            from fuze.venue import worst_price
-            worst = worst_price(ref_px or self.price(coin), units, reduce_only)
+            worst = self.worst(ref_px or self.price(coin), units, reduce_only)
         self.client_index += 1
         self.cache = None
         return self.c.market_order(self.m[coin]["id"], self.client_index, base, self._px(coin, worst),

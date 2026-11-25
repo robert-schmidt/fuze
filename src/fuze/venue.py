@@ -26,6 +26,10 @@ from fuze.protocol import COINS
 
 SLIP_ADD = 0.005  # worst price of an order that opens or adds: 0.5% past the reference price
 SLIP_REDUCE = 0.02  # ... and of one that reduces or closes: 2% (a close must fill)
+# Lighter testnet's order book is thin: on 2026-11-25 its best Bitcoin offer stood 1.4% above its best bid, and an order
+# bound to 0.5% of the last trade did not fill. Test money only, so the bound is wider there; it stays under the 5%
+# from the mark price past which Lighter itself refuses a price.
+TESTNET_SLIP = (0.03, 0.04)
 HOSTS = {"mainnet": "https://mainnet.zklighter.elliot.ai", "testnet": "https://api.testnet.lighter.xyz"}
 CHAIN_ID = {"mainnet": 304, "testnet": 300}  # passed explicitly: the SDK guesses 304 (mainnet) for the testnet host
 EXPLORER = {"mainnet": "https://app.lighter.xyz/explorer", "testnet": "https://testnet.app.lighter.xyz/explorer"}
@@ -39,13 +43,17 @@ def tx_link(net: str, tx) -> str | None:
     return f"{EXPLORER[net]}/logs/{tx}" if net in EXPLORER and isinstance(tx, str) and tx else None
 
 
-def worst_price(ref: float, units: float, reduce_only: bool) -> float:
-    slip = SLIP_REDUCE if reduce_only else SLIP_ADD
-    return ref * (1 + slip) if units > 0 else ref * (1 - slip)
+def worst_price(ref: float, units: float, reduce_only: bool, slip=(SLIP_ADD, SLIP_REDUCE)) -> float:
+    s = slip[1] if reduce_only else slip[0]
+    return ref * (1 + s) if units > 0 else ref * (1 - s)
 
 
 class Venue:
-    live, settle_s = False, 0.0
+    live, settle_s, slip = False, 0.0, (SLIP_ADD, SLIP_REDUCE)
+
+    def worst(self, ref: float, units: float, reduce_only: bool) -> float:
+        """The worst price a market order may fill at, with this venue's bound."""
+        return worst_price(ref, units, reduce_only, self.slip)
 
     def book(self) -> dict:
         return {}
@@ -59,7 +67,7 @@ class Venue:
         for coin, units in self.account(fresh=True)["positions"].items():
             px = self.price(coin)
             if units and px:
-                out.append(self.market(coin, -units, px, worst_price(px, -units, True), True))
+                out.append(self.market(coin, -units, px, self.worst(px, -units, True), True))
         return out
 
 

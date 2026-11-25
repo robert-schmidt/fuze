@@ -128,12 +128,11 @@ def blockers(cfg, mode: str | None = None) -> list:
 def rehearse(ex, sleep=time.sleep, say=print, coin: str = "BTC") -> dict:
     """The testnet rehearsal, on a venue (normally Lighter testnet). Every step is confirmed by reading the account:
       open     buy the smallest order Lighter takes; the account shows the position
-      protect  a reduce-only take profit (+1%) and stop loss (-1%), one cancels the other; the account shows them
+      protect  a reduce-only take profit (+3%) and stop loss (-3%), one cancels the other; the account shows them
+               (3%: they trigger on the mark price, which on testnet's thin book can sit 1% from the last trade)
       cancel   cancel them; the account shows none
       close    a reduce-only market order for the whole position; the account shows it flat
     On a failure it cancels and closes what it opened. Returns the record for rehearsal.json."""
-    from fuze.venue import worst_price
-
     steps = []
     rec = {"ok": False, "net": getattr(ex, "net", None), "account": getattr(ex, "index", None),
            "key_index": getattr(getattr(ex, "c", None), "key_index", None),
@@ -158,11 +157,14 @@ def rehearse(ex, sleep=time.sleep, say=print, coin: str = "BTC") -> dict:
         return rec
     units = ex.smallest(coin, px)
     try:
-        tx = ex.market(coin, units, px, worst_price(px, units, False), False)
+        worst = ex.worst(px, units, False)
+        tx = ex.market(coin, units, px, worst, False)
         held = read()["positions"].get(coin, 0.0)
-        if not step("open", held > 0, tx, f"bought {units:g} {coin} near {px:,.2f}; the account shows {held:+g}"):
+        if not step("open", held > 0, tx, f"bought {units:g} {coin} near {px:,.2f}; the account shows {held:+g}" + (
+                "" if held > 0 else f". Lighter took the order but nothing filled: nobody was selling at {worst:,.2f} "
+                                    "or less. Its order book can be thin; try again in a few minutes")):
             return rec
-        tx = ex.protect(coin, held, px * 1.01, px * 0.99, 0)
+        tx = ex.protect(coin, held, px * 1.03, px * 0.97, 0)
         shown = read()["brackets"]
         if not step("protect", 0 in shown, tx, "take profit and stop loss " + ("shown" if 0 in shown else "NOT shown")
                     + " on the account"):
@@ -171,7 +173,7 @@ def rehearse(ex, sleep=time.sleep, say=print, coin: str = "BTC") -> dict:
         shown = read()["brackets"]
         if not step("cancel", not shown, None, "none left" if not shown else "still shown"):
             return rec
-        tx = ex.market(coin, -held, px, worst_price(px, -held, True), True)
+        tx = ex.market(coin, -held, px, ex.worst(px, -held, True), True)
         left = read()["positions"].get(coin, 0.0)
         step("close", abs(left) < 1e-12, tx, "flat" if abs(left) < 1e-12 else f"still holds {left:+g}")
     except Exception as e:

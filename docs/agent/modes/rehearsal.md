@@ -10,7 +10,7 @@ On your Lighter testnet account, with test money, each step confirmed by reading
 | Step | Order | Passes when |
 |---|---|---|
 | open | Buy the smallest Bitcoin position Lighter accepts | The account shows the position |
-| protect | Place a reduce-only take profit (+1%) and stop loss (-1%) | The account shows them |
+| protect | Place a reduce-only take profit (+3%) and stop loss (-3%) | The account shows them |
 | cancel | Cancel both | The account shows none |
 | close | A reduce-only market order for the whole position | The account is flat |
 

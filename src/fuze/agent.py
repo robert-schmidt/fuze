@@ -30,7 +30,7 @@ from fuze import __version__
 from fuze.config import LIMITS, ensure_home, load, read_json, write_json
 from fuze.follow import decide
 from fuze.protocol import COINS, PINNED, Guard
-from fuze.venue import open_venue, tx_link, worst_price
+from fuze.venue import open_venue, tx_link
 
 log = logging.getLogger("fuze")
 MAX_LINE = 65_536
@@ -255,7 +255,7 @@ class Agent:
     def send(self, coin: str, units: float, ref: float, reduce_only: bool) -> bool:
         """One market order, read back. True if it filled in full."""
         held = self.acct["positions"].get(coin, 0.0)
-        worst = worst_price(ref, units, reduce_only)
+        worst = self.ex.worst(ref, units, reduce_only)
         self.pending = {"t": self.clock(), "coin": coin, "units": units, "before": held, "worst": worst,
                         "reduce_only": reduce_only}
         write_json(self.home / "pending.json", self.pending)  # before sending: a restart must not send it again

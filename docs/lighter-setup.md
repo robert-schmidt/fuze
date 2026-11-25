@@ -5,8 +5,8 @@ two numbers that go with it. FUZE's modes `testnet` and `mainnet` trade on Light
 
 Start on testnet with small sizes and watch it; mainnet stays locked on each machine until that machine has passed
 `fuze rehearse` on testnet, for each new version of FUZE. FUZE is not affiliated with Lighter. Lighter's own documentation is the authority; facts below were checked against https://docs.lighter.xyz (which
-https://apidocs.lighter.xyz now redirects to) and Lighter's official Python SDK on 2026-11-25. The few steps we could
-not verify are listed once, at the end.
+https://apidocs.lighter.xyz now redirects to) and Lighter's official Python SDK on 2026-11-25, and the testnet steps
+were done on Lighter testnet that day. What we did not try ourselves is listed once, at the end.
 
 ## 1. A wallet only you control
 
@@ -16,8 +16,12 @@ trust. The wallet's private key never goes into FUZE, a config file, a chat or a
 
 ## 2. A Lighter account, testnet first
 
-- Testnet app: https://testnet.app.lighter.xyz (API https://api.testnet.lighter.xyz). Lighter's testnet runs against
-  Ethereum Sepolia; its faucet gives test USDC but no ETH, so you need Sepolia ETH from a public Sepolia faucet.
+- Testnet app: https://testnet.app.lighter.xyz (API https://api.testnet.lighter.xyz). Connect your wallet, open the
+  account panel (your address, top right) and press **Request Funds**: the account is created and credited with test
+  money. You can ask again whenever the account is worth less than $100. We needed no Sepolia ETH for this.
+  The button calls Lighter's faucet, which also answers directly: open
+  `https://api.testnet.lighter.xyz/api/v1/faucet?l1_address=<your address>&do_l1_transfer=true` and then the same
+  address ending in `false`. That is the way we used; the account appeared about 20 seconds later.
 - Mainnet app: https://app.lighter.xyz (API https://mainnet.zklighter.elliot.ai).
 - Your **account index** is Lighter's whole number for your account. Main accounts count up from 0; sub-accounts count
   down from a very large number. It is public (it is in the explorer's address). To look it up from your wallet
@@ -34,9 +38,9 @@ https://docs.lighter.xyz/developers/getting-started/core-concepts.md
 
 ## 3. A dedicated sub-account holding only what you can lose
 
-Lighter has sub-accounts, each with its own index, balances and API keys. A sub-account is created with a
-`CreateSubAccount` transaction signed for your account, and you move funds between your main account and a sub-account
-with transfers. Follow FUZE only on a sub-account of its own, and put in it only money you can afford to lose
+Lighter has sub-accounts, each with its own index, balances and API keys. The app's **Sub-accounts** page
+(`/sub-accounts`) has "New Sub-Account" and "Transfer"; underneath, a sub-account is created with a `CreateSubAccount`
+transaction signed for your account, and funds move between your accounts with transfers. Follow FUZE only on a sub-account of its own, and put in it only money you can afford to lose
 completely. FUZE treats every reduce-only trigger order on BTC and ETH in that account as its own take profit or stop
 loss and may cancel it, and `fuze mode` refuses an account that already holds positions or orders.
 
@@ -70,7 +74,16 @@ What Lighter's docs say (https://docs.lighter.xyz/developers/integration-guides/
 
 ### Creating and registering one
 
-The route Lighter documents is its official Python SDK (`lighter-sdk`, the same package FUZE's `[lighter]` extra
+**In the app (the simple route).** Open the **API keys** page, https://testnet.app.lighter.xyz/apikeys on testnet and
+https://app.lighter.xyz/apikeys on mainnet, with the account (or sub-account) FUZE will use selected:
+
+1. Press **Generate API key** and choose an index from 4 to 254 (4 is FUZE's default).
+2. Leave **Maker only** off: FUZE opens and closes with market orders, which a maker-only key cannot send.
+3. Your wallet signs the registration. The app then shows the private key **once**: copy it straight into
+   `fuze keys testnet` (step 5) and nowhere else.
+4. The same page shows **Your account index**.
+
+**With the SDK.** The route Lighter's developer docs describe is its official Python SDK (`lighter-sdk`, the same package FUZE's `[lighter]` extra
 installs). Its example `examples/system_setup.py`, in Lighter's `lighter-python` repository on GitHub:
 
 1. looks up your account index from your wallet address;
@@ -154,8 +167,12 @@ one, and the new key starts without restrictions (set them again). An expired ke
 key leaked: replace it at once, cancel its open orders with another key, and move the funds out of that sub-account.
 `fuze keys testnet --delete` (or mainnet) removes FUZE's copy from this machine; it does not stop the key on Lighter.
 
-## What we could not verify
+## What we did not try ourselves
 
-Lighter's developer docs describe the steps above as transactions and SDK calls. They do not document where in Lighter's
-web app (if anywhere) you can create a sub-account, create or register an API key, set its market restrictions, or use
-the testnet faucet. If the app offers these, it is the simpler route; we have not confirmed it.
+Done on Lighter testnet on 2026-11-25: an account created and funded by the faucet, an API key made on the app's API
+keys page at index 4, `fuze check`, and `fuze rehearse` (open, take profit and stop loss, cancel, close), each order
+confirmed on Lighter's public record.
+
+Not tried by us: the Request Funds button itself (we called the faucet it calls), creating a sub-account in the app, restricting a key to markets (Lighter's docs give the API call,
+signed by your wallet; we did not find the setting on the API keys page), a key with an expiry, and anything on
+mainnet.

@@ -70,6 +70,22 @@ def test_failed_rehearsal_cleans_up_and_keeps_mainnet_locked(exchanges):
     assert "did not pass" in modes.rehearsal_problem()
 
 
+def test_rehearsal_says_why_when_the_opening_order_does_not_fill(exchanges):
+    exchanges["testnet"].fill = "none"
+    rec = rehearsed(exchanges)
+    assert not rec["ok"] and rec["steps"][0]["step"] == "open" and "nobody was selling at 61,800.00 or less" in rec["steps"][0]["detail"]
+
+
+def test_check_reads_the_testnet_account_from_simulation_once_its_key_is_stored(exchanges, monkeypatch):
+    from fuze import checks, venue
+    monkeypatch.setattr(venue, "open_venue", lambda cfg, home, **kw: LighterVenue(
+        exchanges[cfg["mode"]], config.home() / "lighter-testnet.json", net=cfg["mode"], index=77))
+    rows = {r["check"]: r for r in checks.setup_report(read_account=True)}
+    assert config.load()["mode"] == "simulation" and rows["Lighter testnet account read (no order sent)"]["ok"]
+    keys.delete("testnet")
+    assert not any("Lighter" in r["check"] for r in checks.setup_report(read_account=True))
+
+
 def test_rehearsal_needs_a_flat_account(exchanges):
     exchanges["testnet"].pos[0] = 0.1
     assert not rehearsed(exchanges)["ok"] and exchanges["testnet"].sent == []

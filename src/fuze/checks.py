@@ -60,10 +60,12 @@ def _live(cfg, add, read_account: bool) -> None:
     """The live prerequisites for the configured mode, and (fuze check only) one account read. No order."""
     mode = cfg["mode"]
     add(True, "Mode", modes.NAMES[mode])
-    if mode == "simulation":
-        return
+    if mode == "simulation":  # the testnet key is set and rehearsed from simulation: check it once it is stored
+        if cfg["testnet_account"] is None or keys.state("testnet") != "set":
+            return
+        mode = "testnet"
     from fuze.venue import account_link
-    problems = modes.blockers(cfg)
+    problems = modes.blockers(cfg, mode)
     add(not any("SDK" in p for p in problems), "Lighter SDK installed", config.pip_hint("mcp,lighter")
         if any("SDK" in p for p in problems) else "")
     acct = cfg[f"{mode}_account"]
@@ -82,7 +84,7 @@ def _live(cfg, add, read_account: bool) -> None:
         return
     try:
         from fuze.venue import open_venue
-        ex = open_venue(cfg, config.home())
+        ex = open_venue({**cfg, "mode": mode}, config.home())
         a = ex.account(fresh=True)
         add(True, f"Lighter {mode} account read (no order sent)",
             f"balance ${a['balance']:,.2f}, positions {a['positions'] or 'none'}, "
