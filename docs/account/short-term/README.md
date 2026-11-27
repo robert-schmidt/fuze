@@ -15,8 +15,8 @@ hours, each with its own take profit and stop loss. The pages follow one trade f
    limit. See [The bracket](bracket.md).
 5. **A size.** Each entry sets aside a fixed share of the balance as margin; the decider's confidence sets the leverage.
    See [Leverage and size](leverage-size.md).
-6. **Maybe more entries.** A later call on the same side can add to a working position, up to five entries. See
-   [Adding to a position](adding.md).
+6. **Maybe more entries.** A later call on the same side can add to a position that is at least 50 bps in profit, up
+   to five entries. See [Adding to a position](adding.md).
 7. **An end.** The trade ends at its take profit, its stop loss or its time limit, whichever comes first.
 
 ## In one table

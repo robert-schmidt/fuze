@@ -17,7 +17,7 @@ answer to the same snapshot every time, which makes it testable on years of hist
 | When to enter | A busy candle **with** the trend that kept most of its move (closed in the trend-side half of its range), or a candle of either colour **pushed back with the trend** from a new 1-hour extreme (a rejected spike) | This is where the AI traded too |
 | When to wait | A spike against the trend that held, a with-trend candle pushed back from its own new extreme, or a with-trend candle that gave most of its move back | |
 | Halt | An economic release within 10 minutes, stale data, or $1 million or more of liquidations against the trade in the last minute | The AI's danger list, where it can be stated as a number |
-| Open position | Add only to a position on the same side that is in profit and not full (5 entries). Leave a losing or full one alone. Never reverse | Reversing measured about 13 bps worse than holding |
+| Open position | Add only to a position on the same side that is at least 50 bps in profit and not full (5 entries). Leave any other alone. Never reverse | Reversing measured about 13 bps worse than holding |
 | Stop and target | Names no levels, so the default bracket applies: stop 1%, target 1.5% from the average entry | Named levels pulled the stop toward the price and closed winners early |
 | Confidence | Always 0.55, which means 30x leverage | No input separated winners from losers, so there is nothing honest to scale it by |
 

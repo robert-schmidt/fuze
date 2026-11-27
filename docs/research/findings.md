@@ -20,6 +20,7 @@ the loss is the cost.
 | Funding rates | 198 variants | Extremes do not predict direction |
 | Stops and targets at chart levels | About 70 exit variants on 70,000 candles | None beat the fixed 1.5% / 1% / 8-hour bracket per trade |
 | Moving the stop once a trade is in profit | Over 60 variants on 32,890 trades, 2023 to 2026 | None adds money (0 to 2 bps a trade less); trades closing in profit rise from 43% to between 50% and 76%. The account uses one as a rule: see [The bracket](../account/short-term/bracket.md) |
+| Adding entries to a position | 3 years of calls replayed on an account, 2023 to 2026; 138 added entries on the practice account | An added entry earns the same per dollar as a first entry: adding changes the size, not the quality. Adding at any small profit made the worst month about a third deeper than adding from 50 bps. The account now adds only from 50 bps in profit, never to a losing position |
 | Reversing on an opposite signal | Graded by signal strength | Reversing lost about 13 bps more than holding |
 | Market regime (bull, bear, volatility, mood) | 68,000 triggers by regime | Every regime loses on both sides |
 | Day-scale warnings and pauses after stops | 13 flags, several pause rules | None passes; a pause only loses less by trading less |
