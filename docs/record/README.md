@@ -8,7 +8,7 @@ changed afterwards.
 
 | Where | What you see |
 |---|---|
-| fuze.trade, Simple view | The live position, the short-term trade between its take profit and stop loss, the balance since the test period started, the latest moves |
+| fuze.trade, Simple view | The live position, the short-term trade between its take profit and stop loss, the open positions (each with its take profit and stop loss, its entries and their time stamps), the balance since the test period started, the closed positions of the period, and our own follower |
 | fuze.trade, Advanced view | What the account's own dashboard shows, read-only: the account and both books, results by period and by day, every closed trade with its proof, the change history, the AI against our algorithm, the markets we watch, and raw research tables |
 | `https://fuze.trade/v1/record` | The balance numbers as JSON |
 
