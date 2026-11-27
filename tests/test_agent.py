@@ -153,3 +153,33 @@ def test_log_lines_reach_only_the_scrubbing_handler():
     finally:
         agent.log.handlers[:] = before
         agent.log.propagate = True
+
+
+def test_a_stop_moved_into_profit_and_an_added_entry_are_followed(fuze_home, signer):
+    """Our stop follows a scalp that is in profit, and an entry is added only once it is. Each arrives as a new
+    revision: the agent replaces its resting pair at the moved stop, then grows the position and the pair, and the moved
+    stop closes the scalp part when the price comes back. It is not opened again."""
+    from conftest import payload
+    config.save(dict(config.DEFAULTS))
+    now = [1010.0]
+    agent = Agent(home=config.ensure_home(), keys=signer.keys, clock=lambda: now[0])
+
+    def step(seq, rev, px, scalp_x, sl):
+        now[0] = 1005.0 + 5 * seq
+        agent.handle(json.dumps(signer.envelope(payload(
+            seq=seq, rev=rev, ts=now[0], expires=now[0] + 60,
+            targets={"BTC": {"x": -0.6 + scalp_x, "px": px}, "ETH": {"x": -0.4, "px": 2000.0}},
+            scalp={"coin": "BTC", "x": scalp_x, "tp": 59100.0, "sl": sl, "id": 7}))))
+
+    step(1, 1, 60000.0, -1.2, 60600.0)  # short, the scalp part under a stop 1% above its entry
+    assert agent.memory["prot"]["sl"] == 60600.0 and agent.acct["positions"]["BTC"] == pytest.approx(-0.003)
+    step(2, 2, 59640.0, -1.2, 59850.0)  # 60 bps in profit: the stop moved to 25 bps in profit
+    assert agent.memory["prot"]["sl"] == 59850.0 and agent.acct["brackets"] == [7]
+    assert agent.acct["positions"]["BTC"] == pytest.approx(-0.003)  # nothing traded
+    step(3, 3, 59640.0, -1.8, 59850.0)  # an entry is added, the stop is kept
+    assert agent.acct["positions"]["BTC"] == pytest.approx(-240 / 59640, rel=1e-2)
+    assert agent.memory["prot"]["sl"] == 59850.0 and agent.memory["prot"]["units"] == pytest.approx(-180 / 59640, rel=1e-2)
+    step(4, 3, 59860.0, -1.8, 59850.0)  # the price comes back through the moved stop
+    assert agent.acct["brackets"] == [] and agent.acct["positions"]["BTC"] == pytest.approx(-60 / 59640, rel=5e-2)
+    step(5, 3, 59700.0, -1.8, 59850.0)  # still the same revision: the closed scalp part stays closed
+    assert agent.acct["brackets"] == [] and agent.acct["positions"]["BTC"] == pytest.approx(-60 / 59640, rel=5e-2)

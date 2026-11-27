@@ -265,3 +265,36 @@ def test_cents_of_difference_are_not_reported_as_too_small_to_trade():
     assert "under $20" not in d2.reason
     assert not any(r["under_min_change"] for r in compare(d.memory["wanted"], held, {"BTC": 60000.0, "ETH": 2000.0},
                                                           20.0))
+
+
+# --- the stop follows a scalp that is in profit, and an entry is added only then ----------------------------------
+
+MOVED = {"coin": "BTC", "x": -1.2, "tp": 59100.0, "sl": 59850.0, "id": 7}  # entry 60,000: the stop is 25 bps in profit
+
+
+def test_a_stop_moved_into_profit_is_followed():
+    """The new stop is on the winning side of the entry and still on the losing side of the price: a new revision
+    with the same position. The agent keeps the position and replaces the pair."""
+    d = run(sig())
+    held = dict(d.targets)
+    s = sig(seq=2, rev=2, targets={"BTC": {"x": -1.8, "px": 59640.0}, "ETH": {"x": -0.4, "px": 2000.0}}, scalp=MOVED)
+    d2 = run(s, pos=held, brackets=[7], memory=d.memory)
+    assert d2.act and d2.targets == held and "not opened" not in d2.reason
+    assert d2.bracket == {"coin": "BTC", "units": pytest.approx(-120 / 59640), "tp": 59100.0, "sl": 59850.0, "id": 7}
+
+
+def test_an_added_entry_grows_the_position_and_keeps_the_moved_stop():
+    d = run(sig())
+    s = sig(seq=2, rev=2, targets={"BTC": {"x": -2.4, "px": 59640.0}, "ETH": {"x": -0.4, "px": 2000.0}},
+            scalp={**MOVED, "x": -1.8})
+    d2 = run(s, pos=dict(d.targets), brackets=[7], memory=d.memory)
+    assert d2.targets["BTC"] == pytest.approx(-240 / 59640)
+    assert d2.bracket["units"] == pytest.approx(-180 / 59640) and d2.bracket["sl"] == 59850.0 and d2.bracket["id"] == 7
+
+
+def test_a_moved_stop_the_price_already_crossed_closes_the_scalp_part():
+    d = run(sig())
+    s = sig(seq=2, rev=2, targets={"BTC": {"x": -1.8, "px": 59900.0}, "ETH": {"x": -0.4, "px": 2000.0}}, scalp=MOVED)
+    d2 = run(s, pos=dict(d.targets), brackets=[7], memory=d.memory)
+    assert d2.bracket is None and "losing side" in d2.reason
+    assert d2.targets["BTC"] == pytest.approx(-60 / 59900)  # the trend part stays
