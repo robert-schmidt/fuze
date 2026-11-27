@@ -8,7 +8,6 @@ This page lists messages and situations you may meet, what they mean, and what t
 | You see | Meaning | Do this |
 |---|---|---|
 | `uv: command not found` right after installing uv | The terminal was open before uv was installed | Close the terminal and open a new one |
-| `fuze: command not found` after the install | The folder uv puts programs in (`~/.local/bin`) is not on your PATH | Run `uv tool update-shell`, then open a new terminal |
 | `Git executable not found` during the install | git is missing | macOS: run `xcode-select --install`, click Install, then run the install line again. Ubuntu or Debian: `sudo apt install -y git` |
 | `command not found: fuze` | `~/.local/bin` (uv, pipx) or the virtual environment is not on your PATH | `uv tool update-shell` or `pipx ensurepath` and a new terminal; with a clone, use `~/.fuze-venv/bin/fuze` or link it (see [Install](start/install.md)) |
 | `The MCP server needs one extra package` | Installed without `[mcp]` | Run the command the message names: the same install with `[mcp]` (see [The extras](start/install.md#the-extras)) |
