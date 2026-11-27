@@ -8,7 +8,7 @@ moment it opens: a take profit above (for a long) and a stop loss below, or the 
 | Exit | What it does | Default distance |
 |---|---|---|
 | **Take profit** | Closes the trade when the price reaches a target in its favour | 1.5% (150 bps) from the average entry |
-| **Stop loss** | Closes the trade when the price moves a set distance against it | 1% (100 bps) from the average entry, and never more |
+| **Stop loss** | Closes the trade when the price moves a set distance against it | 1% (100 bps) from the average entry, and never more; it [follows a trade that is in profit](#the-stop-follows-a-trade-that-is-in-profit) |
 | **Time limit** | Closes the trade at market if neither has been hit | 8 hours after the last entry |
 
 Whichever comes first ends the trade. The **average entry** is the average price of all the entries in the position
@@ -34,6 +34,33 @@ go). The code then:
 
 Our algorithm names no levels, so its trades always use the default bracket.
 
+## The stop follows a trade that is in profit
+
+Once a trade has moved far enough in its favour, its stop loss moves behind the price in steps, so a trade that was well
+in profit does not end as a loss:
+
+| The trade has been this far in profit | The stop loss moves to |
+|---|---|
+| 50 bps (0.5%) | the average entry + 25 bps |
+| 80 bps | the average entry + 50 bps |
+| 110 bps, 140 bps, and every further 30 bps | 30 bps further each time (+ 80, + 110, ...) |
+
+"+" means on the winning side of the entry: below it for a short, above it for a long.
+
+- **It never moves back.** If the price returns, the trade closes at the last step it reached, in profit.
+- **Adding to the position keeps it.** A new entry moves the average entry and re-sets the levels; the stop stays where
+  the ladder put it if that is the better one, and climbs again from the new average entry.
+- **The take profit and the time limit do not change.**
+
+Example: a short opens at 60,000 with its stop at 60,600. The price falls to 59,700 (50 bps): the stop moves to 59,850.
+At 59,520 (80 bps) it moves to 59,700. If the price then turns, the trade closes near 59,700, about 0.5% in profit,
+instead of running back to 60,600.
+
+What it costs: in our tests on 2023 to 2026 this did not add money. A trade earned 0.5 to 1.5 bps less on average,
+because some trades that would have reached their take profit are closed on the way. What it changes is how trades end:
+59% of them closed in profit instead of 43%. We keep it as a rule of the account: a trade that was well in profit closes
+in profit.
+
 ## Why the stop is never beyond 1%
 
 At 40x leverage, the exchange would force-close (liquidate) a position after a move of roughly 1.27% against it. A stop
@@ -53,4 +80,4 @@ cut losses short.
 
 The short-term part of the position travels in the signal with its take profit and stop loss (`scalp.tp`, `scalp.sl`).
 A follower's agent places the same bracket on its own exchange, so that part stays protected even when the agent or the
-signal is down. See [How following works](../../agent/following.md).
+signal is down. When the stop moves, the signal carries the new price and the agent places the pair again at it. See [How following works](../../agent/following.md).
