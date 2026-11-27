@@ -102,31 +102,10 @@ Three programs are involved:
 
 Install FUZE only from github.com/robert-schmidt/fuze, with that address in the command, as below.
 
-**macOS**
+**macOS and Linux**
 
-1. Open Terminal: press Command + Space, type `Terminal`, press Return.
+1. Open a terminal. On a Mac: press Command + Space, type `Terminal`, press Return.
 2. Install uv. Paste this line and press Return, then close the window and open a new one:
-
-   ```sh
-   curl -LsSf https://astral.sh/uv/install.sh | sh
-   ```
-
-3. Install FUZE. The first time, macOS may offer to install its "command line developer tools" (they contain git):
-   click Install, wait until it has finished, and run the line again.
-
-   ```sh
-   uv tool install "fuze-agent[mcp] @ git+https://github.com/robert-schmidt/fuze"
-   ```
-
-**Linux**
-
-1. Open a terminal. On Ubuntu or Debian, make sure curl and git are there (Fedora: `sudo dnf install -y curl git`):
-
-   ```sh
-   sudo apt update && sudo apt install -y curl git
-   ```
-
-2. Install uv, then close the terminal and open a new one:
 
    ```sh
    curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -137,6 +116,10 @@ Install FUZE only from github.com/robert-schmidt/fuze, with that address in the 
    ```sh
    uv tool install "fuze-agent[mcp] @ git+https://github.com/robert-schmidt/fuze"
    ```
+
+If step 2 or 3 says curl or git is missing: on a Mac, a window offers to install the "command line developer tools"
+(they contain git); click Install, wait until it has finished, and run the line again. On Ubuntu or Debian, run
+`sudo apt update && sudo apt install -y curl git` first (Fedora: `sudo dnf install -y curl git`).
 
 **Windows**
 
@@ -151,7 +134,8 @@ FUZE runs inside WSL, Microsoft's own Linux for Windows 10 and 11, not in PowerS
 
 2. Open "Ubuntu" from the Start menu and choose a username and a password for Linux. Nothing shows while you type the
    password.
-3. In the Ubuntu window, follow the Linux steps above. Every `fuze` command is typed in that window.
+3. In the Ubuntu window, run `sudo apt update && sudo apt install -y curl git`, then follow the steps above from
+   step 2. Every `fuze` command is typed in that window.
 
 **Then, on every system**
 

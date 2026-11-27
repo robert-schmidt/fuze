@@ -22,16 +22,17 @@ the tool itself runs inside WSL (see [Windows](#windows)).
 
 Install FUZE only from `github.com/robert-schmidt/fuze`, with that address in the command, as below.
 
-## macOS
+## macOS and Linux
 
-1. **Open Terminal.** Press Command + Space, type `Terminal`, press Return. A window opens where you type commands.
+1. **Open a terminal.** On a Mac: press Command + Space, type `Terminal`, press Return. A window opens where you type
+   commands.
 2. **Install uv.** Paste this line and press Return:
 
    ```sh
    curl -LsSf https://astral.sh/uv/install.sh | sh
    ```
 
-   Then close the Terminal window and open a new one, so that it finds `uv`. (With Homebrew, `brew install uv` does
+   Then close the terminal window and open a new one, so that it finds `uv`. (With Homebrew, `brew install uv` does
    the same.)
 3. **Install FUZE.** Paste this line and press Return:
 
@@ -39,8 +40,6 @@ Install FUZE only from `github.com/robert-schmidt/fuze`, with that address in th
    uv tool install "fuze-agent[mcp] @ git+https://github.com/robert-schmidt/fuze"
    ```
 
-   The first time, macOS may offer to install its "command line developer tools": they contain git. Click Install,
-   wait until it has finished, and run the line again.
 4. **Check it.**
 
    ```sh
@@ -48,39 +47,14 @@ Install FUZE only from `github.com/robert-schmidt/fuze`, with that address in th
    ```
 
    It prints the version, for example `0.3.0`. If it says `command not found`, run `uv tool update-shell`, open a new
-   Terminal window and try again.
+   terminal window and try again.
 
-## Linux
+**If step 2 or 3 says curl or git is missing:**
 
-1. **Open a terminal.**
-2. **Install curl and git**, if they are missing. On Ubuntu or Debian:
-
-   ```sh
-   sudo apt update && sudo apt install -y curl git
-   ```
-
-   On Fedora: `sudo dnf install -y curl git`.
-3. **Install uv.**
-
-   ```sh
-   curl -LsSf https://astral.sh/uv/install.sh | sh
-   ```
-
-   Then close the terminal and open a new one, so that it finds `uv`.
-4. **Install FUZE.**
-
-   ```sh
-   uv tool install "fuze-agent[mcp] @ git+https://github.com/robert-schmidt/fuze"
-   ```
-
-5. **Check it.**
-
-   ```sh
-   fuze --version
-   ```
-
-   It prints the version, for example `0.3.0`. If it says `command not found`, run `uv tool update-shell`, open a new
-   terminal and try again.
+- On a Mac, a window offers to install the "command line developer tools": they contain git. Click Install, wait
+  until it has finished, and run the line again. (`xcode-select --install` opens that window yourself.)
+- On Ubuntu or Debian, run `sudo apt update && sudo apt install -y curl git` first. On Fedora:
+  `sudo dnf install -y curl git`.
 
 ## Windows
 
@@ -97,7 +71,8 @@ Command Prompt directly.
    Restart the computer when it asks.
 2. **Open Ubuntu.** After the restart, open "Ubuntu" from the Start menu. The first time, it asks you to choose a
    username and a password for Linux. Nothing shows while you type the password; that is normal.
-3. **In the Ubuntu window, follow the [Linux](#linux) steps** from step 2.
+3. **In the Ubuntu window**, run `sudo apt update && sudo apt install -y curl git`, then follow the
+   [steps above](#macos-and-linux) from step 2.
 
 From then on, every `fuze` command in these docs is typed in the Ubuntu window. Your files stay inside Ubuntu, in
 `~/.fuze`. To connect an AI coding tool on Windows, see
