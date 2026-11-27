@@ -597,7 +597,19 @@ def cmd_init(args) -> int:
     return 0
 
 
-TOOLS = ("claude-code", "codex", "copilot", "vscode", "cursor")
+# tools whose settings take the same {"mcpServers": ...} JSON as Cursor: name -> the tool and where it keeps that JSON
+SAME_JSON = {
+    "gemini": "Gemini CLI: ~/.gemini/settings.json",
+    "antigravity": "Antigravity (IDE and CLI): ~/.gemini/config/mcp_config.json",
+    "devin": "Devin Desktop (formerly Windsurf) and Devin CLI: ~/.config/devin/mcp_config.json",
+    "cline": "Cline: its MCP Servers panel, Configure, Configure MCP Servers (cline_mcp_settings.json)",
+    "claude-desktop": "Claude Desktop: Settings, Developer, Edit Config (claude_desktop_config.json); then quit the app "
+                      "and open it again",
+    "jetbrains": "JetBrains AI Assistant: Settings | Tools | AI Assistant | Model Context Protocol (MCP). "
+                 "Junie: ~/.junie/mcp/mcp.json",
+    "kiro": "Kiro: ~/.kiro/settings/mcp.json",
+}
+TOOLS = ("claude-code", "codex", "copilot", "vscode", "cursor", "opencode", "zed", *SAME_JSON)
 
 
 def fuze_command() -> list:
@@ -621,27 +633,39 @@ def mcp_config(tool: str | None = None) -> str:
     q = shlex.quote(f"FUZE_HOME={home}")
     toml = "\n".join(["[mcp_servers.fuze]", f"command = {json.dumps(cmd[0])}", f"args = {json.dumps(args)}",
                       f"env = {{ FUZE_HOME = {json.dumps(home)} }}"])
+    same = json.dumps({"mcpServers": {"fuze": server}}, indent=2)
     parts = {
         "claude-code": ("Claude Code: run this once (or put the JSON in a project's .mcp.json)",
                         f"claude mcp add fuze --scope user -e {q} -- {shell}\n\n"
                         + json.dumps({"mcpServers": {"fuze": server}}, indent=2)),
         "codex": ("Codex: run this once, or add the TOML to ~/.codex/config.toml",
                   f"codex mcp add fuze --env {q} -- {shell}\n\n{toml}"),
-        "copilot": ("GitHub Copilot CLI (~/.copilot/mcp-config.json) or a workspace .mcp.json",
+        "copilot": ("GitHub Copilot CLI, and Copilot in VS Code: ~/.copilot/mcp-config.json, or a workspace .mcp.json",
                     json.dumps({"mcpServers": {"fuze": {**server, "tools": ["*"]}}}, indent=2)),
-        "vscode": ("VS Code with Copilot: .vscode/mcp.json in your workspace",
-                   json.dumps({"servers": {"fuze": server}}, indent=2)),
-        "cursor": ("Cursor: ~/.cursor/mcp.json (every project) or .cursor/mcp.json (one project)",
-                   json.dumps({"mcpServers": {"fuze": server}}, indent=2)),
+        "vscode": ("VS Code with Copilot, the editor's own format: run this once, or put the second JSON in "
+                   ".vscode/mcp.json in your workspace",
+                   "code --add-mcp " + shlex.quote(json.dumps({"name": "fuze", **server})) + "\n\n"
+                   + json.dumps({"servers": {"fuze": server}}, indent=2)),
+        "cursor": ("Cursor: ~/.cursor/mcp.json (every project) or .cursor/mcp.json (one project)", same),
+        "opencode": ("OpenCode: run this once (without --global: this project only)",
+                     f"opencode mcp add --global --env {q} fuze -- {shell}"),
+        "zed": ("Zed: in its settings file (command `zed: open settings file`)",
+                json.dumps({"context_servers": {"fuze": {"command": cmd[0], "args": args, "env": env}}}, indent=2)),
+        **{name: (where, same) for name, where in SAME_JSON.items()},
     }
     out = [f"# FUZE MCP server settings. Command: {shell}", f"# FUZE folder (FUZE_HOME): {home}"]
     if (why := config.no_agent_here()):
         out.append("# WARNING: " + why)
     out.append("# The server can only read and reduce risk. After adding it, restart the tool and ask for the FUZE "
                "status: it must show your mode and balance.")
-    for name in ([tool] if tool else TOOLS):
+    out.append("# In a settings file that already has content, add the \"fuze\" entry next to the others; do not "
+               "replace the file.")
+    for name in ([tool] if tool else [t for t in TOOLS if t not in SAME_JSON]):
         title, text = parts[name]
         out += ["", f"## {title}", text]
+    if not tool:  # the same JSON as Cursor's, printed once: `--tool NAME` prints one of them on its own
+        out += ["", "## The same JSON as Cursor's goes into (`fuze mcp-config --tool NAME` prints one):"]
+        out += [f"- {name}: {where}" for name, where in SAME_JSON.items()]
     return "\n".join(out)
 
 
@@ -697,7 +721,7 @@ def main(argv=None) -> int:
     ui.add_argument("--port", type=int, default=PORT, help=f"port on 127.0.0.1 (default {PORT})")
     ui.add_argument("--open", action="store_true", help="open it in your browser")
     sub.add_parser("mcp", help="start the MCP server (for AI coding tools)")
-    mc = sub.add_parser("mcp-config", help="print the MCP settings for Claude Code, Codex, Copilot / VS Code and Cursor, "
+    mc = sub.add_parser("mcp-config", help="print the MCP settings for Claude Code, Codex, Copilot / VS Code, Cursor and other AI tools, "
                                            "with this fuze's full path and this FUZE folder")
     mc.add_argument("--tool", choices=TOOLS, help="print only this tool's settings")
     args = p.parse_args(argv)

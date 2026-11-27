@@ -4,7 +4,7 @@
 
 **F**utures signals, **U**ser-side, **Z**ero-custody **E**xecution.
 
-**Vibe trading, with your limits.** Tell your AI coding tool (Claude Code, Codex, GitHub Copilot in VS Code, Cursor),
+**Vibe trading, with your limits.** Tell your AI coding tool (Claude Code, Codex, GitHub Copilot, Cursor and others),
 in plain words, "follow the FUZE signal with 5% of my balance". It installs and sets up this agent for you, on your
 machine and your own account. Your limits stay yours: through FUZE's MCP server the AI can only lower them and stop
 the agent; anything that raises risk, the mode (simulation, test money, real money) and your exchange key are typed by
@@ -74,26 +74,112 @@ your mode risks more real money than the account you follow, for example real mo
 - Not advice. It copies one account's position. That account can lose, and so will yours.
 - Not a promise of results. We make no performance claims.
 
-## Quick start
+## Install and set up
 
-Or just ask your AI coding tool to do this for you; [AGENTS.md](AGENTS.md) tells it how, safely.
+It takes about five minutes and needs no Python, no exchange account and no money: the agent starts on a simulated
+account. There are two ways.
 
-Install FUZE only from github.com/robert-schmidt/fuze. With [uv](https://docs.astral.sh/uv/) or
-[pipx](https://pipx.pypa.io), one command puts `fuze` on your PATH (Python 3.10 or newer, macOS or Linux):
+### The short way: ask your AI coding tool
+
+Paste this sentence into Claude Code, Codex, Cursor, GitHub Copilot or any coding tool that can run commands:
+
+```text
+Install the FUZE agent from https://github.com/robert-schmidt/fuze and set it up in simulation. Follow the AGENTS.md in that repository.
+```
+
+It installs the agent, asks how big your positions should be, and connects itself to it. [AGENTS.md](AGENTS.md) tells
+it how, and what it must leave to you: your keys, the mode, and anything that raises risk.
+
+### By hand, step by step
+
+Three programs are involved:
+
+- **uv** is a free, open-source installer for programs written in Python, made by [Astral](https://docs.astral.sh/uv/).
+  It fetches the right Python by itself, keeps FUZE in a folder of its own, away from the rest of your system, and
+  gives you the command `fuze`.
+- **git** is the standard program for downloading code. uv uses it to fetch FUZE from this repository.
+- **FUZE** is the agent: the command `fuze`.
+
+Install FUZE only from github.com/robert-schmidt/fuze, with that address in the command, as below.
+
+**macOS**
+
+1. Open Terminal: press Command + Space, type `Terminal`, press Return.
+2. Install uv. Paste this line and press Return, then close the window and open a new one:
+
+   ```sh
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   ```
+
+3. Install FUZE. The first time, macOS may offer to install its "command line developer tools" (they contain git):
+   click Install, wait until it has finished, and run the line again.
+
+   ```sh
+   uv tool install "fuze-agent[mcp] @ git+https://github.com/robert-schmidt/fuze"
+   ```
+
+**Linux**
+
+1. Open a terminal. On Ubuntu or Debian, make sure curl and git are there (Fedora: `sudo dnf install -y curl git`):
+
+   ```sh
+   sudo apt update && sudo apt install -y curl git
+   ```
+
+2. Install uv, then close the terminal and open a new one:
+
+   ```sh
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   ```
+
+3. Install FUZE:
+
+   ```sh
+   uv tool install "fuze-agent[mcp] @ git+https://github.com/robert-schmidt/fuze"
+   ```
+
+**Windows**
+
+FUZE runs inside WSL, Microsoft's own Linux for Windows 10 and 11, not in PowerShell directly.
+
+1. Open the Start menu, type `PowerShell`, right-click it and choose "Run as administrator". Run this, and restart
+   the computer when it asks:
+
+   ```powershell
+   wsl --install
+   ```
+
+2. Open "Ubuntu" from the Start menu and choose a username and a password for Linux. Nothing shows while you type the
+   password.
+3. In the Ubuntu window, follow the Linux steps above. Every `fuze` command is typed in that window.
+
+**Then, on every system**
 
 ```sh
-uv tool install "fuze-agent[mcp] @ git+https://github.com/robert-schmidt/fuze"   # [mcp] adds the server AI coding tools talk to
-# or: pipx install "fuze-agent[mcp] @ git+https://github.com/robert-schmidt/fuze"
-fuze init        # ~/.fuze; asks the mode and how big your positions should be (Enter keeps the safe default)
-fuze run         # in its own terminal; Ctrl+C to stop
+fuze --version   # prints the version; "command not found"? run `uv tool update-shell` and open a new terminal
+fuze init        # asks the mode and how big your positions should be; Enter keeps the safe choice each time
+fuze run         # starts following on a simulated account; leave this window open, Ctrl+C stops it
+```
+
+And in a second terminal window:
+
+```sh
 fuze status      # what it holds and why
 fuze check       # checks your setup
 fuze ui --open   # a page with all of it, on this computer: http://127.0.0.1:3893
-fuze mcp-config  # the settings to paste into Claude Code, Codex, Copilot / VS Code or Cursor
 ```
 
-To read the code before you run it, install from a clone instead (and see SECURITY.md for an install with pinned
-hashes); then `fuze` is `~/.fuze-venv/bin/fuze`:
+Last, connect your AI coding tool: one step per tool, in
+[Use it from an AI coding tool](#use-it-from-an-ai-coding-tool). The same steps with more detail, and what to do when
+one fails: [the install guide](https://docs.fuze.trade/agent/start/install.html).
+
+### Other ways to install
+
+With [pipx](https://pipx.pypa.io), if you already use it (Python 3.10 or newer):
+`pipx install "fuze-agent[mcp] @ git+https://github.com/robert-schmidt/fuze"`.
+
+To read the code before you run it, install from a clone instead (Python 3.10 or newer; see SECURITY.md for an install
+with pinned hashes); then `fuze` is `~/.fuze-venv/bin/fuze`:
 
 ```sh
 git clone https://github.com/robert-schmidt/fuze && cd fuze
@@ -222,21 +308,35 @@ or shows a key, places an order, or touches files outside `~/.fuze`. `status` re
 account's public explorer link and whether keys are "set" or "missing"; `setup_check` covers what testnet and mainnet
 need; `docs` has a `modes` topic.
 
-With `fuze` installed by `uv tool install` or `pipx install` and the default folder `~/.fuze`, the settings are just
-the command `fuze` with the argument `mcp`, as in the files in `integrations/` and the forms below. AI tools start MCP
-servers with a filtered environment and not always with your shell's `PATH`; for a virtualenv install, another
-folder (`FUZE_HOME`), or a tool that does not find `fuze`, **`fuze mcp-config` prints the settings with the full path
-of `fuze` and your `FUZE_HOME` filled in**, ready to paste for every tool below (`fuze mcp-config --tool cursor`
-prints one).
+Connect your tool with the one step in its row, typed in a terminal, after `fuze init`:
 
-| Tool | Setup | Snippet |
-|---|---|---|
-| Claude Code plugin | `claude plugin install fuze --marketplace robert-schmidt/fuze`, or on any version `claude plugin marketplace add robert-schmidt/fuze` then `claude plugin install fuze@fuze` | [plugins/fuze](plugins/fuze/.claude-plugin/plugin.json) |
-| Claude Code | `claude mcp add fuze --scope user -- fuze mcp`, or `.mcp.json` in your project | [integrations/claude-code.mcp.json](integrations/claude-code.mcp.json) |
-| Codex CLI | `codex mcp add fuze -- fuze mcp`, or `~/.codex/config.toml` | [integrations/codex-config.toml](integrations/codex-config.toml) |
-| VS Code / Copilot | `.vscode/mcp.json` | [integrations/vscode-mcp.json](integrations/vscode-mcp.json) |
-| VS Code / Copilot (newer format) | `.mcp.json` at the workspace root | [integrations/copilot.mcp.json](integrations/copilot.mcp.json) |
-| Cursor | the [Add to Cursor](docs/agent/ai-tools/cursor.md) link, or `.cursor/mcp.json` / `~/.cursor/mcp.json` | [integrations/cursor-mcp.json](integrations/cursor-mcp.json) |
+| Your tool | What to do |
+|---|---|
+| Claude Code | `claude mcp add fuze --scope user -- fuze mcp`. Or the plugin: `claude plugin install fuze --marketplace robert-schmidt/fuze` (on any version: `claude plugin marketplace add robert-schmidt/fuze`, then `claude plugin install fuze@fuze`) |
+| Codex: the CLI, the IDE extension and the ChatGPT desktop app share one setting | `codex mcp add fuze -- fuze mcp` |
+| GitHub Copilot CLI | `copilot mcp add fuze -- fuze mcp` |
+| GitHub Copilot in VS Code | Run `fuze mcp-config --tool copilot` and paste what it prints into `~/.copilot/mcp-config.json` |
+| Cursor | Run `fuze mcp-config --tool cursor` and paste what it prints into `~/.cursor/mcp.json`, or use the [Add to Cursor](docs/agent/ai-tools/cursor.md) link |
+| OpenCode | `opencode mcp add --global fuze -- fuze mcp` |
+| Gemini CLI | `gemini mcp add -s user fuze fuze mcp` |
+| Antigravity | Run `fuze mcp-config --tool antigravity` and paste what it prints into `~/.gemini/config/mcp_config.json` |
+| Devin Desktop (formerly Windsurf) | `devin mcp add -s user fuze -- fuze mcp`, or run `fuze mcp-config --tool devin` and paste what it prints into `~/.config/devin/mcp_config.json` |
+| Cline | Run `fuze mcp-config --tool cline`; in Cline open the MCP Servers panel, Configure, Configure MCP Servers, and paste |
+| Claude Desktop | Run `fuze mcp-config --tool claude-desktop`; in the app open Settings, Developer, Edit Config, paste, then quit the app and open it again |
+| Zed | Run `fuze mcp-config --tool zed` and paste what it prints into Zed's settings file |
+| JetBrains AI Assistant, Junie | Run `fuze mcp-config --tool jetbrains` and paste what it prints under Settings, Tools, AI Assistant, Model Context Protocol (MCP) |
+| Kiro | Run `fuze mcp-config --tool kiro` and paste what it prints into `~/.kiro/settings/mcp.json` |
+
+Restart the tool and ask it "What is the FUZE agent doing?": it should answer with your mode and balance. In a
+settings file that already has content, add the `"fuze"` entry next to the others; do not replace the file. On
+Windows, and for each tool in detail: [docs/agent/ai-tools](docs/agent/ai-tools/README.md).
+
+Why some rows paste and others are one line: a tool you start in a terminal finds `fuze` the way your terminal does.
+An app you start from the Dock or a menu does not, and AI tools start MCP servers with a filtered environment, so its
+settings need the full path of `fuze` and, when you use another folder, `FUZE_HOME`. **`fuze mcp-config` prints the
+settings with both filled in**, for every tool above (`fuze mcp-config --tool cursor` prints one). Use it also for a
+virtualenv install, and when a one-line form does not find `fuze`. Ready-made files for the default install are in
+[integrations/](integrations/).
 
 [AGENTS.md](AGENTS.md) tells any coding agent how to help you set FUZE up safely.
 

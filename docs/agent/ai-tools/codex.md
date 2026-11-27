@@ -1,6 +1,7 @@
 # Codex
 
-This page connects the FUZE MCP server to the Codex CLI.
+This page connects the FUZE MCP server to Codex. The Codex CLI, the Codex IDE extension and the ChatGPT desktop app
+share one configuration, `~/.codex/config.toml`, so one step covers all three.
 
 ## One line
 

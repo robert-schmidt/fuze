@@ -1,41 +1,131 @@
 # Install
 
-This page installs the agent and its MCP server. The usual way is one command that puts `fuze` on your PATH, straight
-from the repository; the other way is a clone you can read first.
+This page installs the agent and its MCP server on macOS, Linux or Windows, one step at a time. It takes about five
+minutes. You do not need Python, an exchange account or money: the agent starts on a simulated account.
 
-## What you need
+Prefer to let your AI coding tool do it? Paste this sentence into it, and skip the rest of this page:
 
-- macOS or Linux (on Windows, use WSL).
-- Python 3.10 or newer: check with `python3 --version`.
-- `git`, and [uv](https://docs.astral.sh/uv/) or [pipx](https://pipx.pypa.io) for the usual way.
-
-Install FUZE only from `github.com/robert-schmidt/fuze`. To pin every dependency by its hash, follow the repository's
-`SECURITY.md`.
-
-## The usual way: `fuze` on your PATH
-
-With uv:
-
-```sh
-uv tool install "fuze-agent[mcp] @ git+https://github.com/robert-schmidt/fuze"
-fuze --version
+```text
+Install the FUZE agent from https://github.com/robert-schmidt/fuze and set it up in simulation. Follow the AGENTS.md in that repository.
 ```
 
-Or with pipx:
+The repository's `AGENTS.md` tells the tool how, and which steps it must leave to you. It works on Windows only when
+the tool itself runs inside WSL (see [Windows](#windows)).
+
+## What gets installed
+
+| | What it is | Why |
+|---|---|---|
+| **uv** | A free, open-source installer for programs written in Python, made by [Astral](https://docs.astral.sh/uv/) | It fetches the right Python by itself, keeps FUZE in a folder of its own, away from the rest of your system, and gives you the command `fuze` |
+| **git** | The standard program for downloading code | uv uses it to fetch FUZE from its repository on GitHub |
+| **FUZE** | The agent and its MCP server: the command `fuze` | |
+
+Install FUZE only from `github.com/robert-schmidt/fuze`, with that address in the command, as below.
+
+## macOS
+
+1. **Open Terminal.** Press Command + Space, type `Terminal`, press Return. A window opens where you type commands.
+2. **Install uv.** Paste this line and press Return:
+
+   ```sh
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   ```
+
+   Then close the Terminal window and open a new one, so that it finds `uv`. (With Homebrew, `brew install uv` does
+   the same.)
+3. **Install FUZE.** Paste this line and press Return:
+
+   ```sh
+   uv tool install "fuze-agent[mcp] @ git+https://github.com/robert-schmidt/fuze"
+   ```
+
+   The first time, macOS may offer to install its "command line developer tools": they contain git. Click Install,
+   wait until it has finished, and run the line again.
+4. **Check it.**
+
+   ```sh
+   fuze --version
+   ```
+
+   It prints the version, for example `0.3.0`. If it says `command not found`, run `uv tool update-shell`, open a new
+   Terminal window and try again.
+
+## Linux
+
+1. **Open a terminal.**
+2. **Install curl and git**, if they are missing. On Ubuntu or Debian:
+
+   ```sh
+   sudo apt update && sudo apt install -y curl git
+   ```
+
+   On Fedora: `sudo dnf install -y curl git`.
+3. **Install uv.**
+
+   ```sh
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   ```
+
+   Then close the terminal and open a new one, so that it finds `uv`.
+4. **Install FUZE.**
+
+   ```sh
+   uv tool install "fuze-agent[mcp] @ git+https://github.com/robert-schmidt/fuze"
+   ```
+
+5. **Check it.**
+
+   ```sh
+   fuze --version
+   ```
+
+   It prints the version, for example `0.3.0`. If it says `command not found`, run `uv tool update-shell`, open a new
+   terminal and try again.
+
+## Windows
+
+FUZE runs on Windows inside WSL, Microsoft's own Linux for Windows 10 and 11. It does not run in PowerShell or the
+Command Prompt directly.
+
+1. **Install WSL.** Open the Start menu, type `PowerShell`, right-click it and choose "Run as administrator". Paste
+   this line and press Enter:
+
+   ```powershell
+   wsl --install
+   ```
+
+   Restart the computer when it asks.
+2. **Open Ubuntu.** After the restart, open "Ubuntu" from the Start menu. The first time, it asks you to choose a
+   username and a password for Linux. Nothing shows while you type the password; that is normal.
+3. **In the Ubuntu window, follow the [Linux](#linux) steps** from step 2.
+
+From then on, every `fuze` command in these docs is typed in the Ubuntu window. Your files stay inside Ubuntu, in
+`~/.fuze`. To connect an AI coding tool on Windows, see
+[Using it from an AI coding tool](../ai-tools/README.md#on-windows).
+
+## Next
+
+[First run in simulation](first-run.md): set your sizing, start the agent, read its status. Then
+[connect your AI coding tool](../ai-tools/README.md).
+
+## Other ways to install
+
+**With pipx**, if you already use it (it needs Python 3.10 or newer and git):
 
 ```sh
 pipx install "fuze-agent[mcp] @ git+https://github.com/robert-schmidt/fuze"
-fuze --version
 ```
 
-The last command prints the version, for example `0.3.0`. Each tool keeps FUZE in an environment of its own and puts
-the `fuze` command in `~/.local/bin`. If your shell does not find `fuze`, run `uv tool update-shell` (or
-`pipx ensurepath`) and open a new terminal.
+If your shell does not find `fuze` afterwards, run `pipx ensurepath` and open a new terminal.
 
-The Claude Code plugin and the short MCP settings start the command `fuze`, so this install is the one they expect. See
-[Using it from an AI coding tool](../ai-tools/README.md).
+**Pinned by hash**: to pin every dependency by its hash, follow the repository's `SECURITY.md`.
 
-## The other way: a clone you read first
+The Claude Code plugin and the short MCP settings start the command `fuze`, so the install above (uv or pipx) is the
+one they expect.
+
+### A clone you read first
+
+This way needs Python 3.10 or newer (`python3 --version`) and git.
 
 ```sh
 git clone https://github.com/robert-schmidt/fuze

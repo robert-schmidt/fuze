@@ -17,7 +17,7 @@ This page lists every `fuze` command with its options, as printed by `fuze --hel
 | `fuze rehearse` | The testnet rehearsal that unlocks mainnet on this machine | Yes |
 | `fuze ui` | A read-only page about the agent on this computer. Options `--port`, `--open` | |
 | `fuze mcp` | Start the MCP server for AI coding tools | |
-| `fuze mcp-config` | Print the MCP settings for Claude Code, Codex, Copilot / VS Code and Cursor, with this `fuze`'s full path and your `FUZE_HOME`. Option `--tool` | |
+| `fuze mcp-config` | Print the MCP settings for Claude Code, Codex, Copilot / VS Code, Cursor and other AI tools, with this `fuze`'s full path and your `FUZE_HOME`. Option `--tool` | |
 | `fuze --version` | Print the version | |
 
 ## fuze init
@@ -101,7 +101,7 @@ Undo `fuze pause` and `fuze flatten`. Like raising a limit, they refuse when inp
 ## fuze mcp-config
 
 ```text
-fuze mcp-config [--tool {claude-code,codex,copilot,vscode,cursor}]
+fuze mcp-config [--tool {claude-code,codex,copilot,vscode,cursor,opencode,zed,gemini,antigravity,devin,cline,claude-desktop,jetbrains,kiro}]
 ```
 
 Prints ready-to-paste MCP settings for each AI tool: the full path of the `fuze` you ran it with (AI tools do not use

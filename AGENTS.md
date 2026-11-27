@@ -52,9 +52,15 @@ mainnet comes from the running agent or from `fuze rehearse` that the user start
 
 ## Setting up
 
-1. Check Python 3.10 or newer. Install FUZE only from `github.com/robert-schmidt/fuze`, with the repository address
-   in the command, never by a bare package name. With uv (or pipx, the same with `pipx install`):
-   `uv tool install "fuze-agent[mcp] @ git+https://github.com/robert-schmidt/fuze"`, which puts `fuze` on the PATH.
+1. Install FUZE only from `github.com/robert-schmidt/fuze`, with the repository address in the command, never by a
+   bare package name. It runs on macOS and Linux; on Windows only inside WSL (`wsl --install` in an administrator
+   PowerShell, which the user runs and restarts for; then everything, you included, works inside the Ubuntu it
+   installs). It needs `git`, and `uv` (or `pipx` with Python 3.10 or newer). When `uv` is missing, tell the user
+   what it is (Astral's open-source installer for Python programs; it fetches Python itself) and install it with its
+   official installer, `curl -LsSf https://astral.sh/uv/install.sh | sh`; it lands in `~/.local/bin`, so use that
+   path or a new shell afterwards. Then, with uv (or pipx, the same with `pipx install`):
+   `uv tool install "fuze-agent[mcp] @ git+https://github.com/robert-schmidt/fuze"`, which puts `fuze` on the PATH
+   (`~/.local/bin/fuze`; `uv tool update-shell` when the shell does not find it).
    When the user wants to read the code first: `git clone https://github.com/robert-schmidt/fuze`, then in the clone
    `python3 -m venv ~/.fuze-venv && ~/.fuze-venv/bin/pip install '.[mcp]'`, or hash-pinned as `SECURITY.md` shows.
 2. `fuze init` creates `~/.fuze` and sets how big the user's positions are. Ask the user, in plain words, which
@@ -67,7 +73,8 @@ mainnet comes from the running agent or from `fuze rehearse` that the user start
    `fuze init --yes` (the safe defaults). `fuze init` never replaces an existing config; do not add `--force` for
    them. `fuze check` must show everything ok except "Agent is running".
 3. The user starts `fuze run` in its own terminal (or a service they control). You may read `fuze status`.
-4. Add the MCP server to their tool: run `fuze mcp-config` (or `fuze mcp-config --tool claude-code|codex|copilot|vscode|cursor`)
+4. Add the MCP server to their tool: run `fuze mcp-config` (or `fuze mcp-config --tool NAME` for one: claude-code, codex, copilot, vscode, cursor,
+   opencode, zed, gemini, antigravity, devin, cline, claude-desktop, jetbrains, kiro)
    with the same `FUZE_HOME` as the agent and use what it prints: the full path of `fuze` and `FUZE_HOME`, which AI
    tools do not inherit from the shell. Then call the `status` tool: it must show their mode and balance. If it says
    no agent is set up in a folder, the settings point at the wrong folder.

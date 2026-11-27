@@ -1,7 +1,68 @@
 # Using it from an AI coding tool
 
-This section shows how to connect the agent's MCP server to Claude Code, Codex, GitHub Copilot in VS Code or Cursor, what
-your AI tool can then do, and what it cannot.
+This section shows how to connect the agent's MCP server to your AI coding tool, what the tool can then do, and what it
+cannot. It covers Claude Code, Codex, GitHub Copilot, Cursor, OpenCode, Gemini CLI, Antigravity, Devin Desktop
+(formerly Windsurf), Cline, Claude Desktop, Zed, JetBrains and Kiro.
+
+## Connect your tool
+
+Install the agent first ([Install](../start/install.md)) and run `fuze init` once
+([First run](../start/first-run.md)). Then do the one thing in your tool's row, in a terminal:
+
+| Your tool | What to do |
+|---|---|
+| Claude Code | `claude mcp add fuze --scope user -- fuze mcp` |
+| Codex: the CLI, the IDE extension and the ChatGPT desktop app share one setting | `codex mcp add fuze -- fuze mcp` |
+| GitHub Copilot CLI | `copilot mcp add fuze -- fuze mcp` |
+| GitHub Copilot in VS Code | Run `fuze mcp-config --tool copilot` and paste what it prints into `~/.copilot/mcp-config.json` |
+| Cursor | Run `fuze mcp-config --tool cursor` and paste what it prints into `~/.cursor/mcp.json` |
+| OpenCode | `opencode mcp add --global fuze -- fuze mcp` |
+| Gemini CLI | `gemini mcp add -s user fuze fuze mcp` |
+| Antigravity | Run `fuze mcp-config --tool antigravity` and paste what it prints into `~/.gemini/config/mcp_config.json` |
+| Devin Desktop (formerly Windsurf) | `devin mcp add -s user fuze -- fuze mcp`, or run `fuze mcp-config --tool devin` and paste what it prints into `~/.config/devin/mcp_config.json` |
+| Cline | Run `fuze mcp-config --tool cline`; in Cline open the MCP Servers panel, Configure, Configure MCP Servers, and paste |
+| Claude Desktop | Run `fuze mcp-config --tool claude-desktop`; in the app open Settings, Developer, Edit Config, paste, then quit the app and open it again |
+| Zed | Run `fuze mcp-config --tool zed` and paste what it prints into Zed's settings file |
+| JetBrains AI Assistant, Junie | Run `fuze mcp-config --tool jetbrains` and paste what it prints under Settings, Tools, AI Assistant, Model Context Protocol (MCP) |
+| Kiro | Run `fuze mcp-config --tool kiro` and paste what it prints into `~/.kiro/settings/mcp.json` |
+
+Restart the tool, then ask it: "What is the FUZE agent doing?" It should answer with your mode and balance.
+
+Two things to know:
+
+- **Why some rows paste and others are one line.** A tool you start in a terminal finds `fuze` the way your terminal
+  does. An app you start from the Dock or a menu does not, so its settings need the full path of `fuze`:
+  `fuze mcp-config` prints the settings with that path filled in. It works for the one-line tools too
+  (`fuze mcp-config --tool claude-code`), and it is what to use when a one-line form fails.
+- **A settings file that already has content.** Add the `"fuze"` entry next to the entries that are there; do not
+  replace the file. If the file does not exist, create it with exactly what was printed.
+
+Each tool has a page with the details: see [Per tool](#per-tool).
+
+## On Windows
+
+The agent lives inside WSL (see [Install](../start/install.md#windows)), so the AI tool has to reach into WSL to start
+it.
+
+| Your tool | On Windows |
+|---|---|
+| Claude Code, Codex CLI, GitHub Copilot CLI, OpenCode, Gemini CLI | Install the tool inside Ubuntu, the same way as on Linux, and start it there. Then the rows above work as written |
+| VS Code | Install Microsoft's "WSL" extension, then type `code .` in the Ubuntu window. VS Code opens connected to Ubuntu, and `~/.copilot/mcp-config.json` is the one inside Ubuntu |
+| An app that runs on the Windows side (Cursor, Claude Desktop and others) | Have it start the agent through Microsoft's `wsl` command: in the JSON, the command is `wsl` and the arguments are the full Linux path of `fuze` and `mcp`, as below |
+
+```json
+{
+  "mcpServers": {
+    "fuze": {
+      "command": "wsl",
+      "args": ["/home/YOUR-LINUX-USERNAME/.local/bin/fuze", "mcp"]
+    }
+  }
+}
+```
+
+`command -v fuze`, typed in the Ubuntu window, prints that path. The `wsl` form relies on Windows itself; the makers of
+these apps do not describe it in their own documentation.
 
 ## What the MCP server is
 
@@ -55,11 +116,12 @@ Run `fuze mcp-config` the way you run the agent (the same `fuze`, the same `FUZE
 
 ```sh
 fuze mcp-config                  # every tool
-fuze mcp-config --tool codex     # one: claude-code, codex, copilot, vscode or cursor
+fuze mcp-config --tool codex     # one tool; `fuze mcp-config --help` lists the names
 ```
 
-It prints the JSON or TOML for each tool's settings file and the one-line `claude mcp add ...` and `codex mcp add ...`
-commands, with the full path of the `fuze` you ran and your FUZE folder filled in. It warns when that folder has no
+It prints the JSON or TOML for each tool's settings file and the one-line `claude mcp add ...`, `codex mcp add ...`,
+`code --add-mcp ...` and `opencode mcp add ...` commands, with the full path of the `fuze` you ran and your FUZE folder
+filled in. It warns when that folder has no
 agent set up.
 
 If the server looks in a folder with no agent, `pause`, `flatten` and `lower_limits` answer an error that names the
@@ -74,8 +136,9 @@ folder, and nothing is written; `status` says the same.
 | Tool | Page |
 |---|---|
 | Claude Code (and its plugin) | [Claude Code](claude-code.md) |
-| Codex CLI | [Codex](codex.md) |
-| GitHub Copilot in VS Code | [GitHub Copilot in VS Code](copilot.md) |
+| Codex: CLI, IDE extension, ChatGPT desktop app | [Codex](codex.md) |
+| GitHub Copilot: in VS Code and the CLI | [GitHub Copilot](copilot.md) |
 | Cursor | [Cursor](cursor.md) |
+| OpenCode, Gemini CLI, Antigravity, Devin Desktop (formerly Windsurf), Cline, Claude Desktop, Zed, JetBrains, Kiro | [More tools](more-tools.md) |
 
 Then: [What you can say](what-to-say.md) and the [MCP tools](../mcp-tools.md) reference.

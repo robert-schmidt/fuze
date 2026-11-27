@@ -66,7 +66,9 @@ DOCS = {
               "unflatten`. Never paste a private key or API key into a chat. " + HONEST,
     "setup": "Install FUZE only from github.com/robert-schmidt/fuze. The usual way puts `fuze` on the PATH: uv tool "
              "install \"fuze-agent[mcp] @ git+https://github.com/robert-schmidt/fuze\" (or the same with pipx "
-             "install). For testnet and mainnet the user adds the lighter extra by running it again with "
+             "install). uv is Astral's open-source installer for Python programs and fetches Python itself; when "
+             "it is missing: curl -LsSf https://astral.sh/uv/install.sh | sh, then a new terminal. macOS and Linux; "
+             "on Windows inside WSL. For testnet and mainnet the user adds the lighter extra by running it again with "
              "[mcp,lighter] (pipx needs --force). Or from a clone of the repository: python3 -m venv ~/.fuze-venv, "
              "then in the clone ~/.fuze-venv/bin/pip install '.[mcp]'. Then fuze init; fuze run (in its own "
              "terminal); `fuze check`. To connect an AI tool, the user "

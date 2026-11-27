@@ -275,13 +275,20 @@ def test_mcp_config_prints_absolute_command_and_fuze_home_for_every_tool(fuze_ho
     env = shlex.quote(f"FUZE_HOME={home}")
     assert f"claude mcp add fuze --scope user -e {env} -- '{exe}' mcp" in out  # the space in the path is quoted
     assert f"codex mcp add fuze --env {env} -- '{exe}' mcp" in out
+    assert f"opencode mcp add --global --env {env} fuze -- '{exe}' mcp" in out
+    assert "code --add-mcp '{\"name\": \"fuze\", \"type\": \"stdio\", \"command\": \"" + str(exe) + '"' in out
     blocks = [b[b.index("{\n"):] for b in out.split("\n\n") if "{\n" in b]
-    assert len(blocks) == 4
+    assert len(blocks) == 5  # Claude Code, Copilot, VS Code, Cursor, Zed
     for b in blocks:
         servers = next(iter(_json.loads(b).values()))
         assert servers["fuze"]["command"] == str(exe) and servers["fuze"]["args"] == ["mcp"]
         assert servers["fuze"]["env"] == {"FUZE_HOME": home}
     assert "WARNING" not in out
+    for name, where in cli.SAME_JSON.items():  # the tools that take Cursor's JSON: listed once, printed one at a time
+        assert f"- {name}: {where}" in out
+        cli.main(["mcp-config", "--tool", name])
+        one = capsys.readouterr().out
+        assert f"## {where}" in one and _json.loads(one[one.index("{\n"):])["mcpServers"]["fuze"]["command"] == str(exe)
 
 
 def test_mcp_config_without_a_fuze_on_path_uses_this_python(fuze_home, monkeypatch, capsys):
