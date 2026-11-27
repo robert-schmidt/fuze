@@ -21,10 +21,19 @@ It sends one market order for the difference between the target and what the acc
 - otherwise only when the gap is at least **5% of the balance**, which is what happens when the trend book moves every
   4 hours.
 
-## The short-term trades follow the trend's side
+## A short-term trade against the trend position
 
-When the trend book holds Bitcoin on one side, a short-term trade on the other side is not taken into the account. In
-practice the account only scalps with the slow trend.
+Most short-term trades are on the slow trend's side. Since 27 November 2026 a trade on the other side of the trend book's
+Bitcoin position is taken too: it is how the account bets on a move against the trend. The two net on the account:
+
+- **The trade is the bigger one:** the account ends up on the trade's side. The take profit and stop loss rest for exactly
+  what the account then holds. When either fills, the account is flat in Bitcoin and the trend position comes back with
+  the next order.
+- **The trend position is the bigger one:** the trade only makes it smaller. Nothing rests on the exchange for it, because
+  exposure was taken off, not added. It goes back when the trade ends.
+
+In the signal, `scalp.x` is the part under the take profit and stop loss, so it has the sign of the Bitcoin target and is
+never larger than it.
 
 ## Protection
 
