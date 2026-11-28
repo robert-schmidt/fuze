@@ -23,12 +23,12 @@ hours, each with its own take profit and stop loss. The pages follow one trade f
 
 | Question | Answer at the time of writing |
 |---|---|
-| Coin | Bitcoin only |
+| Coins | Bitcoin, Ether, HYPE and LIT, each with its own trade (at most one per coin) |
 | When it looks | When a 5-minute candle closes on about 1.5 times the average volume of the 20 before |
-| Who decides | Claude Opus or our algorithm, by switch; the other answers alongside for the record |
+| Who decides | Claude Opus, in one call for every coin whose candle was busy at that 5-minute close; our algorithm decides a coin when the AI has no answer for it (the call failed, took too long, or left the coin out), and its answer is kept beside the AI's on every call |
 | Sides | Long or short; in the account, only on the side of the slow trend |
 | Take profit / stop loss | About 1.5% / 1% from the average entry by default; never a stop more than 1% from it |
 | Time limit | 8 hours |
-| Leverage | 20x to 40x, from the decider's confidence |
+| Leverage | Bitcoin 20x to 40x and Ether 20x to 25x, from the decider's confidence; HYPE 20x; LIT 5x |
 | Margin per entry | A fixed share of the balance (5% at the time of writing) |
 | Entries per position | Up to 5 |
