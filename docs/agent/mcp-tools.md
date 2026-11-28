@@ -13,7 +13,7 @@ read; three only reduce risk.
 | `ui` | Read | none |
 | `pause` | Reduce risk | none |
 | `flatten` | Reduce risk | none |
-| `lower_limits` | Reduce risk | any of `percent`, `fixed_usd`, `max_position_usd`, `max_x`, `max_balance_usd`, `daily_loss_frac` |
+| `lower_limits` | Reduce risk | any of `percent`, `fixed_usd`, `max_position_usd`, `max_x`, `max_balance_usd`, `daily_loss_frac`, `risk_allowed`, `coins` |
 
 There is no tool to resume, unflatten, raise a limit, change the mode or the server, or take or show a key.
 
@@ -24,8 +24,8 @@ or logged.
 
 ```text
 lower_limits(max_x=0.5, mode="mainnet")
--> error: "The lower_limits tool does not take mode; it takes daily_loss_frac, fixed_usd, max_position_usd, max_x,
-   percent. This tool cannot change the mode, the server, or any key, and cannot resume or unflatten: the user does
+-> error: "The lower_limits tool does not take mode; it takes coins, daily_loss_frac, fixed_usd, max_balance_usd,
+   max_position_usd, max_x, percent, risk_allowed. This tool cannot change the mode, the server, or any key, and cannot resume or unflatten: the user does
    that in a terminal with the `fuze` command. A key must never be pasted into a chat; ... Nothing was changed."
 ```
 
@@ -39,7 +39,9 @@ when the AI tool starts the server without your `FUZE_HOME`.
 The agent's state: whether it is running, the folder it reads, mode in words, your exchange account's public explorer
 link (testnet and mainnet), whether API keys are "set" or "missing", balance and positions, and per coin **what the
 signal asks for and what you hold, in dollars** (`positions_usd`, `positions_in_words`), with the smallest change the
-agent makes and a note when a difference is under it; your limits, your sizing in words with the worked example, the
+agent makes and a note when a difference is under it, and each part of the signal it skips and why (a score above
+your risk allowed, a coin not among your coins, a coin the exchange does not list); your limits, `risk_allowed` and
+`coins`, your sizing in words with the worked example, the
 pause and flatten flags, and the agent's last reason. It adds a REAL MONEY warning in mainnet. `sharing` says
 `private` or `public` and `reporting` says in one line where the reports go ([What your agent reports](sharing.md));
 no tool changes them: the user does, with `fuze share` in a terminal.
@@ -47,7 +49,8 @@ no tool changes them: the user does, with `fuze share` in a terminal.
 ```text
 status()
 -> {"mode": "simulation", "mode_in_words": "simulation (a simulated account, no money)",
-    "account": {"balance": 1000.04, "positions": {"BTC": -0.00145}, "brackets": [796]},
+    "account": {"balance": 1000.04, "positions": {"BTC": -0.00145}, "brackets": {"BTC": 4411}},
+    "risk_allowed": 60, "coins": ["BTC", "ETH", "HYPE", "LIT"],
     "reason": "Following revision 5; nothing to change.", "running": true,
     "positions_in_words": ["BTC: the signal asks for short $85, you hold short $85",
                            "ETH: the signal asks for short $16, you hold none",
@@ -66,9 +69,10 @@ The latest verified signal the agent accepted, and when it arrived. Its `why` te
 
 ```text
 signal()
--> {"signal": {"rev": 5, "state": "live", "source": "paper",
-               "targets": {"BTC": {"x": -1.7003, "px": 58723.5}, "ETH": {"x": -0.3296, "px": 1646.05}},
-               "scalp": {"coin": "BTC", "x": -1.2936, "tp": 58029.0, "sl": 59442.0, "id": 796}, "why": "We hold short ..."},
+-> {"signal": {"v": 2, "rev": 57, "state": "live", "source": "paper",
+               "targets": {"BTC": {"x": -0.4712, "px": 90950.0, "trend": {"x": -0.0212, "score": 20}}, ...},
+               "scalps": [{"coin": "BTC", "x": -0.45, "tp": 90500.0, "sl": 91400.0, "id": 4411, "score": 5}],
+               "why": "We hold short ..."},
     "received_at": 1795605824.44}
 ```
 
@@ -133,13 +137,17 @@ flatten()
 ## lower_limits
 
 Lowers one or more limits. `percent` only in percent mode and `fixed_usd` only in fixed mode; `max_position_usd` and
-`max_balance_usd` (the balance ceiling) can be added or lowered, never removed or raised; `daily_loss_frac` is a fraction (0.05 = 5%). Anything that would raise risk
+`max_balance_usd` (the balance ceiling) can be added or lowered, never removed or raised; `daily_loss_frac` is a fraction (0.05 = 5%);
+`risk_allowed` can only go down; `coins` is a list that can only drop coins (`["BTC", "ETH"]`), never add one. Anything that would raise risk
 is refused, and it cannot switch the sizing mode. A running agent resizes the held position to it within seconds.
 
 ```text
 lower_limits(percent=4)
 -> {"percent": 4.0, "sizing": ["4% of your balance follows the signal. ...",
     "With $1,000 and our position at 1.8 times our balance, yours would be $72 of Bitcoin. With $2,000 it would be $144."]}
+
+lower_limits(coins=["BTC", "ETH"])
+-> {"coins": ["BTC", "ETH"], ...}   # the running agent closes what it holds of HYPE and LIT
 
 lower_limits(max_x=5)
 -> error: "This would raise exposure cap from 3 times your balance to 5 times your balance. This server can only lower

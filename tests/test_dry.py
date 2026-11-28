@@ -28,10 +28,10 @@ def test_stop_loss(ex):
     ex.market("BTC", -0.01, 60000.0)
     ex.protect("BTC", -0.004, 59400.0, 60420.0, 7)
     ex.mark({"BTC": 60100.0})
-    assert ex.account()["brackets"] == [7]
+    assert ex.account()["brackets"] == {"BTC": 7}
     ex.mark({"BTC": 60500.0})
     a = ex.account()
-    assert a["positions"]["BTC"] == pytest.approx(-0.006) and a["brackets"] == []
+    assert a["positions"]["BTC"] == pytest.approx(-0.006) and a["brackets"] == {}
 
 
 def test_take_profit(ex, tmp_path):
@@ -63,7 +63,7 @@ def test_emergency_stop_closes_its_part_after_the_pair(ex, tmp_path):
     assert ex.account()["guards"] == {"BTC": {"units": -0.006, "stop": 72000.0, "ref": 60000.0, "t": 1.0}}
     ex.mark({"BTC": 60500.0})  # the pair's stop loss: the scalp part goes, the emergency stop stays
     a = ex.account()
-    assert a["positions"]["BTC"] == pytest.approx(-0.006) and a["brackets"] == [] and "BTC" in a["guards"]
+    assert a["positions"]["BTC"] == pytest.approx(-0.006) and a["brackets"] == {} and "BTC" in a["guards"]
     ex.mark({"BTC": 71999.0})
     assert "BTC" in ex.account()["guards"]
     ex.mark({"BTC": 72100.0})
@@ -95,3 +95,14 @@ def test_an_account_file_from_before_the_emergency_stop_still_reads(tmp_path):
     assert ex.account()["guards"] == {}
     ex.guard("BTC", -0.01, 73200.0, 61000.0)
     assert DryExchange(tmp_path, 1000.0).account()["guards"]["BTC"]["stop"] == 73200.0
+
+
+def test_one_pair_per_coin_each_fires_on_its_own_price(ex):
+    ex.market("BTC", -0.01, 60000.0)
+    ex.market("HYPE", 2.0, 34.0)
+    ex.protect("BTC", -0.004, 59400.0, 60420.0, 7)
+    ex.protect("HYPE", 1.0, 34.5, 33.6, 7)  # the same id on another coin is told apart by its coin
+    assert ex.account()["brackets"] == {"BTC": 7, "HYPE": 7}
+    ex.mark({"HYPE": 34.6, "BTC": 60100.0})  # HYPE's take profit
+    a = ex.account()
+    assert a["brackets"] == {"BTC": 7} and a["positions"]["HYPE"] == pytest.approx(1.0)

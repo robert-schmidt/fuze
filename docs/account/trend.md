@@ -1,6 +1,6 @@
 # The slow trend position
 
-This page explains the trend book: the slow part of the account that holds Bitcoin and Ether for days, following the
+This page explains the trend book: the slow part of the account that holds Bitcoin, Ether, HYPE and LIT for days, following the
 direction of the last weeks to months. In our tests it is the only part that made money.
 
 ## The rule
@@ -23,8 +23,8 @@ The rule and its settings were frozen when it went live. They are not tuned to r
 ## Worked example
 
 Balance $1,000. Bitcoin is down over 14, 30 and 60 days, so the direction is -1. Its 30-day volatility is 50% a year,
-so the adjustment is 0.5 / 0.5 = 1. Split over two coins: -1 times 1 divided by 2 = -0.5, a short worth $500. The Fear &
-Greed index is 20 (extreme fear), so the short is halved: -0.25, a short worth $250.
+so the adjustment is 0.5 / 0.5 = 1. Split over four coins: -1 times 1 divided by 4 = -0.25, a short worth $250. The Fear &
+Greed index is 20 (extreme fear), so the short is halved: -0.125, a short worth $125.
 
 ## What it is like to hold
 
@@ -38,7 +38,9 @@ Greed index is 20 (extreme fear), so the short is halved: -0.25, a short worth $
 The rule beat every placebo we tried (shifted, flipped and random versions) on Bitcoin and Ether, with costs and funding
 included, and it also made money on a stretch of history that was never looked at while building it. But the lookback
 lengths sit on a peak of past results, Bitcoin and Ether were chosen after another coin failed, and over the last three
-years the result is not statistically solid. History is not a forecast. Details: [What the tests found](../research/findings.md).
+years the result is not statistically solid. HYPE and LIT joined on 28 November 2026, each coin now getting a quarter
+of the book: their history is short (HYPE 22 months, LIT 9), and on it the rule's result on each cannot be told from
+luck. With four coins the Bitcoin and Ether parts are half the size they were. History is not a forecast. Details: [What the tests found](../research/findings.md).
 
 We also tested giving the rule a stop of its own: a stop that follows the price 2 to 5 daily ranges behind, a breakout
 version of the rule, adding in steps, and cutting the size after losses. Chosen on 2020 to 2023 and judged on 2024 to
@@ -51,4 +53,4 @@ The trend book is one of the [two books](README.md). How its position combines w
 [How the two books become one account](netting.md). The trend part has no take profit or stop loss: the rule above
 is its only exit. On the exchange it rests under an emergency stop, about 20% from the price, which is moved as the
 price moves and fills only when nothing is there to move it. See
-[the emergency stop](../agent/following.md#5-the-emergency-stop).
+[the emergency stop](../agent/following.md#6-the-emergency-stop).

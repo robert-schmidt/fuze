@@ -22,6 +22,8 @@ DEFAULTS = {
     "max_balance_usd": None,  # the most of the account's balance the agent counts; None: all of it
     "daily_loss_frac": 0.1,
     "stale_flat_min": None,
+    "risk_allowed": 60,  # a part of a position is followed when its risk score is at or under this, skipped otherwise
+    "coins": ["BTC", "ETH", "HYPE", "LIT"],  # the coins followed, in protocol.COINS order; any other is held at 0
     "testnet_account": None,  # Lighter account index (public: it is in the explorer's address); set with `fuze keys`
     "testnet_key_index": 4,  # the API key's index on that account; Lighter keeps 0 to 3 for its own apps
     "mainnet_account": None,
@@ -34,8 +36,11 @@ RANGES = {"percent": (1.0, 100.0), "fixed_usd": (10.0, 1e6), "max_position_usd":
           "max_x": (0.1, 25.0), "daily_loss_frac": (0.01, 0.5), "dry_balance": (10.0, 1e9),
           "stale_flat_min": (1.0, 10080.0)}
 SIZE_MODES = ("percent", "fixed")
+# Every setting that sizes or bounds what the agent holds. A change to one reaches the running agent at its next step
+# and resizes the held position (follow.decide); raising one needs RAISE typed at a terminal (sizing.raised).
+# risk_allowed and coins are here too: a higher risk allowed or one more coin lets the agent hold more.
 LIMITS = ("size_mode", "percent", "fixed_usd", "max_position_usd", "max_x", "max_balance_usd", "daily_loss_frac",
-          "stale_flat_min")
+          "stale_flat_min", "risk_allowed", "coins")
 LOCAL_HOSTS = ("localhost", "127.0.0.1")
 MODES = ("simulation", "testnet", "mainnet")  # in order of how real the money is
 NETS = ("testnet", "mainnet")
@@ -161,6 +166,28 @@ def _whole(v) -> bool:
     return isinstance(v, int) and not isinstance(v, bool)
 
 
+def risk_allowed(v) -> int:
+    """A whole number from 0 to 100 (20.0 is taken as 20)."""
+    if isinstance(v, float) and v.is_integer():
+        v = int(v)
+    if not _whole(v) or not 0 <= v <= 100:
+        raise ValueError("risk_allowed must be a whole number from 0 to 100")
+    return v
+
+
+def coins(v) -> list:
+    """A non-empty list among BTC, ETH, HYPE and LIT, returned in that fixed order without repeats."""
+    from fuze.protocol import COINS
+    if isinstance(v, str) or not isinstance(v, (list, tuple)) or not all(isinstance(c, str) for c in v):
+        raise ValueError("coins must be a list such as [\"BTC\", \"ETH\"]")
+    bad = [c for c in v if c not in COINS]
+    if bad:
+        raise ValueError(f"coins must be among {', '.join(COINS)}, not {', '.join(sorted(set(bad)))}")
+    if not v:
+        raise ValueError(f"coins needs at least one of {', '.join(COINS)}")
+    return [c for c in COINS if c in v]
+
+
 def validate(cfg) -> dict:
     if not isinstance(cfg, dict):
         raise ValueError("config must be a JSON object")
@@ -193,6 +220,8 @@ def validate(cfg) -> dict:
     for name in ("max_position_usd", "max_balance_usd", "stale_flat_min"):
         if out[name] is not None:
             out[name] = _number(name, out[name])
+    out["risk_allowed"] = risk_allowed(out["risk_allowed"])
+    out["coins"] = coins(out["coins"])
     if not isinstance(out["public"], bool):
         raise ValueError("public must be true or false")
     if out["handle"] is not None:

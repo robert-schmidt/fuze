@@ -110,7 +110,7 @@ function hero(d) {
 
 // ---- positions and the short-term part ----
 function positions(d) {
-  const when = $("pos-when"), stale = !d.agent.running && num(d.agent.last_step) && (d.positions.length || d.short);
+  const when = $("pos-when"), stale = !d.agent.running && num(d.agent.last_step) && (d.positions.length || d.shorts.length);
   when.hidden = !stale;
   if (stale) when.textContent = `As the agent last read the account, at ${clock(d.agent.last_step, d.now)}. Nothing is updated, and nothing follows the signal, until it runs again.`;
   put($("positions"), d.positions, () => {
@@ -127,27 +127,30 @@ function positions(d) {
   const asked = (d.asked && d.asked.lines) || [];  // what the signal asks for next to what is held, in dollars
   put($("pos-asked"), asked, () => asked.length ? [h("b", {text: "The signal and you"}), ...asked.map(t => h("span", {text: t}))] : []);
   $("pos-asked").hidden = !asked.length;
-  const s = d.short, box = $("short");
-  box.hidden = !s;
-  if (s) {
-    const lo = Math.min(s.tp, s.sl), hi = Math.max(s.tp, s.sl), at = v => 20 + 960 * Math.min(1, Math.max(0, (v - lo) / (hi - lo || 1)));
-    const x = num(s.mark) ? at(s.mark) : 500, tpLow = s.tp < s.sl, pos = d.positions.find(p => p.coin === s.coin);
-    const entry = pos && s.units && Math.abs(Math.abs(pos.units) - Math.abs(s.units)) < 1e-9 ? pos.entry : null;  // the position is only this part: its entry is this part's
-    $("spark").setAttribute("transform", `translate(${x.toFixed(1)} 0)`);
-    const n = $("f-now"); n.textContent = `${s.name} ${px(s.mark)}`; n.setAttribute("x", Math.min(860, Math.max(140, x)).toFixed(1));
-    $("f-lo").textContent = `${tpLow ? "Take profit" : "Stop loss"} ${px(lo)}`; $("f-hi").textContent = `${tpLow ? "Stop loss" : "Take profit"} ${px(hi)}`;
-    $("burnt").setAttribute("x1", (num(entry) ? at(entry) : x).toFixed(1)); $("burnt").setAttribute("x2", x.toFixed(1));
-    box.classList.toggle("cold", !d.agent.running);
-    $("short-h").textContent = s.held ? `The short-term part: ${s.side} ${s.name}, ${money(s.usd, 0)}` : `The short-term trade in the signal: ${s.side} ${s.name}`;
-    const cap = $("short-cap"), live = d.mode.trading !== "simulation";
-    cap.replaceChildren();
-    if (s.held) cap.append(s.protected ? h("b", {text: live ? "Its take profit and stop loss rest on the exchange" : d.agent.running ? "Its take profit and stop loss are set in the simulated account" : "Its take profit and stop loss are set in the simulated account, which checks them only while the agent runs"}) : h("b", {text: "Its take profit and stop loss are not shown on the exchange right now"}),
-      `: it closes by itself when the price reaches either end of the line.${num(entry) ? ` The bright part runs from the entry, ${px(entry)}, to the price now.` : ""} The rest of the position follows the slow trend. It has no take profit or stop loss; an emergency stop rests for it, far from the price, and fills only when the agent is not there to move it.`);
-    else cap.append("Your agent holds no short-term part right now; its last step says why, at the top of this page.");
-  }
+  const tpl = $("short-t");  // one fuse per coin with a short-term part, from the template in the page
+  put($("shorts"), [d.shorts, d.agent.running, d.mode.trading, d.limits.risk_allowed, d.positions.map(p => [p.coin, p.units, p.entry])],
+    () => d.shorts.map(s => fuse(d, s, tpl.content.firstElementChild.cloneNode(true))));
   put($("pos-do"), [d.positions.length > 0, d.limits.percent, d.limits.fixed_usd, d.limits.size_mode], () => d.positions.length ? [
     line(h("b", {text: "Smaller positions"}), ": ", cmd(`fuze limits ${lower(d.limits).flag}`), " or tell your AI tool ", say(lower(d.limits).ask), "."),
     line(h("b", {text: "Close everything now"}), ": ", cmd("fuze flatten"), " or ", say("flatten FUZE"), ".")] : []);
+}
+
+function fuse(d, s, box) {               // one coin's short-term part between its take profit and stop loss
+  const q = c => box.querySelector("." + c);
+  const lo = Math.min(s.tp, s.sl), hi = Math.max(s.tp, s.sl), at = v => 20 + 960 * Math.min(1, Math.max(0, (v - lo) / (hi - lo || 1)));
+  const x = num(s.mark) ? at(s.mark) : 500, tpLow = s.tp < s.sl, pos = d.positions.find(p => p.coin === s.coin);
+  const entry = pos && s.units && Math.abs(Math.abs(pos.units) - Math.abs(s.units)) < 1e-9 ? pos.entry : null;  // the position is only this part: its entry is this part's
+  q("spark").setAttribute("transform", `translate(${x.toFixed(1)} 0)`);
+  const n = q("f-now"); n.textContent = `${s.name} ${px(s.mark)}`; n.setAttribute("x", Math.min(860, Math.max(140, x)).toFixed(1));
+  q("f-lo").textContent = `${tpLow ? "Take profit" : "Stop loss"} ${px(lo)}`; q("f-hi").textContent = `${tpLow ? "Stop loss" : "Take profit"} ${px(hi)}`;
+  q("burnt").setAttribute("x1", (num(entry) ? at(entry) : x).toFixed(1)); q("burnt").setAttribute("x2", x.toFixed(1));
+  box.classList.toggle("cold", !d.agent.running);
+  q("short-h").textContent = s.held ? `The short-term part: ${s.side} ${s.name}, ${money(s.usd, 0)}` : `The short-term trade in the signal: ${s.side} ${s.name}`;
+  const cap = q("short-cap"), live = d.mode.trading !== "simulation";
+  if (s.held) cap.append(s.protected ? h("b", {text: live ? "Its take profit and stop loss rest on the exchange" : d.agent.running ? "Its take profit and stop loss are set in the simulated account" : "Its take profit and stop loss are set in the simulated account, which checks them only while the agent runs"}) : h("b", {text: "Its take profit and stop loss are not shown on the exchange right now"}),
+    `: it closes by itself when the price reaches either end of the line.${num(entry) ? ` The bright part runs from the entry, ${px(entry)}, to the price now.` : ""} The rest of the ${s.name} position follows the slow trend. It has no take profit or stop loss; an emergency stop rests for it, far from the price, and fills only when the agent is not there to move it.`);
+  else cap.append(`Your agent holds no ${s.name} short-term part right now` + (num(s.score) && s.score > d.limits.risk_allowed ? `: it scores ${s.score}, above your risk allowed of ${d.limits.risk_allowed}.` : "; its last step says why, at the top of this page."));
+  return box;
 }
 
 // ---- the signal ----
@@ -160,8 +163,10 @@ function signal(d) {
   else {
     const what = {live: "Live", flat: "Flat: our account is out of the market", offline: "Offline: our account is not trading"}[s.state] || "–";
     rows.push(["State", what, s.fresh || s.origin === "page" ? "" : "Not fresh: the agent holds what it has and opens nothing new."]);
-    const held = s.targets.filter(t => num(t.x) && Math.abs(t.x) >= 0.005).map(t => `${t.x < 0 ? "short" : "long"} ${t.name} ${Math.abs(t.x).toFixed(2)} times our balance`);
-    if (s.state === "live") rows.push(["Our position", held.length ? held.join(", ") : "nothing", s.scalp ? `including a short-term trade on ${s.scalp.coin === "BTC" ? "Bitcoin" : "Ether"}: take profit ${px(s.scalp.tp)}, stop loss ${px(s.scalp.sl)}` : ""]);
+    const held = s.targets.filter(t => num(t.x) && Math.abs(t.x) >= 0.005).map(t => `${t.x < 0 ? "short" : "long"} ${t.name} ${Math.abs(t.x).toFixed(2)} times our balance` + (num(t.trend_score) && t.trend_score ? ` (trend part scores ${t.trend_score})` : ""));
+    const trades = (s.scalps || []).map(c => `a short-term trade on ${c.name} scoring ${num(c.score) ? c.score : "–"}: take profit ${px(c.tp)}, stop loss ${px(c.sl)}`);
+    if (s.state === "live") rows.push(["Our position", held.length ? held.join(", ") : "nothing", trades.length ? `including ${trades.join("; ")}` : ""]);
+    if (s.state === "live") rows.push(["Risk score", `yours allows ${d.limits.risk_allowed}`, "how much of the balance a part can lose on a bad day, in tenths of a percent (20 means 2%). It says nothing about how likely a part is to win."]);
     rows.push(["Revision", num(s.rev) ? String(s.rev) : "–", "goes up each time our position changes"]);
     rows.push(["Signed", "", ""]);                 // filled below, every poll
     rows.push(["Signature", s.origin === "page" ? "Checked by this page against the key built into FUZE" : "Checked against the key built into FUZE before use", d.agent.last_drop ? `Last message dropped: ${d.agent.last_drop}.` : ""]);
@@ -193,9 +198,10 @@ function limits(d) {
       h("div", {className: "trk", role: "img", "aria-label": `${Math.round(used * 100)} percent of today's loss stop used`}, bar),
       h("small", {text: `Lost today ${money(dl.lost)} of ${money(dl.allowed)}. Everything closes until the next UTC day if the balance reaches ${money(dl.floor)}.`})];
   });
-  put($("lim-do"), [L.size_mode, L.percent, L.fixed_usd, L.values.stale_flat_min], () => {
+  put($("lim-do"), [L.size_mode, L.percent, L.fixed_usd, L.values.stale_flat_min, L.values.risk_allowed, L.values.coins], () => {
     const lo = lower(L);
     return [line(`Close everything after no live signal for: ${L.values.stale_flat_min}.`),
+      line(`Risk allowed: ${L.values.risk_allowed}. Coins: ${L.values.coins}.`),
       line(h("b", {text: "Lower"}), " (applies at once): ", cmd(`fuze limits ${lo.flag}`), " or tell your AI tool ", say(lo.ask), "."),
       line(h("b", {text: "Raise"}), " only in your own terminal, with ", cmd("fuze limits"), " and the new value; it asks you to type RAISE. Your AI tool cannot raise a limit. ", cmd("fuze limits -h"), " lists every setting.")];
   });
@@ -212,7 +218,7 @@ function orders(d) {
   put($("orders"), d.trades, () => {
     if (!d.trades.length) return h("li", {className: "empty", text: "No orders yet."});
     return d.trades.map(t => {
-      const u = num(t.units) ? t.units : 0, verb = u > 0 ? "Bought" : u < 0 ? "Sold" : "No fill:", name = t.coin === "BTC" ? "Bitcoin" : "Ether";
+      const u = num(t.units) ? t.units : 0, verb = u > 0 ? "Bought" : u < 0 ? "Sold" : "No fill:", name = {BTC: "Bitcoin", ETH: "Ether"}[t.coin] || t.coin;
       const head = `${verb} ${units(u || t.asked, t.coin)}${num(t.px) ? ` at ${px(t.px)} (${money(Math.abs(u) * t.px, 0)})` : ""}`;
       const sub = [KIND[t.kind] || t.kind, t.result && t.result !== "filled" ? t.result : "", num(t.asked) && t.asked !== u ? `asked ${units(t.asked, t.coin)}` : "", num(t.worst) ? `worst price ${px(t.worst)}` : "", t.mode && t.mode !== "simulation" ? t.mode : ""].filter(Boolean).join(", ");
       const res = num(t.pnl) && Math.abs(t.pnl) >= 0.005 ? h("span", {className: `res ${tone(t.pnl)}`, text: signed(t.pnl)}) : t.link ? h("span", {className: "res"}, out(t.link, "explorer")) : h("span", {className: "res"});

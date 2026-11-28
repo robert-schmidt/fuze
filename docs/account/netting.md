@@ -8,7 +8,7 @@ position per coin on one account, and what protects each part.
 One process does all the trading. Every second it adds the books together:
 
 - **Bitcoin target** = the trend book's Bitcoin position + the short-term book's position.
-- **Ether target** = the trend book's Ether position (the short-term book trades Bitcoin only).
+- **Ether, HYPE and LIT targets** = the trend book's position in each (the short-term book trades Bitcoin only).
 
 Both books size on the account's own balance, so the account holds each short-term trade at exactly the book's size from
 entry to exit.

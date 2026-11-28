@@ -51,7 +51,7 @@ class DryExchange(Venue):
         upnl = sum(p["units"] * (self.s["marks"].get(c, p["entry"]) - p["entry"]) for c, p in self.s["pos"].items())
         return {"balance": self.s["cash"] + upnl,
                 "positions": {c: p["units"] for c, p in self.s["pos"].items() if p["units"]},
-                "brackets": [b["id"] for b in self.s["brackets"].values()],
+                "brackets": {c: b["id"] for c, b in self.s["brackets"].items()},
                 "guards": {c: dict(g) for c, g in (self.s.get("guards") or {}).items()}}
 
     def book(self) -> dict:

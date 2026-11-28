@@ -4,17 +4,27 @@ The signal gives, per coin, `x` = our position value divided by our balance. The
 follows that signal:
   percent: `percent`% of its balance (grows and shrinks with the balance), position value = x × percent/100 × balance
   fixed:   `fixed_usd`, whatever the balance is (does not compound),   position value = x × fixed_usd
-Then two caps: `max_position_usd` on any one coin, and `max_x` × the real balance across coins.
+Then the caps: `max_position_usd` on any one coin, the highest leverage Lighter allows on that coin's market
+(MAX_LEVERAGE) × the counted balance, and `max_x` × the counted balance across coins.
+
+Which parts of the signal follow at all is decided before (follow.decide): a part whose risk score is above
+`risk_allowed`, or a coin not in `coins`, is wanted at 0.
 """
 
 from __future__ import annotations
 
 SIZE_FIELD = {"percent": "percent", "fixed_usd": "fixed"}  # the field that sizes each mode
 EXAMPLE_X = 1.8  # our position, as a multiple of our balance, in the worked example
+# The highest leverage Lighter allows on a market, where it is under the exposure cap's highest value of 25 (as of
+# 28 November 2026: HYPE 20 times, LIT 5 times; Bitcoin and Ether allow more, so the exposure cap bounds them). FUZE
+# does not change the leverage setting on Lighter; instead no position is sized larger than this many times the
+# balance, so the market's own margin rule is not the reason an order fails. The same in every mode, so a simulation
+# shows what Lighter would take.
+MAX_LEVERAGE = {"HYPE": 20.0, "LIT": 5.0}
 LABELS = {"size_mode": "sizing", "percent": "share of your balance", "fixed_usd": "fixed amount",
           "max_position_usd": "cap per position", "max_x": "exposure cap", "max_balance_usd": "balance ceiling",
           "daily_loss_frac": "daily loss stop",
-          "stale_flat_min": "close after no signal for"}
+          "stale_flat_min": "close after no signal for", "risk_allowed": "risk allowed", "coins": "coins"}
 
 
 def counted(cfg, bal: float) -> float:
@@ -34,10 +44,14 @@ def fit(usd: dict, cfg, bal: float) -> tuple:
 
     Returns (factors, notes). The scalp part of a coin shrinks by the same factor as the coin.
     """
-    cap = cfg.get("max_position_usd")
+    cap, bal = cfg.get("max_position_usd"), counted(cfg, bal)
     f = {c: cap / abs(v) if cap and abs(v) > cap else 1.0 for c, v in usd.items()}
     notes = [f"Cut to your cap of ${cap:,.0f} per position."] if any(k < 1 for k in f.values()) else []
-    total, bal = sum(abs(v) * f[c] for c, v in usd.items()), counted(cfg, bal)
+    lev = [c for c, v in usd.items() if c in MAX_LEVERAGE and abs(v) * f[c] > MAX_LEVERAGE[c] * bal]
+    for c in lev:
+        f[c] = MAX_LEVERAGE[c] * bal / abs(usd[c])
+        notes.append(f"Cut {c} to {MAX_LEVERAGE[c]:g} times your balance, the highest leverage Lighter allows on it.")
+    total = sum(abs(v) * f[c] for c, v in usd.items())
     if total > cfg["max_x"] * bal:
         k = cfg["max_x"] * bal / total
         f = {c: x * k for c, x in f.items()}
@@ -73,6 +87,10 @@ def fmt(name: str, value) -> str:
         return f"{value:.0%}"
     if name == "stale_flat_min":
         return "off" if value is None else f"{value:g} minutes"
+    if name == "risk_allowed":
+        return f"{value} (a part that can lose {value / 10:g}% of the balance on a bad day, or less)"
+    if name == "coins":
+        return ", ".join(value)
     return str(value)
 
 
@@ -91,6 +109,10 @@ def describe(cfg, bal: float) -> list:
             f"Daily loss stop: {cfg['daily_loss_frac']:.0%} of the balance in a UTC day closes everything.",
             *([f"Balance ceiling: ${top:,.0f}. The agent counts no more than this as your balance, whatever the "
                "account holds."] if top else []),
+            f"Risk allowed: {cfg['risk_allowed']}. A part of a position is followed whole when its risk score is "
+            f"{cfg['risk_allowed']} or less, and skipped whole above it. A score of 20 means the part can lose 2% of "
+            "the balance on a bad day; it says nothing about how likely the part is to win.",
+            f"Coins: {', '.join(cfg['coins'])}. Any other coin is not opened, and what is held of it is closed.",
             example(cfg, bal)]
 
 
@@ -105,4 +127,8 @@ def raised(cur, new, bal: float) -> list:
             up.append(k)
     if new["size_mode"] != cur["size_mode"] and base_usd(new, bal) > base_usd(cur, bal):
         up.append("size_mode")
+    if new["risk_allowed"] > cur["risk_allowed"]:  # parts with higher scores are then followed
+        up.append("risk_allowed")
+    if set(new["coins"]) - set(cur["coins"]):  # one more coin can be held
+        up.append("coins")
     return up

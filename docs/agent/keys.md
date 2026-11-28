@@ -63,7 +63,7 @@ Testnet and mainnet keys are kept separately.
 
 Any program that runs as you (with your shell access) can read the key from the keyring or the file, as it can run
 `fuze` itself. What protects the money is on the exchange: a sub-account holding only what you can lose, and a key
-restricted to the BTC and ETH markets, which cannot withdraw. Do not give an AI tool unattended shell access on a
+restricted to the markets of the coins you follow (BTC, ETH, HYPE, LIT), which cannot withdraw. Do not give an AI tool unattended shell access on a
 machine that holds a mainnet key. See [Security model](security.md).
 
 ## Removing it

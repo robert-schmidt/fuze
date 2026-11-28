@@ -25,18 +25,33 @@ HONEST = ("What the confirmations protect against: the typed words (RAISE, REAL 
           "rehearsal lock stop this server's tools, programs without a terminal, and mistakes. They are not a barrier "
           "against a program already running as the user with shell access: such a program can do whatever the user "
           "can, and could also read the API key. The protection for money is on the exchange: a Lighter sub-account "
-          "holding only what the user is willing to lose, and an API key restricted to the BTC and ETH markets, which "
-          "cannot withdraw (an unrestricted key can still make secure withdrawals to the owner's own wallet). Do not "
+          "holding only what the user is willing to lose, and an API key restricted to the markets FUZE trades (BTC, "
+          "ETH, HYPE, LIT), which cannot withdraw (an unrestricted key can still make secure withdrawals to the "
+          "owner's own wallet). Do not "
           "run commands that raise risk, change the mode or touch keys, and tell the user not to give an AI tool "
           "unattended shell access on a machine that holds a mainnet key.")
 SECRETISH = re.compile(r"mode|key|secret|private|seed|mnemonic|phrase|password|token|wallet|server|resume|unflatten",
                        re.I)
 FLAG = {"percent": "--percent", "fixed_usd": "--fixed-usd", "max_position_usd": "--max-position-usd", "max_x": "--max-x",
-        "max_balance_usd": "--max-balance-usd", "daily_loss_frac": "--daily-loss"}  # the `fuze limits` flag for each limit, for the refusal that names the command
+        "max_balance_usd": "--max-balance-usd", "daily_loss_frac": "--daily-loss", "risk_allowed": "--risk-allowed",
+        "coins": "--coins"}  # the `fuze limits` flag for each limit, for the refusal that names the command
+
+
+def _flag_value(k: str, v) -> str:
+    """A value as the `fuze limits` flag takes it."""
+    if k == "coins":
+        return ",".join(v)
+    return f"{v * 100 if k == 'daily_loss_frac' else v:g}"
 DOCS = {
-    "following": "FUZE publishes the position its own account holds, signed: per coin, x = our position value "
-                 "divided by our balance (negative is short). Your agent copies it on your account at your sizing "
-                 "(see the sizing topic). It acts when the signal's revision changes, when the user's limits change "
+    "following": "FUZE publishes the position its own account holds, signed: per coin (BTC, ETH, HYPE, LIT), x = "
+                 "our position value divided by our balance (negative is short), in parts: the trend part, and at "
+                 "most one short-term trade with its own take profit and stop loss. Each part carries a risk score, 0 "
+                 "to 100: how much of our balance it can lose on a bad day, in tenths of a percent (20 means 2%). The "
+                 "score orders how much a part can lose; it does not say how likely a part is to win. Your agent "
+                 "follows a part whole when its score is at or under your risk allowed (standard 60) and skips it "
+                 "whole above it, only on the coins you chose (standard all four), and copies the rest on your "
+                 "account at your sizing (see the sizing topic). It acts when the signal's revision changes, when "
+                 "the user's limits change "
                  "(within seconds: lowered limits shrink the held position at once), when the position no longer "
                  "matches what it set, and on a re-check every 5 minutes that corrects a coin only when it is more "
                  "than 10% off; never on price moves alone. Changes smaller than the larger of $10 and 2% of the "
@@ -59,9 +74,12 @@ DOCS = {
               "daily_loss_frac (0.01 to 0.5): if the balance falls this much in a UTC day, everything closes until "
               "the next day. stale_flat_min: close everything after this many minutes without a live signal. When "
               "a cap cuts a position, its scalp part (with its stop loss and take profit) shrinks in the same "
-              "proportion. Through this server percent, fixed_usd, max_position_usd, max_x, max_balance_usd and "
-              "daily_loss_frac can only be lowered (a cap per position or a balance ceiling can be added, not "
-              "removed).",
+              "proportion. On Lighter's markets with a lower highest leverage, a position is never larger than that "
+              "many times the balance (HYPE 20, LIT 5). risk_allowed (0 to 100, standard 60): a part of a position is "
+              "followed when its risk score is at or under it. coins (standard BTC, ETH, HYPE, LIT): the coins "
+              "followed; any other is not opened, and what is held of it is closed. Through this server percent, "
+              "fixed_usd, max_position_usd, max_x, max_balance_usd, daily_loss_frac and risk_allowed can only be "
+              "lowered, and coins only removed (a cap per position or a balance ceiling can be added, not removed).",
     "page": "`fuze ui` serves a read-only page on this computer only, http://127.0.0.1:3893 by default (`--port` to "
             "change it, `--open` to open the browser): running or not and since when, the mode, balance and today's "
             "result, each position with its entry, price and result, the short-term part between its take profit and "
@@ -81,7 +99,8 @@ DOCS = {
              "runs `fuze mcp-config` and pastes what it prints (the full path of fuze and FUZE_HOME). `fuze init` asks the mode and "
              "the sizing questions in a terminal; on the user's instruction an AI tool may pass the sizing as flags "
              "instead: --size-mode percent|fixed, --percent, --fixed-usd, --max-position-usd, --max-x, --daily-loss "
-             "(percent), --yes. Without a terminal it always saves mode simulation. It never replaces an existing "
+             "(percent), --risk-allowed (0 to 100), --coins (for example BTC,ETH), --yes. Without a terminal it "
+             "always saves mode simulation. It never replaces an existing "
              "config without --force, and replacing one with more risk needs the user to type RAISE. The mode and "
              "the keys are the user's own terminal actions (see the modes topic).",
     "modes": "Three modes. simulation (default): a simulated account on this computer, no money. testnet: Lighter's "
@@ -93,10 +112,12 @@ DOCS = {
              "closes it, each step confirmed by reading the account). A mode change is refused while anything is open in the current "
              "mode; close it first with flatten. The API key is typed by the user with `fuze keys testnet` (or "
              "mainnet), hidden, kept in the OS keyring or a private file; never ask for it, never accept it in a "
-             "chat. Use a Lighter API key restricted to the BTC and ETH markets on a sub-account that holds only "
-             "what the user can lose. Any mode follows any signal source (our paper, testnet or mainnet account), "
+             "chat. Use a Lighter API key restricted to the markets FUZE trades (BTC, ETH, HYPE, LIT) on a "
+             "sub-account that holds only what the user can lose. A coin the test exchange lists no market for is "
+             "not traded there. Any mode follows any signal source (our paper, testnet or mainnet account), "
              "since x is a ratio; status says when the user's mode is more real than ours. The same limits apply "
-             "in every mode. The scalp part rests under its take profit and stop loss on the exchange, and the rest "
+             "in every mode. Each coin's short-term part rests under its own take profit and stop loss on the "
+             "exchange, and the rest "
              "of each position under an emergency stop about 20% from the price: the agent moves it with the price "
              "while it follows a live signal, and it fills only when the agent is off, paused or without a signal.",
     "status": "The status tool says whether the agent is running, its mode, the balance, each position next to what "
@@ -104,7 +125,7 @@ DOCS = {
               "on, and the limits in words. The same is shown on a read-only page on the user's computer: the ui tool "
               "gives its address (http://127.0.0.1:3893 once `fuze ui --open` runs). To raise a limit the user types "
               "`fuze limits` with a flag in a terminal (--percent, --fixed-usd, --max-position-usd, --max-x, "
-              "--daily-loss) and confirms with RAISE.",
+              "--daily-loss, --risk-allowed, --coins) and confirms with RAISE.",
     "risks": "This mirrors one account's trading. Most tested scalping rules lose money after costs. Past results "
              "promise nothing. You can lose everything you put in. This is not financial advice.",
 }
@@ -185,6 +206,7 @@ def build() -> MCPServer:
             if mode == "mainnet" or s.get("mode") == "mainnet":
                 out["warning"] = "REAL MONEY: the agent trades a real Lighter account."
             out["sizing"] = describe(cfg, config.current_balance(cfg))
+            out["risk_allowed"], out["coins"] = cfg["risk_allowed"], cfg["coins"]
             from fuze.report import status_line
             out["sharing"] = "public" if cfg["public"] else "private"  # changed only with `fuze share` in a terminal
             out["reporting"] = status_line(cfg)
@@ -240,25 +262,34 @@ def build() -> MCPServer:
 
     @app.tool(description="Lower one or more limits: percent (percent mode only), fixed_usd (fixed mode only), "
                           "max_position_usd (a cap per position can be added or lowered, never removed or raised), "
-                          "max_x, max_balance_usd (a balance ceiling, the same rule as the cap), daily_loss_frac. Any change that would raise risk is refused, and the sizing mode "
-                          "cannot be switched here. " + RULE)
+                          "max_x, max_balance_usd (a balance ceiling, the same rule as the cap), daily_loss_frac, "
+                          "risk_allowed (a whole number, only lower: parts of a position with a higher risk score are "
+                          "then skipped), coins (the coins to keep following, only fewer: a coin left out is closed). "
+                          "Any change that would raise risk is refused, and the sizing mode cannot be switched here. "
+                          + RULE)
     def lower_limits(percent: float | None = None, fixed_usd: float | None = None,
                      max_position_usd: float | None = None, max_x: float | None = None,
-                     daily_loss_frac: float | None = None, max_balance_usd: float | None = None) -> dict:
+                     daily_loss_frac: float | None = None, max_balance_usd: float | None = None,
+                     risk_allowed: int | None = None, coins: list[str] | None = None) -> dict:
         _agent_here()
         cfg = config.load()
+        if isinstance(coins, list):
+            coins = [c.upper() if isinstance(c, str) else c for c in coins]
         asked = {k: v for k, v in {"percent": percent, "fixed_usd": fixed_usd, "max_position_usd": max_position_usd,
                                    "max_x": max_x, "daily_loss_frac": daily_loss_frac,
-                                   "max_balance_usd": max_balance_usd}.items() if v is not None}
+                                   "max_balance_usd": max_balance_usd, "risk_allowed": risk_allowed,
+                                   "coins": coins}.items() if v is not None}
         if not asked:
             raise ToolError("give at least one of percent, fixed_usd, max_position_usd, max_x, daily_loss_frac, "
-                            "max_balance_usd")
+                            "max_balance_usd, risk_allowed, coins")
         idle = "fixed_usd" if cfg["size_mode"] == "percent" else "percent"
         if idle in asked:
             raise ToolError(f"Positions are sized by {fmt('size_mode', cfg['size_mode'])}, so {idle} does not apply. "
                             "This server cannot switch the sizing mode; the user does that in a terminal with "
                             "`fuze limits --size-mode ...`.")
         for k, v in asked.items():
+            if k == "coins":
+                continue  # config.validate checks the list
             if isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v):
                 raise ToolError(f"{k} must be a number")
         try:
@@ -267,7 +298,7 @@ def build() -> MCPServer:
             raise ToolError(str(e)) from None
         up = raised(cfg, new, config.current_balance(cfg))
         if up:
-            flags = " ".join(f"{FLAG[k]} {asked[k] * 100 if k == 'daily_loss_frac' else asked[k]:g}" for k in up if k in asked)
+            flags = " ".join(f"{FLAG[k]} {_flag_value(k, new[k])}" for k in up if k in asked)
             raise ToolError("This would raise " + "; ".join(f"{LABELS[k]} from {fmt(k, cfg[k])} to {fmt(k, new[k])}"
                                                             for k in up) +
                             f". This server can only lower limits; to raise one the user types `fuze limits {flags}`"

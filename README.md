@@ -12,8 +12,8 @@ you in your own terminal. Those typed steps stop the MCP tools, scripts and mist
 as you with shell access: see [What the confirmations protect against](#what-the-confirmations-protect-against).
 No promise of profit: it copies one account, and that account can lose.
 
-A FUZE server publishes, signed, the position that our own trading account holds on Bitcoin and Ether perpetual
-futures. This agent checks every message against a key built into the code, and follows that position on **your**
+A FUZE server publishes, signed, the position that our own trading account holds on Bitcoin, Ether, HYPE and LIT
+perpetual futures, each part of it with a risk score. This agent checks every message against a key built into the code, and follows that position on **your**
 account at the size and limits **you** set. Nobody else holds your keys or your money. The AI tool watches and
 controls the agent through an MCP server that can only make things safer.
 
@@ -32,7 +32,7 @@ including order matching and liquidations" (https://lighter.xyz). A standard acc
 orders (https://docs.lighter.xyz/trading/trading-fees.md).
 
 Start in simulation, then testnet with small sizes, and watch it; mainnet after that. The signal server is
-https://fuze.trade (`/v1/signal`, `/v1/stream`); the code is at https://github.com/robert-schmidt/fuze.
+https://fuze.trade (`/v2/signal`, `/v2/stream`; agent 0.6.0 reads version 2 only); the code is at https://github.com/robert-schmidt/fuze.
 
 ## Three modes
 
@@ -57,7 +57,7 @@ your mode risks more real money than the account you follow, for example real mo
 - **Keys**: `fuze keys testnet` (or `mainnet`) asks your Lighter account index, the API key's index and the API key
   itself (80 hexadecimal characters), hidden as you type; a key of the wrong shape is refused and nothing is saved. The key goes into your OS keyring (with the `keyring` package) or else a file only you can
   read in `~/.fuze`. It is never printed, logged, shown to an AI tool, or accepted as a command-line argument. Use an
-  API key restricted to the BTC and ETH markets, on a sub-account holding only what you can lose:
+  API key restricted to the markets of the coins you follow (BTC, ETH, HYPE, LIT), on a sub-account holding only what you can lose:
   [docs/lighter-setup.md](docs/lighter-setup.md).
 - **The rehearsal** (`fuze rehearse`, testnet): opens a small Bitcoin position, places the emergency stop for one
   half and a take profit and stop loss for the other, cancels them and closes the position, confirming every step by
@@ -74,11 +74,11 @@ your mode risks more real money than the account you follow, for example real mo
   anything else and never sends a blind second order; an order in flight is written to disk first, so a restart reads
   the account instead of sending it again; reductions are reduce-only; every market order has a worst price (0.5%
   past the signal's price to open, 2% to close); sizes and prices are rounded to the decimals and minimum order
-  Lighter publishes; the scalp part rests under its own take profit and stop loss on the exchange, sized to that part,
+  Lighter publishes; each short-term trade rests under its own take profit and stop loss on the exchange, sized to that part,
   re-placed when it changes and cancelled when it closes, and if the exchange does not show them, that part is closed;
   the rest of each position rests under an emergency stop about 20% from the price, moved with the price while a live
   signal is followed, so a position nobody is watching has an order behind it
-  ([docs/agent/following.md](docs/agent/following.md#5-the-emergency-stop)).
+  ([docs/agent/following.md](docs/agent/following.md#6-the-emergency-stop)).
 
 ## What it is not
 
@@ -226,7 +226,7 @@ where a key is stored. Links lead to [fuze.trade](https://fuze.trade) (our publi
 ## How following works
 
 1. Every message is checked in this order: the key is pinned in this code and the signature is valid; protocol
-   version 1; its time stamp `ts` is later than the last one accepted (kept on disk in `guard.json`, so a restart
+   version 2 (a version 1 message is refused); its time stamp `ts` is later than the last one accepted (kept on disk in `guard.json`, so a restart
    cannot be replayed); it has not expired (a message lives at most 60 s after `ts`) and is not more than 30 s in the
    future. Then every field is checked for type and range. Anything that fails is dropped. See
    [docs/PROTOCOL.md](docs/PROTOCOL.md).
@@ -236,14 +236,20 @@ where a key is stored. Links lead to [fuze.trade](https://fuze.trade) (our publi
    even by less than the smallest change below). Every 5 minutes it also compares
    what the signal asks for with what you hold and corrects a coin only when it is more than 10% off (and over the
    smallest change below), so `x` moving with the price alone never causes a trade.
-3. Your position per coin is sized as you chose (see [How big are my positions](#how-big-are-my-positions)), then
-   cut to your cap per position, then the total across coins is cut down to your `max_x` if it is larger. Changes
+3. For each coin among your `coins`, the agent takes each part of our position (the trend part, and at most one
+   short-term trade) whole when its risk score is at or under your `risk_allowed`, and skips it whole otherwise; a coin
+   not among your coins is closed and never opened. `fuze status` says each skip in plain words. The score says how
+   much of the balance a part can lose on a bad day, in tenths of a percent; it does not say how likely it is to win.
+   Your position per coin is sized as you chose (see [How big are my positions](#how-big-are-my-positions)), then
+   cut to your cap per position (and HYPE to 20, LIT to 5 times your balance, the highest leverage Lighter allows on
+   them), then the total across coins is cut down to your `max_x` if it is larger. Changes
    smaller than the larger of $10 and 2% of your balance are skipped, unless the target is zero. So a small size can
    mean nothing is held: with a fixed $10 the signal may ask for $17 of Bitcoin, under the $20 step of a $1,000
    balance. `fuze status`, the MCP `status` tool and the local page show, per coin, what the signal asks for and what
    you hold in dollars, and say when the difference is under that step; `fuze limits` warns when a size can never
    open anything at the current signal.
-4. The scalp part of a position gets its own take profit and stop loss (on Lighter: resting on the exchange). If the
+4. Each short-term trade followed gets its own take profit and stop loss, one pair per coin (on Lighter: resting on
+   the exchange). If the
    stop loss is on the wrong side of the price or more than 1.5% away, or the take profit is on the wrong side, or
    the part is under the exchange's smallest order, that part is not opened (the rest is). The rest of the position
    has no take profit or stop loss; it rests under an emergency stop 20% from the price, which the agent moves with the
@@ -265,6 +271,8 @@ Bitcoin worth 1.8 times our balance (negative is short). You choose how much of 
 | Cap per position (optional) | `--max-position-usd 300` (10 to 1,000,000, or `off`) | no coin above $300 | $300 instead of $900 in the fixed example |
 | Exposure cap | `--max-x 3` (0.1 to 25) | everything together at most 3 times your **real** balance, in both choices | a fixed amount larger than your balance is cut down here |
 | Daily loss stop | `--daily-loss 10` (percent, 1 to 50) | if the balance falls 10% in a UTC day, everything closes until the next UTC day | |
+| Risk allowed | `--risk-allowed 60` (0 to 100) | a part of our position is followed when its risk score is at or under this | |
+| Coins | `--coins BTC,ETH` (or `all`, standard) | only these coins are followed; any other is closed | |
 
 When a cap cuts a coin's position, the part of it that has its own take profit and stop loss shrinks in the same
 proportion.
@@ -285,10 +293,12 @@ is between a share of your balance and a fixed amount, and both shrink when we s
 | `max_balance_usd` | off, or 10 and up | off | balance ceiling: the agent counts no more than this as your balance, whatever the account holds |
 | `daily_loss_frac` | 1% – 50% | 10% | if the balance falls this much in a UTC day, close everything until the next UTC day |
 | `stale_flat_min` | off, or minutes | off | close everything after this long without a live signal |
+| `risk_allowed` | 0 – 100 | 60 | a part of the position is followed whole when its risk score is at or under this, skipped whole above it |
+| `coins` | among BTC, ETH, HYPE, LIT | all four | the coins followed; any other is wanted at 0 |
 
 `fuze limits` shows them with the worked example at your current balance. Lower any time: `fuze limits --percent 5`,
 `fuze limits --max-position-usd 300`; a running agent resizes to it within seconds. Anything that can raise risk is
-only possible in a terminal and asks you to type `RAISE` (it also applies without a restart): a higher percent, fixed amount, `max_x`, daily loss stop or `stale_flat_min`; removing or raising the cap per
+only possible in a terminal and asks you to type `RAISE` (it also applies without a restart): a higher percent, fixed amount, `max_x`, daily loss stop, `stale_flat_min` or `risk_allowed`; adding a coin; removing or raising the cap per
 position or the balance ceiling; switching to the other choice when it gives a larger position at your current balance. `fuze init --force`
 replaces an existing config under the same rule. Emergency controls: `fuze pause` (hold, no new orders),
 `fuze flatten` (close all and stay out); `fuze resume` and `fuze unflatten` undo them, only at a terminal and after you
@@ -352,7 +362,7 @@ mistakes. They are **not** a barrier against a program that already runs as you 
 fake a terminal and type the words, edit the files in `~/.fuze`, or change FUZE's own code, and it could equally read
 your API key. `AGENTS.md` tells coding agents not to, but that is a request, not a lock. The protection for money is
 on the exchange side: give FUZE a Lighter sub-account that holds only what you are willing to lose, and an API key that
-cannot withdraw: one restricted to the BTC and ETH markets, which per Lighter's docs can only create, modify and cancel
+cannot withdraw: one restricted to the markets of the coins you follow (BTC, ETH, HYPE, LIT), which per Lighter's docs can only create, modify and cancel
 orders there (an unrestricted key can still withdraw to your own wallet; no API key alone can send funds to another
 owner). See [docs/lighter-setup.md](docs/lighter-setup.md). **Do not give an AI tool unattended shell access on a machine that
 holds a mainnet key.**

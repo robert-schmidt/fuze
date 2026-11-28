@@ -33,7 +33,7 @@ from urllib.parse import urlsplit
 
 from fuze import __version__, config, keys, modes
 from fuze.checks import setup_report
-from fuze.protocol import COINS, PINNED, clean, verify
+from fuze.protocol import COINS, NAMES, PATHS, PINNED, VERSION, clean, verify
 from fuze.sizing import LABELS, counted, describe, fmt
 from fuze.venue import EXPLORER, account_link
 
@@ -51,7 +51,6 @@ FILES = {  # path -> (file in fuze/static, content type). Nothing else is ever s
     "/archivo.woff2": ("archivo.woff2", "font/woff2"),
     "/favicon.svg": ("favicon.svg", "image/svg+xml"),
 }
-NAMES = {"BTC": "Bitcoin", "ETH": "Ether"}
 
 
 # --- reading the FUZE folder, tolerant of anything missing or odd ------------------------------------------------
@@ -133,19 +132,26 @@ def _signal(sig) -> dict | None:
     """The fields of a verified, cleaned signal that the page shows."""
     if not isinstance(sig, dict):
         return None
-    sc = sig.get("scalp") if isinstance(sig.get("scalp"), dict) else None
+    scalps = [sc for sc in sig.get("scalps") or [] if isinstance(sc, dict) and sc.get("coin") in COINS] \
+        if isinstance(sig.get("scalps"), list) else []
     targets = sig.get("targets") if isinstance(sig.get("targets"), dict) else {}
+
+    def score(part):
+        v = part.get("score") if isinstance(part, dict) else None
+        return v if isinstance(v, int) and not isinstance(v, bool) else None
+
     return {"state": sig.get("state") if sig.get("state") in ("live", "flat", "offline") else None,
             "rev": sig.get("rev") if isinstance(sig.get("rev"), int) else None,
             "seq": sig.get("seq") if isinstance(sig.get("seq"), int) else None,
             "ts": _num(sig.get("ts")), "expires": _num(sig.get("expires")),
             "source": sig.get("source") if sig.get("source") in modes.SOURCE_RANK else None,
             "why": _text(sig.get("why"), 600),
-            "targets": [{"coin": c, "name": NAMES[c], "x": _num(t.get("x")), "px": _num(t.get("px"))}
+            "targets": [{"coin": c, "name": NAMES[c], "x": _num(t.get("x")), "px": _num(t.get("px")),
+                         "trend_score": score(t.get("trend"))}
                         for c, t in targets.items() if c in COINS and isinstance(t, dict)],
-            "scalp": {"coin": sc["coin"], "x": _num(sc.get("x")), "tp": _num(sc.get("tp")), "sl": _num(sc.get("sl")),
-                      "id": sc.get("id") if isinstance(sc.get("id"), int) else None}
-            if sc and sc.get("coin") in COINS else None}
+            "scalps": [{"coin": sc["coin"], "name": NAMES[sc["coin"]], "x": _num(sc.get("x")), "tp": _num(sc.get("tp")),
+                        "sl": _num(sc.get("sl")), "id": sc.get("id") if isinstance(sc.get("id"), int) else None,
+                        "score": score(sc)} for sc in scalps]}
 
 
 def peek(server: str, timeout: float = 4.0) -> dict | None:
@@ -153,7 +159,7 @@ def peek(server: str, timeout: float = 4.0) -> dict | None:
     the agent's own)."""
     from fuze.agent import MAX_LINE, opener
 
-    req = urllib.request.Request(server + "/v1/signal", headers={"User-Agent": f"fuze-agent/{__version__} (ui)"})
+    req = urllib.request.Request(server + PATHS[0], headers={"User-Agent": f"fuze-agent/{__version__} (ui)"})
     try:
         with opener().open(req, timeout=timeout) as r:
             body = r.read(MAX_LINE + 1)
@@ -162,7 +168,7 @@ def peek(server: str, timeout: float = 4.0) -> dict | None:
         msg = verify(json.loads(body), PINNED)
     except Exception:
         return None
-    if not msg or msg.get("v") != 1 or isinstance(msg.get("v"), bool):
+    if not msg or msg.get("v") != VERSION or isinstance(msg.get("v"), bool):
         return None
     return clean(msg)
 
@@ -220,7 +226,8 @@ def snapshot(now: float | None = None, peeker: Peeker | None = None) -> dict:
     a = s.get("account") if isinstance(s.get("account"), dict) else {}
     bal = _num(a.get("balance"))
     held = a.get("positions") if isinstance(a.get("positions"), dict) else {}
-    brackets = [b for b in a.get("brackets") or [] if isinstance(b, int)] if isinstance(a.get("brackets"), list) else []
+    brackets = {c: b for c, b in a["brackets"].items() if c in COINS and isinstance(b, int)} \
+        if isinstance(a.get("brackets"), dict) else {}
     book = s.get("book") if isinstance(s.get("book"), dict) else {}
     guards = a.get("guards") if isinstance(a.get("guards"), dict) else {}
     sig = _signal(s.get("signal"))
@@ -254,21 +261,27 @@ def snapshot(now: float | None = None, peeker: Peeker | None = None) -> dict:
         daily = {"day_start": day_start, "floor": day_start - allowed, "allowed": allowed, "lost": lost,
                  "used": min(1.0, lost / allowed) if allowed else None}
 
-    # the short-term part: what the agent placed (memory "prot"), else what the signal has
-    prot = s.get("protected") if isinstance(s.get("protected"), dict) else None
-    short = None
-    if prot and prot.get("coin") in COINS and _num(prot.get("units")):
-        c = prot["coin"]
+    # the short-term parts, one per coin: what the agent placed (memory "prots"), else what the signal has
+    prots = s.get("protected") if isinstance(s.get("protected"), dict) else {}
+    if "coin" in prots:  # a status.json written by agent 0.5.0: one pair, and the ids the exchange showed as a list
+        prots = {prots["coin"]: prots} if prots.get("coin") in COINS else {}
+        if isinstance(a.get("brackets"), list):
+            brackets = {c: p.get("id") for c, p in prots.items() if p.get("id") in a["brackets"]}
+    shorts = []
+    for c in COINS:
+        prot = prots.get(c) if isinstance(prots.get(c), dict) else None
         mark = _num((book.get(c) or {}).get("mark") if isinstance(book.get(c), dict) else None) or sig_px.get(c)
-        short = {"coin": c, "name": NAMES[c], "side": "short" if prot["units"] < 0 else "long",
-                 "units": _num(prot["units"]), "usd": abs(prot["units"]) * mark if mark else None,
-                 "tp": _num(prot.get("tp")), "sl": _num(prot.get("sl")), "mark": mark,
-                 "protected": prot.get("id") in brackets, "held": True}
-    elif sig and sig["scalp"] and running:
-        sc = sig["scalp"]
-        short = {"coin": sc["coin"], "name": NAMES[sc["coin"]], "side": "short" if (sc["x"] or 0) < 0 else "long",
-                 "units": None, "usd": None, "tp": sc["tp"], "sl": sc["sl"], "mark": sig_px.get(sc["coin"]),
-                 "protected": False, "held": False}
+        if prot and _num(prot.get("units")):
+            shorts.append({"coin": c, "name": NAMES[c], "side": "short" if prot["units"] < 0 else "long",
+                           "units": _num(prot["units"]), "usd": abs(prot["units"]) * mark if mark else None,
+                           "tp": _num(prot.get("tp")), "sl": _num(prot.get("sl")), "mark": mark,
+                           "protected": brackets.get(c) == prot.get("id"), "held": True, "score": prot.get("score")})
+        elif sig and running:
+            sc = next((x for x in sig["scalps"] if x["coin"] == c), None)
+            if sc:
+                shorts.append({"coin": c, "name": NAMES[c], "side": "short" if (sc["x"] or 0) < 0 else "long",
+                               "units": None, "usd": None, "tp": sc["tp"], "sl": sc["sl"], "mark": sig_px.get(c),
+                               "protected": False, "held": False, "score": sc["score"]})
 
     # the signal: the agent's last verified one, or (agent not running) the public one read by this page
     origin = "agent"
@@ -304,9 +317,10 @@ def snapshot(now: float | None = None, peeker: Peeker | None = None) -> dict:
                     "today_known": today_known, "today": bal - day_start if today_known else None,
                     "today_pct": (bal - day_start) / day_start * 100 if today_known else None,
                     "exposure": exposure, "exposure_x": exposure / bal if bal else None},
-        "positions": positions, "asked": asked, "short": short, "signal": sig,
+        "positions": positions, "asked": asked, "shorts": shorts, "signal": sig,
         "limits": {"lines": describe(cfg, sizing_bal), "balance": sizing_bal, "size_mode": cfg["size_mode"],
-                   "percent": cfg["percent"], "fixed_usd": cfg["fixed_usd"],
+                   "percent": cfg["percent"], "fixed_usd": cfg["fixed_usd"], "risk_allowed": cfg["risk_allowed"],
+                   "coins": list(cfg["coins"]),
                    "values": {k: fmt(k, cfg[k]) for k in LABELS}, "labels": dict(LABELS), "daily": daily,
                    "daily_frac": frac},
         "trades": _tail(h / "trades.jsonl"), "checks": checks, "keys": nets,

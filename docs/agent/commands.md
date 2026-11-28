@@ -7,7 +7,7 @@ This page lists every `fuze` command with its options, as printed by `fuze --hel
 |---|---|---|
 | `fuze init` | Create the FUZE folder and set how big your positions are | Asks questions at a terminal; `--yes` takes flags and safe defaults |
 | `fuze run` | Run the agent in the mode set with `fuze mode` | |
-| `fuze status` | What the agent holds and why: per coin, what the signal asks for and what you hold, in dollars | |
+| `fuze status` | What the agent holds and why: per coin, what the signal asks for and what you hold, in dollars; each part it skips and why; a line for each take profit and stop loss pair | |
 | `fuze check` | Check the local setup; in testnet or mainnet also reads your account (no order) | |
 | `fuze limits` | Show or change your sizing and limits | Raising asks you to type `RAISE` |
 | `fuze pause` / `fuze resume` | Hold with no new orders / undo | Undoing: yes, type `RESUME` |
@@ -30,6 +30,7 @@ This page lists every `fuze` command with its options, as printed by `fuze --hel
 fuze init [--size-mode {percent,fixed}] [--percent PERCENT] [--fixed-usd FIXED_USD]
           [--max-position-usd MAX_POSITION_USD] [--max-x MAX_X]
           [--max-balance-usd MAX_BALANCE_USD] [--daily-loss DAILY_LOSS]
+          [--risk-allowed RISK_ALLOWED] [--coins COINS]
           [--yes] [--force] [--mode {simulation,testnet,mainnet}]
 ```
 
@@ -42,9 +43,15 @@ fuze init [--size-mode {percent,fixed}] [--percent PERCENT] [--fixed-usd FIXED_U
 | `--max-x` | Most you hold across coins, times your balance |
 | `--max-balance-usd` | Balance ceiling: the most of the account the agent counts as your balance, or `off` |
 | `--daily-loss` | Daily loss stop in percent, 1 to 50 |
+| `--risk-allowed` | 0 to 100, standard 60: a part of a position is followed when its risk score is at or under this (see [Limits](limits.md#risk-allowed)) |
+| `--coins` | The coins to follow, among BTC, ETH, HYPE, LIT: `BTC,ETH`, or `all` (standard) |
 | `--yes` | Ask no questions; use the flags and the safe defaults |
 | `--force` | Replace an existing config (raising anything asks you to type `RAISE`) |
 | `--mode` | Where to trade (default simulation); testnet and mainnet ask you to confirm at a terminal |
+
+At a terminal it also asks "How much risk may a part of a position carry? 0 to 100, standard 60. A part scores how much
+of the balance it can lose on a bad day, in tenths of a percent: 20 means 2%." and "Which coins? BTC, ETH, HYPE, LIT,
+standard all four".
 
 It never replaces an existing config without `--force`, and without a terminal it always saves `simulation`. It says
 what the agent reports to the FUZE server and, at a terminal, asks "Show this agent publicly in the FUZE Fellowship?
@@ -69,11 +76,11 @@ that it reports its trades and results to the FUZE server, private or public (se
 fuze limits [--size-mode {percent,fixed}] [--percent PERCENT] [--fixed-usd FIXED_USD]
             [--max-position-usd MAX_POSITION_USD] [--max-x MAX_X]
             [--max-balance-usd MAX_BALANCE_USD] [--daily-loss DAILY_LOSS]
-            [--stale-flat-min STALE_FLAT_MIN]
+            [--stale-flat-min STALE_FLAT_MIN] [--risk-allowed RISK_ALLOWED] [--coins COINS]
 ```
 
 With no options it shows your sizing with the worked example at your current balance. `--stale-flat-min` takes minutes
-or `off`. A running agent resizes to a change within seconds; raising asks you to type `RAISE` first. It warns when the
+or `off`. Raising `--risk-allowed` or adding a coin to `--coins` counts as raising. A running agent resizes to a change within seconds; raising asks you to type `RAISE` first. It warns when the
 size you chose can never open anything at the current signal (every change under the larger of $10 and 2% of your
 balance).
 

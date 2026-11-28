@@ -24,8 +24,16 @@ FUZE sees them unless you choose public; your Lighter account number is sent onl
 No. Every agent reports; you choose private (the default) or public with `fuze share`. Reading the signal on its own
 needs no account and sends nothing.
 
-**Why only Bitcoin and Ether?**
-They are what the account trades. The protocol and the agent accept only those two coins.
+**Which coins?**
+Bitcoin, Ether, HYPE and LIT: what the account trades. The protocol and the agent accept only those four. You can follow
+fewer with `fuze limits --coins BTC,ETH`; a coin you leave out is closed and never opened. See
+[Limits: Coins](limits.md#coins).
+
+**What is the risk score?**
+Each part of a position scores 0 to 100: how much of the balance it can lose on a bad day, in tenths of a percent. Your
+agent follows a part whole when its score is at or under your risk allowed (standard 60) and skips it otherwise. The
+score orders how much a part can lose; it does not say how likely a part is to win. See
+[Limits: Risk allowed](limits.md#risk-allowed).
 
 **Why only Lighter?**
 Lighter charges no trading fee on regular orders on a standard account, and costs decide whether short-term trading
@@ -45,11 +53,12 @@ Within seconds, if the agent is running: it notices the changed settings on its 
 signal revision. A raise you confirmed with `RAISE` applies the same way, without a restart.
 
 **Can I follow only the slow trend?**
-Not today. The signal is the whole account.
+Not by choosing a part by name. You choose a risk allowed and coins; the agent skips any part, trend or short-term,
+that scores above your risk allowed.
 
 **What happens if my computer sleeps or the agent stops?**
-Positions stay as they are. On Lighter the short-term part keeps its take profit and stop loss on the exchange, and
-the rest of each position keeps its [emergency stop](following.md#5-the-emergency-stop), about 20% from the price the
+Positions stay as they are. On Lighter each short-term trade keeps its take profit and stop loss on the exchange, and
+the rest of each position keeps its [emergency stop](following.md#6-the-emergency-stop), about 20% from the price the
 agent last saw. When the agent starts again it reads the account and catches up with the latest signal.
 
 **What happens if the FUZE server goes down?**

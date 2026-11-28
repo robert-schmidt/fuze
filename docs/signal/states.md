@@ -16,12 +16,12 @@ offline) ask a follower to do.
 |---|---|---|
 | `live` | We hold the targets in the message | Follow them |
 | `flat` | We closed everything and are staying out | Close everything and stay out |
-| `offline` | We have no fresh reading of the account (`targets` is empty) | Hold what you have, open nothing new |
+| `offline` | We have no fresh reading of the account | Hold what you have, open nothing new |
 
 ## Why "offline" means hold, not close
 
 If our side stops, closing everything at once would turn a technical problem into a market order at a bad moment, for
-every follower at the same time. Holding is the calmer default, and the short-term part keeps its take profit and stop
+every follower at the same time. Holding is the calmer default, and each short-term part keeps its take profit and stop
 loss on the exchange. A follower who prefers to close can set a time limit: the agent's `stale_flat_min` closes
 everything after that many minutes without a live signal (see [Limits and safety switches](../agent/limits.md)).
 

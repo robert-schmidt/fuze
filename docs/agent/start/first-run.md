@@ -45,11 +45,11 @@ In its own terminal window:
 fuze run
 ```
 
-The output below comes from a run with the default 10% (25 November 2026):
+The output below comes from a run with the default 10% (25 November 2026, when the signal had Bitcoin and Ether only):
 
 ```text
 FUZE agent (simulated account, no real money). Ctrl+C to stop.
-... Protected the scalp part -0.004433 BTC: take profit 57797, stop loss 59029.
+... Protected the BTC scalp part -0.004433: take profit 57797, stop loss 59029.
 ... Following revision 7: the signal asks for BTC short $300, ETH short $33 at your limits.
 ... Following revision 7; nothing to change.
 ```
@@ -82,7 +82,8 @@ Sizing:
   ...
 ```
 
-Per coin it shows what the signal asks for at your limits and what you hold, in dollars. Here Ether is not opened:
+Per coin it shows what the signal asks for at your limits and what you hold, in dollars, and it says each part it skips
+because of your risk allowed or your coins, and each coin the exchange does not list. Here Ether is not opened:
 $3 is under the $20 smallest change of a $1,000 balance (see [How following works](../following.md)).
 
 ## 5. Try the safety switches

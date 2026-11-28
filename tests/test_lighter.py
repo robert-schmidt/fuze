@@ -87,12 +87,40 @@ def test_market_order_in_integer_units_with_a_worst_price(fake):
 def test_account_reading(fake):
     fake.pos, fake.bal = {0: 0.5, 1: -0.01}, 1234.5
     a = venue(fake).account(fresh=True)
-    assert a == {"balance": 1234.5, "positions": {"ETH": 0.5, "BTC": -0.01}, "brackets": [], "guards": {}}
+    assert a == {"balance": 1234.5, "positions": {"ETH": 0.5, "BTC": -0.01}, "brackets": {}, "guards": {},
+                 "absent": []}
 
 
-def test_markets_missing_are_refused(fake):
-    fake.markets = lambda: [m for m in FakeLighter().markets() if m["symbol"] != "ETH"]
-    with pytest.raises(RuntimeError, match="no ETH market"):
+def test_markets_resolve_by_symbol_on_either_network(fake):
+    """Market numbers differ between mainnet and testnet (Bitcoin 1 and 4096): each is found by its symbol."""
+    v = venue(fake)
+    assert {c: m["id"] for c, m in v.m.items()} == {"ETH": 0, "BTC": 1, "HYPE": 24, "LIT": 120}
+    assert v.m["HYPE"]["sd"] == 2 and v.m["HYPE"]["min_base"] == 0.07 and v.m["LIT"]["min_base"] == 1.0
+    assert not v.tradable("HYPE", 0.06, 34.0) and not v.tradable("HYPE", 0.07, 100.0) and v.tradable("HYPE", 0.3, 34.0)
+    assert not v.tradable("LIT", 0.9, 20.0) and v.tradable("LIT", 4.0, 2.5)
+    real = fake.markets
+    fake.markets = lambda: [dict(m, market_id=4096) if m["symbol"] == "BTC" else m for m in real()]
+    assert venue(fake).m["BTC"]["id"] == 4096
+
+
+def test_a_coin_the_network_does_not_list_is_not_traded_there(fake, signer, capsys):
+    fake.listed -= {"LIT"}
+    v = venue(fake)
+    assert v.absent == ["LIT"] and v.price("LIT") is None and v.round("LIT", 5.0) == 0.0
+    assert not v.tradable("LIT", 5.0, 2.5) and v.unguard("LIT") is False and v.cancel("LIT") is None
+    with pytest.raises(ValueError, match="lists no LIT market"):
+        v.market("LIT", 5.0, 2.5)
+    assert v.account(fresh=True)["absent"] == ["LIT"]
+    c = Clock()
+    a = agent(fake, signer, c)
+    send(a, signer, c, scalp=None, targets={"BTC": {"x": -0.6, "px": 60000.0}, "LIT": {"x": 2.0, "px": 2.5}})
+    assert [s[1] for s in fake.markets_sent()] == [1]  # Bitcoin only
+    assert "The exchange lists no LIT market here: LIT is not traded." in a.last_reason
+
+
+def test_markets_all_missing_are_refused(fake):
+    fake.listed = {"SOL"}
+    with pytest.raises(RuntimeError, match="none of the markets FUZE trades"):
         venue(fake)
 
 
@@ -109,10 +137,11 @@ def test_follows_and_protects_the_scalp_part(fake, signer):
     c = Clock()
     a = agent(fake, signer, c)
     send(a, signer, c)
-    # the scalp's coin first, then the pair of the scalp part only, then an emergency stop for the rest of each coin
-    assert fake.sent == [BTC_SELL, ETH_SELL, PAIR, BTC_GUARD, ETH_GUARD]
+    # the scalp's coin first, its pair for the scalp part only right after it, then the other coin, then an emergency
+    # stop for the rest of each coin
+    assert fake.sent == [BTC_SELL, PAIR, ETH_SELL, BTC_GUARD, ETH_GUARD]
     st = config.read_json(config.home() / "status.json")
-    assert st["account"]["positions"] == {"BTC": -0.003, "ETH": -0.02} and st["account"]["brackets"] == [7]
+    assert st["account"]["positions"] == {"BTC": -0.003, "ETH": -0.02} and st["account"]["brackets"] == {"BTC": 7}
     assert {k: (g["units"], g["stop"]) for k, g in st["account"]["guards"].items()} == {
         "BTC": (-0.001, 72000.0), "ETH": (-0.02, 2400.0)}
     assert st["mode"] == "testnet" and st["account_link"].endswith("/accounts/77")
@@ -139,8 +168,8 @@ def test_partial_fill_stops_the_step_and_protects_what_is_held(fake, signer):
     n = len(fake.sent)
     send(a, signer, c, seq=3)
     # the next try: from a new account read, only the rest; the pair is re-placed at the scalp part's full size
-    assert [s[0] for s in fake.sent[n:]] == ["cancel", "cancel", "market", "market", "tp_sl", "stop", "stop"]
-    assert fake.sent[n + 2][2] == 150 and fake.sent[n + 3] == ETH_SELL and fake.sent[n + 4:] == [PAIR, BTC_GUARD, ETH_GUARD]
+    assert [s[0] for s in fake.sent[n:]] == ["cancel", "cancel", "market", "tp_sl", "market", "stop", "stop"]
+    assert fake.sent[n + 2][2] == 150 and fake.sent[n + 3] == PAIR and fake.sent[n + 4:] == [ETH_SELL, BTC_GUARD, ETH_GUARD]
     assert fake.pos == {0: -0.02, 1: -0.003}
 
 
@@ -174,7 +203,7 @@ def test_restart_mid_order_reads_the_account_and_never_resends(fake, signer):
     assert fake.sent == [] and "may still be settling" in a.last_reason
     c.t += INFLIGHT_WAIT_S
     send(a, signer, c, seq=2)
-    assert fake.markets_sent() == [ETH_SELL] and fake.sent[-3:] == [PAIR, BTC_GUARD, ETH_GUARD]  # no second BTC order
+    assert fake.markets_sent() == [ETH_SELL] and fake.sent[-4:] == [PAIR, ETH_SELL, BTC_GUARD, ETH_GUARD]  # no 2nd BTC
     assert not (config.home() / "pending.json").exists()
     rows = [json.loads(x) for x in (config.home() / "trades.jsonl").read_text().splitlines()]
     assert rows[0]["coin"] == "BTC" and rows[0]["result"] == "filled"
@@ -186,8 +215,9 @@ def test_an_unprotected_scalp_part_is_closed(fake, signer, trouble):
     a = agent(fake, signer, c)
     fake.pair = trouble
     send(a, signer, c)
-    assert fake.markets_sent()[-1] == ("market", 1, 200, 612000, False, True)  # reduce-only, worst price 2% over
-    assert fake.pos[1] == pytest.approx(-0.001) and a.memory["scalp_done"] == 7
+    assert fake.markets_sent()[1] == ("market", 1, 200, 612000, False, True)  # reduce-only, worst price 2% over
+    assert fake.markets_sent()[2] == ETH_SELL  # closed before anything else is traded
+    assert fake.pos[1] == pytest.approx(-0.001) and a.memory["done"]["BTC"] == 7
     fake.pair = "ok"
     c.t += 5
     n = len(fake.sent)
@@ -220,7 +250,7 @@ def test_the_exchange_firing_the_stop_ends_that_scalp(fake, signer):
     c.t += 6
     n = len(fake.sent)
     send(a, signer, c, seq=2)
-    assert len(fake.sent) == n and a.memory["scalp_done"] == 7 and fake.pos[1] == pytest.approx(-0.001)
+    assert len(fake.sent) == n and a.memory["done"]["BTC"] == 7 and fake.pos[1] == pytest.approx(-0.001)
 
 
 def test_the_scalp_stop_firing_is_seen_beside_a_resting_emergency_stop(fake, signer):
@@ -232,7 +262,7 @@ def test_the_scalp_stop_firing_is_seen_beside_a_resting_emergency_stop(fake, sig
     c.t += 6
     send(a, signer, c, seq=2)
     st = config.read_json(config.home() / "status.json")["account"]
-    assert st["brackets"] == [] and set(st["guards"]) == {"BTC", "ETH"}  # the emergency stop is not taken for the pair
+    assert st["brackets"] == {} and set(st["guards"]) == {"BTC", "ETH"}  # the emergency stop is not taken for the pair
     assert fake.stops_sent() == [BTC_GUARD, ETH_GUARD]  # ... and still fits what is left: not replaced
 
 
@@ -276,7 +306,7 @@ def test_an_emergency_stop_that_cannot_rest_is_tried_again_and_stops_nothing_els
     a = agent(fake, signer, c)
     fake.stop = trouble
     send(a, signer, c)
-    assert fake.sent[:3] == [BTC_SELL, ETH_SELL, PAIR] and why in a.last_reason  # the position and the pair are there
+    assert fake.sent[:3] == [BTC_SELL, PAIR, ETH_SELL] and why in a.last_reason  # the position and the pair are there
     fake.stop = "ok"
     c.t += 5
     n = len(fake.stops_sent())
@@ -360,17 +390,146 @@ def test_an_unreadable_account_sends_nothing(fake, signer):
     assert fake.sent == [] and "Could not read the account" in a.last_reason
 
 
-def test_a_quiet_minute_leaves_half_of_lighters_request_limit_for_orders(fake, signer, monkeypatch):
-    """A standard Lighter account gets 60 requests a rolling minute, orders included. With a scalp and both emergency
-    stops resting, a minute of nothing to do must stay at half of that."""
+FOUR = {"BTC": {"x": -1.8, "px": 60000.0}, "ETH": {"x": -0.4, "px": 2000.0}, "HYPE": {"x": -1.0, "px": 34.0},
+        "LIT": {"x": 1.0, "px": 2.5}}
+FOUR_SCALPS = [{"coin": "BTC", "x": -1.2, "tp": 59400.0, "sl": 60420.0, "id": 7},
+               {"coin": "ETH", "x": -0.2, "tp": 1980.0, "sl": 2014.0, "id": 8},
+               {"coin": "HYPE", "x": -0.5, "tp": 33.66, "sl": 34.24, "id": 9},
+               {"coin": "LIT", "x": 0.5, "tp": 2.525, "sl": 2.482, "id": 10}]
+
+
+def quiet_minute(fake, signer, monkeypatch, **kw) -> dict:
+    """Requests in a minute of nothing to do (one step a second, a fresh signal each time), by kind."""
     reads = []
     for name in ("markets", "account", "active_orders"):
         monkeypatch.setattr(fake, name, lambda *a, _f=getattr(fake, name), _n=name: (reads.append(_n), _f(*a))[1])
     c = Clock()
     a = agent(fake, signer, c)
-    send(a, signer, c)  # a short with its scalp pair on BTC, an emergency stop on BTC and ETH
+    send(a, signer, c, **kw)
     del reads[:]
-    for _ in range(60):  # one step a second, a fresh signal each time, nothing changes
+    n = len(fake.sent)
+    for _ in range(60):
         c.t += 1
-        send(a, signer, c)
-    assert len(reads) <= 30, {n: reads.count(n) for n in set(reads)}
+        send(a, signer, c, **kw)
+    assert len(fake.sent) == n  # nothing was sent: a quiet minute
+    return {k: reads.count(k) for k in ("account", "active_orders", "markets")}
+
+
+def test_a_quiet_minute_leaves_half_of_lighters_request_limit_for_orders(fake, signer, monkeypatch):
+    """A standard Lighter account gets 60 requests a rolling minute, orders included. With a scalp and both emergency
+    stops resting, a minute of nothing to do must stay at half of that, and no worse than 0.5.0's 27."""
+    got = quiet_minute(fake, signer, monkeypatch)  # a short with its scalp pair on BTC, an emergency stop on BTC and ETH
+    assert got["account"] == 12 and got["active_orders"] == 13 and got["markets"] <= 2 and sum(got.values()) <= 27
+
+
+def test_a_quiet_minute_with_four_scalps_still_leaves_half_for_orders(fake, signer, monkeypatch):
+    """Four coins, each with its own take profit and stop loss and an emergency stop: each coin's orders are read every
+    4 x 5 s, so the total stays where one scalp was."""
+    got = quiet_minute(fake, signer, monkeypatch, targets=FOUR, scalps=FOUR_SCALPS)
+    assert len([o for o in fake.orders.values() if o["type"] != "stop-loss"]) == 8  # four pairs
+    assert len([o for o in fake.orders.values() if o["type"] == "stop-loss"]) == 4  # four emergency stops
+    assert got["account"] == 12 and got["active_orders"] == 12 and got["markets"] <= 2 and sum(got.values()) <= 30
+
+
+def test_a_filled_pair_is_seen_at_the_next_account_read_with_four_scalps(fake, signer):
+    """The slower check of four pairs (each every 20 s) does not slow down seeing a fill: the position moves."""
+    c = Clock()
+    a = agent(fake, signer, c)
+    send(a, signer, c, targets=FOUR, scalps=FOUR_SCALPS)
+    assert a.acct["brackets"] == {"BTC": 7, "ETH": 8, "HYPE": 9, "LIT": 10}
+    c.t += 6
+    send(a, signer, c, seq=2, targets=FOUR, scalps=FOUR_SCALPS)  # the orders of every coin were read just now
+    fake.stop_out(24)  # the HYPE stop loss fills
+    c.t += 5
+    send(a, signer, c, seq=3, targets=FOUR, scalps=FOUR_SCALPS)
+    assert a.acct["brackets"] == {"BTC": 7, "ETH": 8, "LIT": 10} and a.memory["done"]["HYPE"] == 9
+
+
+def test_four_scalps_each_under_its_own_pair_never_larger_than_the_position(fake, signer):
+    c = Clock()
+    a = agent(fake, signer, c)
+    send(a, signer, c, targets=FOUR, scalps=FOUR_SCALPS)
+    pairs = {s[1]: s for s in fake.sent if s[0] == "tp_sl"}
+    assert set(pairs) == {0, 1, 24, 120}
+    for m, p in pairs.items():
+        held = fake.pos[m]
+        assert p[3] == (held > 0)  # is_ask: a long is closed by selling, a short by buying, never the other way
+        sd = {0: 4, 1: 5, 24: 2, 120: 1}[m]
+        assert 0 < p[2] / 10 ** sd <= abs(held) + 1e-12  # never larger than the position
+    kinds = [s[0] for s in fake.sent]
+    assert kinds[:8] == ["market", "tp_sl"] * 4  # each coin's pair right after its own trade
+    # the emergency stop covers, per coin, the part without a pair
+    stops = {s[1]: s[2] for s in fake.stops_sent()}
+    assert stops == {1: 100, 0: 100, 24: 147, 120: 200}
+
+
+def test_lowering_risk_allowed_closes_the_parts_above_it(fake, signer):
+    c = Clock()
+    a = agent(fake, signer, c)
+    send(a, signer, c, targets=FOUR, scalps=FOUR_SCALPS)
+    config.save({**a.cfg, "risk_allowed": 11})  # the trend parts score 10; the BTC scalp 12, the others 2 to 5
+    a.fixed_cfg = False
+    c.t += 6
+    n = len(fake.sent)
+    send(a, signer, c, seq=2, targets=FOUR, scalps=FOUR_SCALPS)
+    assert fake.sent[n:n + 3] == [("cancel", 1, 101), ("cancel", 1, 102), ("market", 1, 200, 612000, False, True)]
+    assert fake.pos[1] == pytest.approx(-0.001) and "scores 12, above your risk allowed of 11" in a.last_reason
+    assert set(a.acct["brackets"]) == {"ETH", "HYPE", "LIT"}
+
+
+def test_the_request_pace_holds_reads_and_never_orders():
+    from fuze.lighter_venue import Pace
+    t, slept = [0.0], []
+    p = Pace(clock=lambda: t[0], sleep=lambda s: (slept.append(s), t.__setitem__(0, t[0] + s)), cap=3)
+    p.send()
+    p.read()
+    p.read()
+    assert slept == []
+    p.send()  # an order never waits, it is only counted
+    assert slept == []
+    p.read()  # four went out in the last minute: the read waits until the oldest is a minute old
+    assert slept == [pytest.approx(60.0)] and len(p.t) == 1  # the four are a minute old now
+
+
+def test_a_running_0_5_0_agents_memory_keeps_its_open_pair(fake, signer):
+    """0.5.0 remembered one protected scalp part as `prot`. After the update the pair resting on Lighter is still
+    known: not placed twice, not taken for a closed trade, and the emergency stop still covers only the rest."""
+    c = Clock()
+    a = agent(fake, signer, c)
+    send(a, signer, c)
+    path = config.home() / "state.json"
+    m = config.read_json(path)
+    prot = {k: v for k, v in m.pop("prots")["BTC"].items() if k != "score"}
+    m.pop("done", None)
+    config.write_json(path, {**m, "prot": prot, "scalp": {"id": 7, "coin": "BTC"}, "scalp_done": 5})
+    c.t += 6
+    n = len(fake.sent)
+    b = agent(fake, signer, c)  # the restart after the update
+    assert b.memory["prots"] == {"BTC": prot} and b.memory["done"] == {"BTC": 5} and "prot" not in b.memory
+    send(b, signer, c, seq=2)
+    assert fake.sent[n:] == []  # the same position, the same pair, the same emergency stops
+    assert b.memory["prots"]["BTC"]["id"] == 7 and b.acct["brackets"] == {"BTC": 7}
+    fake.stop_out(1)  # and when it fills, that trade is closed for good
+    c.t += 6
+    send(b, signer, c, seq=3)
+    assert b.memory["done"]["BTC"] == 7 and fake.markets_sent()[-1] == ETH_SELL
+
+
+def test_an_unprotected_scalp_part_is_closed_on_its_own_coin_only(fake, signer):
+    c = Clock()
+    a = agent(fake, signer, c)
+    real = fake.tp_sl
+
+    def refuse_hype(market_id, *rest):
+        if market_id == 24:
+            raise RuntimeError("take profit and stop loss refused by Lighter: invalid order")
+        return real(market_id, *rest)
+
+    fake.tp_sl = refuse_hype
+    send(a, signer, c, targets=FOUR, scalps=FOUR_SCALPS)
+    hype = [s for s in fake.markets_sent() if s[1] == 24]
+    assert hype[0][4] is True and hype[1] == ("market", 24, 147, 346800, False, True)  # opened, then its part closed
+    assert fake.pos[24] == pytest.approx(-1.47) and a.memory["done"] == {"HYPE": 9}  # the trend part stays
+    assert set(a.acct["brackets"]) == {"BTC", "ETH", "LIT"}  # the other coins keep their pairs
+    assert "The HYPE short-term part's take profit and stop loss could not be placed" in a.last_reason
+    assert {s[1]: s[2] for s in fake.stops_sent()}[24] == 147  # its emergency stop covers what is left

@@ -95,7 +95,8 @@ def test_no_tool_switches_the_mode_or_removes_a_cap():
 
     tools = {t.name: t for t in asyncio.run(build().list_tools())}
     props = set(tools["lower_limits"].input_schema["properties"])
-    assert props == {"percent", "fixed_usd", "max_position_usd", "max_x", "daily_loss_frac", "max_balance_usd"}
+    assert props == {"percent", "fixed_usd", "max_position_usd", "max_x", "daily_loss_frac", "max_balance_usd",
+                     "risk_allowed", "coins"}
     assert not any("size_mode" in t.input_schema.get("properties", {}) for t in tools.values())
 
 
@@ -142,7 +143,7 @@ def test_switches_without_an_agent_in_the_folder_are_errors(fuze_home):
 def test_status_shows_what_is_asked_and_what_is_held_in_dollars(fuze_home):
     config.save({**config.DEFAULTS, "size_mode": "fixed", "fixed_usd": 10.0})
     config.write_json(fuze_home / "status.json", {
-        "t": 0, "account": {"balance": 1000.0, "positions": {}, "brackets": []}, "min_change_usd": 20.0,
+        "t": 0, "account": {"balance": 1000.0, "positions": {}, "brackets": {}}, "min_change_usd": 20.0,
         "wanted": {"BTC": -10 * 1.7 / 58000, "ETH": -10 * 0.33 / 1600},
         "signal": {"rev": 5, "state": "live", "source": "paper", "why": "", "scalp": None,
                    "targets": {"BTC": {"x": -1.7, "px": 58000.0}, "ETH": {"x": -0.33, "px": 1600.0}}}})
@@ -171,3 +172,24 @@ def test_setup_check_does_not_call_a_missing_config_valid(fuze_home):
     assert not rows["config.json is valid"]["ok"] and "fuze init" in rows["config.json is valid"]["detail"]
     config.save(dict(config.DEFAULTS))
     assert {r["check"]: r for r in checks.setup_report()}["config.json is valid"]["ok"]
+
+
+def test_lower_limits_can_lower_risk_allowed_and_remove_coins_only(fuze_home):
+    config.save(dict(config.DEFAULTS))
+    with pytest.raises(ToolError, match="can only lower") as e:
+        call("lower_limits", risk_allowed=80)
+    assert "`fuze limits --risk-allowed 80`" in str(e.value)
+    assert call("lower_limits", risk_allowed=20)["risk_allowed"] == 20
+    with pytest.raises(ToolError, match="can only lower"):
+        call("lower_limits", risk_allowed=21)
+    assert call("lower_limits", coins=["eth", "BTC"])["coins"] == ["BTC", "ETH"]
+    with pytest.raises(ToolError, match="can only lower") as e:
+        call("lower_limits", coins=["BTC", "ETH", "LIT"])
+    assert "`fuze limits --coins BTC,ETH,LIT`" in str(e.value)
+    with pytest.raises(ToolError, match="at least one"):
+        call("lower_limits", coins=[])
+    cfg = config.load()
+    assert (cfg["risk_allowed"], cfg["coins"]) == (20, ["BTC", "ETH"])
+    st = call("status")
+    assert st["risk_allowed"] == 20 and st["coins"] == ["BTC", "ETH"]
+    assert any("Risk allowed: 20." in line for line in st["sizing"])

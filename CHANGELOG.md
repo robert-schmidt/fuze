@@ -3,6 +3,42 @@
 What changed in each version of the FUZE agent. A new version that changes how orders are sent asks for a new testnet
 rehearsal (`fuze rehearse`) before mainnet unlocks on a computer again; the entries say so.
 
+## 0.6.0 (28 November 2026)
+
+This version changes how orders are sent: mainnet asks for a new testnet rehearsal (`fuze rehearse`) on each computer.
+
+- **Version 2 of the signal, four coins.** The agent reads `/v2/signal` and `/v2/stream` and follows Bitcoin, Ether,
+  HYPE and LIT. Each coin's position comes in parts, the slow trend part and at most one short-term trade, and each
+  part carries a **risk score** from 0 to 100: how much of our balance it can lose on a bad day, in tenths of a
+  percent. The score orders how much a part can lose; it does not say how likely a part is to win. A version 1 message
+  is refused with "a version 1 message: this agent reads version 2 of the signal (/v2/signal)". Every rule of version
+  2 is checked after the signature (only the four coins, at most one short-term trade per coin, each trend part equal
+  to its coin's x less its short-term trade, scores whole numbers from 0 to 100). New test vectors in
+  `tests/vectors.json`. See [the protocol](docs/PROTOCOL.md).
+- **Risk allowed** (`risk_allowed`, 0 to 100, standard 60; `--risk-allowed`). A part is followed whole when its score
+  is at or under it and skipped whole otherwise. **Coins** (`coins`, standard all four; `--coins BTC,ETH` or `all`). A
+  coin left out is wanted at 0: what is held of it is closed and it is never opened. Raising the risk allowed or adding
+  a coin asks you to type `RAISE` at a terminal; the MCP `lower_limits` tool can only lower the one and drop coins.
+  `fuze init` asks both. `fuze status`, the MCP `status` tool, `fuze check` and the local page show them, and say each
+  skipped part in plain words. See [Limits](docs/agent/limits.md#risk-allowed).
+- **A take profit and stop loss per coin.** Up to four short-term trades, each with its own pair on the exchange. Coins
+  are handled one at a time (cancel that coin's old pair, trade it, place its new pair); an order that does not fill in
+  full stops the step and the coins not reached keep their pairs. A pair that cannot be seen after placing closes that
+  short-term part with a reduce-only order. The state of 0.5.0 (one protected trade on Bitcoin) is carried over on the
+  first start.
+- **Lighter's request limit.** Lighter allows 60 requests a minute per account, orders included. A quiet minute stays
+  at 30 requests or fewer, with a short-term trade on all four coins or on one; a coin's open orders are read less often
+  when several pairs rest (with four, each every 20 seconds), so an order that went without a fill can go unseen for up
+  to 20 seconds. Reads wait when a busy minute reaches 45 requests; orders never wait.
+- **Markets by symbol.** The agent finds each coin's Lighter market by its symbol (mainnet: BTC 1, ETH 0, HYPE 24,
+  LIT 120; testnet BTC 4096). A coin with no market on a network is said at start and in `fuze status`, and not traded
+  there. HYPE is held at no more than 20 times and LIT at no more than 5 times your counted balance, the highest
+  leverage Lighter allows on them. FUZE still does not change the leverage set on your account.
+- **Reports.** The hello carries the risk allowed and the coins; a trade carries its part (`trend` or `scalp`) and that
+  part's risk score when one part explains it. See [What your agent reports](docs/agent/sharing.md).
+- Key advice: restrict the Lighter API key to the markets of the coins you follow.
+- Orders on Lighter from this version have run only against a fake client in the tests, not on Lighter.
+
 ## 0.5.0 (28 November 2026)
 
 - **The agent reports its trades and results to the FUZE server.** Every agent does; there is no off switch, and
@@ -31,7 +67,7 @@ rehearsal (`fuze rehearse`) before mainnet unlocks on a computer again; the entr
   sets the stop again each time the price has moved 5%, so the price reaches it only when nothing is running to move
   it: the agent is off, paused, or has no fresh signal. It is a safety net, not a trading rule. The agent places it
   for 28 days (Lighter allows an order to rest between 5 minutes and 30 days) and places it again after 14. See
-  [The emergency stop](docs/agent/following.md#5-the-emergency-stop).
+  [The emergency stop](docs/agent/following.md#6-the-emergency-stop).
 - **Balance ceiling** (`max_balance_usd`, `fuze limits --max-balance-usd`). An account can hold more than you want to
   trade: with a ceiling the agent counts no more than that amount as your balance, for sizes, the exposure cap and the
   daily loss stop. `fuze go-live` and `fuze mode mainnet` show what the account holds and ask for it before real

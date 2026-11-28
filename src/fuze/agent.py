@@ -7,9 +7,9 @@ One code path for every mode. The order step follows these rules on every venue:
   - an order in flight is written to pending.json before it is sent, so a restart reads the account first and never
     sends it again;
   - reductions are reduce-only and every market order has a worst price (venue.SLIP_ADD / SLIP_REDUCE);
-  - the scalp part rests under its own take profit and stop loss on the venue, sized to that part, re-placed when its
-    size or levels change and cancelled when it closes; if the venue does not show them after placing, the scalp part
-    is closed;
+  - each coin's scalp part rests under its own take profit and stop loss on the venue (one pair per coin), sized to
+    that part, never larger than the position nor on the other side of it, re-placed when its size or levels change and
+    cancelled when it closes; if the venue does not show them after placing, that scalp part is closed;
   - the rest of each position (the trend part, which has no take profit or stop loss) rests under an emergency stop
     on the venue, far from the price (follow.guard_plan): it is moved with the price while a live signal is followed
     and stays where it is when the agent is off or the signal is gone, so a position nobody is watching has an order
@@ -32,8 +32,8 @@ from pathlib import Path
 
 from fuze import __version__
 from fuze.config import LIMITS, ensure_home, load, read_json, write_json
-from fuze.follow import GUARD_FRAC, STALE_S, decide, guard_plan, min_change, utc_day
-from fuze.protocol import COINS, PINNED, Guard
+from fuze.follow import GUARD_FRAC, STALE_S, decide, guard_plan, migrate, min_change, utc_day
+from fuze.protocol import COINS, NAMES, PATHS, PINNED, Guard
 from fuze.sizing import counted
 from fuze.venue import open_venue, tx_link
 
@@ -85,7 +85,7 @@ class Agent:
         self.server, self.clock, self.sleep, self.mode = self.cfg["server"], clock, sleep, self.cfg["mode"]
         self.guard = Guard(self.home / "guard.json", keys)
         self.ex = exchange or open_venue(self.cfg, self.home, clock)
-        self.memory = read_json(self.home / "state.json", {}) or {}
+        self.memory = migrate(read_json(self.home / "state.json", {}) or {})  # 0.5.0's one pair -> one per coin
         if self.memory.get("mode", "simulation") != self.mode:  # notes about another account mean nothing here
             self.memory = {}
         self.memory.update(rev=None, mode=self.mode)  # act on the first signal after a start
@@ -97,13 +97,12 @@ class Agent:
         self.headers = {"User-Agent": f"fuze-agent/{__version__}"}
         # reporting (report.Reporter, or None): it only queues, and every call to it is wrapped in _report
         self.reporter, self.said, self.beat_at, self.read_ok = reporter, None, None, False
-        self.rev_seen, self.order, self.sig_px, self.flags = (None, None), None, {}, {}
+        self.rev_seen, self.order, self.sig_px, self.flags, self.parts = (None, None), None, {}, {}, {}
 
     # --- network -----------------------------------------------------------------------------
     def stream(self, stop: threading.Event):
-        """Yield each `data:` event of /v1/stream as text."""
-        req = urllib.request.Request(self.server + "/v1/stream", headers={**self.headers,
-                                                                          "Accept": "text/event-stream"})
+        """Yield each `data:` event of /v2/stream as text."""
+        req = urllib.request.Request(self.server + PATHS[1], headers={**self.headers, "Accept": "text/event-stream"})
         with self.http.open(req, timeout=20) as r:
             data = []
             while not stop.is_set():
@@ -120,7 +119,7 @@ class Agent:
                     data = []
 
     def poll(self) -> None:
-        req = urllib.request.Request(self.server + "/v1/signal", headers=self.headers)
+        req = urllib.request.Request(self.server + PATHS[0], headers=self.headers)
         try:
             with self.http.open(req, timeout=10) as r:
                 body = r.read(MAX_LINE + 1)
@@ -204,7 +203,7 @@ class Agent:
             "reason": reason, "flags": flags, "account": self.acct, "signal": self.signal,
             "received_at": self.received_at, "last_drop": self.guard.why, "pending": self.pending,
             "limits": {k: self.cfg[k] for k in LIMITS}, "started": self.started, "book": self.book(),
-            "protected": self.memory.get("prot"), "day": self.memory.get("day"),
+            "protected": self.memory.get("prots") or {}, "day": self.memory.get("day"),
             "day_start": self.memory.get("day_start"), "stopped_day": self.memory.get("stopped_day"),
             "wanted": self.memory.get("wanted"), "min_change_usd": self.memory.get("min_change")})
 
@@ -273,13 +272,15 @@ class Agent:
         for c in [c for c in mine if c not in resting]:
             gone(c)
         following = m.get("live_at") == now and not flags.get("pause") and not flags.get("flatten")
-        prot, placed = m.get("prot"), {}
+        prots, shown, placed = m.get("prots") or {}, acct.get("brackets") or {}, {}
         for c in COINS:
             px, held = ex.price(c), acct["positions"].get(c, 0.0)
             if not px:
                 continue
-            covered = prot["units"] if prot and prot["coin"] == c and prot["id"] in acct["brackets"] else 0.0
-            what, g = guard_plan(held, covered, px, resting.get(c), now, following, min_change(counted(self.cfg, acct["balance"])) / px)
+            p = prots.get(c)  # the coin's own pair covers its scalp part only while the exchange shows it
+            covered = p["units"] if p and shown.get(c) == p["id"] else 0.0
+            what, g = guard_plan(held, covered, px, resting.get(c), now, following,
+                                 min_change(counted(self.cfg, acct["balance"])) / px)
             if what == "place":
                 g["units"] = ex.round(c, g["units"])
                 if not ex.tradable(c, g["units"], px):  # under the exchange's smallest order: nothing can rest
@@ -345,13 +346,15 @@ class Agent:
                         p["coin"], p["units"], what, got, MISS_WAIT_S)
         return full
 
-    def send(self, coin: str, units: float, ref: float, reduce_only: bool, part=None) -> bool:
-        """One market order, read back. True if it filled in full."""
+    def send(self, coin: str, units: float, ref: float, reduce_only: bool, part=None, risk=None) -> bool:
+        """One market order, read back. True if it filled in full. part / risk: the part of the signal that explains
+        it and that part's score, for the trade report only."""
         held = self.acct["positions"].get(coin, 0.0)
         worst = self.ex.worst(ref, units, reduce_only)
         self.pending = {"t": self.clock(), "coin": coin, "units": units, "before": held, "worst": worst,
                         "reduce_only": reduce_only, "ref": ref}
-        self.order = {"t": self.pending["t"], "book": self.book(), "balance": self.acct.get("balance"), "part": part}
+        self.order = {"t": self.pending["t"], "book": self.book(), "balance": self.acct.get("balance"), "part": part,
+                      "risk": risk}
         write_json(self.home / "pending.json", self.pending)  # before sending: a restart must not send it again
         try:
             self.pending["tx"] = self.ex.market(coin, units, ref, worst, reduce_only)
@@ -376,68 +379,75 @@ class Agent:
             if not self.ex.tradable(coin, units, ref):
                 self.notes.append(f"The {coin} change of {units:+.6f} is under the exchange's smallest order: skipped.")
                 return True
-            if not self.send(coin, units, ref, reduce):
+            part, risk = self.parts.get(coin) or (None, None)
+            if not self.send(coin, units, ref, reduce, part=part, risk=risk):
                 return False
             held = self.acct["positions"].get(coin, 0.0)
         return True
 
     def apply(self, d, now: float) -> None:
+        """Coin by coin, the coins with a short-term part first (the urgent part): cancel the coin's take profit / stop
+        loss when it changes or ends, trade the coin, then place its pair. So a pair is always cancelled before any
+        order on its coin, and a new short-term part waits for its pair only as long as its own trade takes. An order
+        that does not fill in full ends the step there: what is held of that coin is protected, and the coins not
+        reached keep what rests on them until the next try, sized from a new account read."""
         m, ex, want = self.memory, self.ex, dict(d.targets)
-        self.sig_px = dict(d.px)
-        br = dict(d.bracket) if d.bracket else None
-        if br:
-            c = br["coin"]
-            br["units"] = ex.round(c, br["units"])
-            if not ex.tradable(c, br["units"], d.px.get(c)):  # too small to rest under its own stop loss: not opened
-                if abs(want[c] - self.acct["positions"].get(c, 0.0)) > 1e-12:
-                    want[c] -= d.bracket["units"]
-                    m["set"] = {**m.get("set", {}), c: want[c]}
-                m["scalp"], br = None, None
-                self.notes.append("The scalp part is not opened: it is under the exchange's smallest order, so it "
-                                  "could not rest under its own stop loss.")
-        placed = m.get("prot")
-        closing = all(abs(v) < 1e-12 for v in want.values())
-        for c in COINS:  # a pair that changes or ends is cancelled before any order on its coin
-            if closing or (placed and placed["coin"] == c and (not br or _pair(br) != _pair(placed))):
-                ex.cancel(c)
-                if placed and placed["coin"] == c:
-                    m["prot"] = placed = None
-        first = br["coin"] if br else None
-        for c in sorted(COINS, key=lambda c: c != first):  # the scalp's coin first: it is the urgent part
+        self.sig_px, self.parts = dict(d.px), dict(d.parts or {})
+        brackets = {}
+        for c, b in (d.brackets or {}).items():
+            b = {**b, "units": ex.round(c, b["units"])}
+            if ex.tradable(c, b["units"], d.px.get(c)):
+                brackets[c] = b
+                continue
+            if abs(want[c] - self.acct["positions"].get(c, 0.0)) > 1e-12:  # too small to rest under its own stop loss
+                want[c] -= d.brackets[c]["units"]
+                m["set"] = {**m.get("set", {}), c: want[c]}
+            self.notes.append(f"The {NAMES[c]} short-term trade is not opened: it is under the exchange's smallest "
+                              "order, so it could not rest under its own stop loss.")
+        prots = m.setdefault("prots", {})
+        for c in sorted(COINS, key=lambda c: c not in brackets):
+            placed, br, held = prots.get(c), brackets.get(c), self.acct["positions"].get(c, 0.0)
+            if (placed and (not br or _pair(br) != _pair(placed))) or (abs(want[c]) < 1e-12 and abs(held) > 1e-12):
+                ex.cancel(c)  # whatever pair rests on this coin, before any order on it
+                prots.pop(c, None)
             ref = d.px.get(c) or ex.price(c)
-            if not self.trade(c, want[c], ref):
-                break  # not filled in full: no further orders now; protect what is held, then stop
-        if br:
-            self.protect(br, d.px.get(br["coin"]) or ex.price(br["coin"]))
+            filled = self.trade(c, want[c], ref)
+            if br:
+                self.protect(br, ref)
+            if not filled:
+                break  # not filled in full: no further orders now
 
     def protect(self, br: dict, ref) -> None:
+        """Rest the coin's take profit and stop loss for its scalp part: at most what is held, only on the side held.
+        If the exchange does not show them after placing, the scalp part is closed: it may not stay open unprotected."""
         m, ex, c = self.memory, self.ex, br["coin"]
         held = self.acct["positions"].get(c, 0.0)
         units = ex.round(c, min(abs(br["units"]), abs(held)) * (1 if br["units"] > 0 else -1)) \
             if held * br["units"] > 0 else 0.0
         if not units:
             return
-        want = {**br, "units": units}
-        placed = m.get("prot")
-        if placed and _pair(placed) == _pair(want) and placed["id"] in self.acct["brackets"]:
+        want, prots = {**br, "units": units}, m.setdefault("prots", {})
+        placed = prots.get(c)
+        if placed and _pair(placed) == _pair(want) and (self.acct.get("brackets") or {}).get(c) == placed["id"]:
             return
         ex.cancel(c)  # whatever rests on this coin; the pair is placed fresh
+        prots.pop(c, None)
         try:
             ex.protect(c, units, br["tp"], br["sl"], br["id"])
         except Exception as e:
             log.error("Take profit / stop loss for %s: %s", c, _plain(e))
         self.sleep(ex.settle_s)
         self.acct = ex.account(fresh=True)
-        if br["id"] in self.acct["brackets"]:
-            m["prot"] = want
-            log.info("Protected the scalp part %+.6f %s: take profit %g, stop loss %g.", units, c, br["tp"], br["sl"])
+        if (self.acct.get("brackets") or {}).get(c) == br["id"]:
+            prots[c] = want
+            log.info("Protected the %s scalp part %+.6f: take profit %g, stop loss %g.", c, units, br["tp"], br["sl"])
             return
-        # the exchange does not show them: the scalp part may not stay open unprotected
         log.error("The take profit / stop loss for the %s scalp part are not on the exchange: closing that part.", c)
-        self.notes.append("The scalp part's take profit and stop loss could not be placed, so that part was closed.")
+        self.notes.append(f"The {NAMES[c]} short-term part's take profit and stop loss could not be placed, so that "
+                          "part was closed.")
         ex.cancel(c)
-        m.update(prot=None, scalp=None, scalp_done=br["id"])
-        if self.send(c, -units, ref, True, part="scalp"):
+        m["done"] = {**(m.get("done") or {}), c: br["id"]}
+        if self.send(c, -units, ref, True, part="scalp", risk=br.get("score")):
             m["set"] = {**m.get("set", {}), c: self.acct["positions"].get(c, 0.0)}
 
     # --- reporting (report.py): every call is wrapped; nothing here may stop, delay or change a step ----------------
@@ -504,7 +514,7 @@ class Agent:
             self._report("trade", c, "buy" if got > 0 else "sell", why, abs(got) * px / bal, px,
                          # no real fill price: no ref, so the server measures no distance from the signal's price
                          ref=self.sig_px.get(c) if ctx and filled else None, rev=rev, late=late, part=ctx.get("part"),
-                         result=result, snap=self._snap())
+                         risk=ctx.get("risk"), result=result, snap=self._snap())
         except Exception as e:
             log.debug("Report not queued: %s", type(e).__name__)
 
@@ -518,21 +528,23 @@ class Agent:
             m, acct, px = self.memory, self.acct, self._prices()
             bal, h0, h1 = prev.get("balance"), prev.get("positions") or {}, acct.get("positions") or {}
             found = []
-            pr = m.get("prot")
-            if pr and pr["id"] in (prev.get("brackets") or []) and pr["id"] not in acct["brackets"]:
-                c, u, now = pr["coin"], pr["units"], px.get(pr["coin"])
-                long = u > 0
-                why = "close" if not now else ("tp" if (now >= pr["tp"] if long else now <= pr["tp"]) else
-                                               "sl" if (now <= pr["sl"] if long else now >= pr["sl"]) else "close")
-                found.append((c, u, {"tp": pr["tp"], "sl": pr["sl"]}.get(why, now), why, "scalp"))
+            was, shown = prev.get("brackets") or {}, acct.get("brackets") or {}
+            for c, pr in (m.get("prots") or {}).items():
+                if was.get(c) == pr["id"] and shown.get(c) != pr["id"]:
+                    u, now = pr["units"], px.get(c)
+                    long = u > 0
+                    why = "close" if not now else ("tp" if (now >= pr["tp"] if long else now <= pr["tp"]) else
+                                                   "sl" if (now <= pr["sl"] if long else now >= pr["sl"]) else "close")
+                    found.append((c, u, {"tp": pr["tp"], "sl": pr["sl"]}.get(why, now), why, "scalp", pr.get("score")))
             for c, g in (m.get("guards") or {}).items():
                 if c in (prev.get("guards") or {}) and c not in (acct.get("guards") or {}):
-                    found.append((c, g["units"], g["stop"], "stop", "trend"))
-            for c, u, at, why, part in found:
+                    trend = ((m.get("parts") or {}).get(c) or {}).get("trend") or [0.0, None]
+                    found.append((c, g["units"], g["stop"], "stop", "trend", trend[1] if trend[0] else None))
+            for c, u, at, why, part, risk in found:
                 moved = (h0.get(c, 0.0) - h1.get(c, 0.0)) * (1 if u > 0 else -1)  # how much the position shrank
                 if at and bal and bal > 0 and moved >= 0.5 * abs(u):
                     self._report("trade", c, "sell" if u > 0 else "buy", why, min(abs(u), moved) * at / bal, at,
-                                 part=part, snap=self._snap())
+                                 part=part, risk=risk, snap=self._snap())
         except Exception as e:
             log.debug("Report not queued: %s", type(e).__name__)
 

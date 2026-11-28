@@ -30,10 +30,15 @@ def mainnet_home(now: float | None = None, pid: int | None = None, key_file: boo
                                              "version": __version__, "t": now - 86400,
                                              "steps": [{"step": s, "ok": True} for s in modes.STEPS]})
     link = "https://app.lighter.xyz/explorer/accounts/281474"
-    sig = {"v": 1, "seq": 90211, "rev": 412, "ts": now - 3, "expires": now + 57, "source": "paper", "state": "live",
-           "targets": {"BTC": {"x": -1.69, "px": 58520.0}, "ETH": {"x": 0.33, "px": 1642.4}},
-           "scalp": {"coin": "BTC", "x": -1.29, "tp": 58029.0, "sl": 59442.0, "id": 796},
-           "why": "We hold short 1.69 times the balance on Bitcoin and long 0.33 times on Ether."}
+    sig = {"v": 2, "seq": 90211, "rev": 412, "ts": now - 3, "expires": now + 57, "source": "paper", "state": "live",
+           "targets": {"BTC": {"x": -1.69, "px": 58520.0, "trend": {"x": -0.4, "score": 14}},
+                       "ETH": {"x": 0.33, "px": 1642.4, "trend": {"x": 0.33, "score": 9}},
+                       "HYPE": {"x": -0.2, "px": 34.12, "trend": {"x": -0.1, "score": 6}},
+                       "LIT": {"x": 0.0, "px": 2.59, "trend": {"x": 0.0, "score": 0}}},
+           "scalps": [{"coin": "BTC", "x": -1.29, "tp": 58029.0, "sl": 59442.0, "id": 796, "score": 13},
+                      {"coin": "HYPE", "x": -0.1, "tp": 33.8, "sl": 34.4, "id": 797, "score": 1}],
+           "why": "We hold short 1.69 times the balance on Bitcoin, long 0.33 times on Ether and short 0.20 times on "
+                  "HYPE."}
     day = time.strftime("%Y-%m-%d", time.gmtime(now))
     config.write_json(h / "status.json", {
         "t": now - 1, "pid": pid or os.getpid(), "version": __version__, "mode": "mainnet",
@@ -41,11 +46,11 @@ def mainnet_home(now: float | None = None, pid: int | None = None, key_file: boo
         "reason": "Following revision 412: BTC short $205 (0.08 times your balance), ETH long $40 (0.02 times your "
                   "balance).",
         "flags": {"pause": False, "flatten": False},
-        "account": {"balance": 2431.8, "positions": {"BTC": -0.0035, "ETH": 0.0244}, "brackets": [796]},
+        "account": {"balance": 2431.8, "positions": {"BTC": -0.0035, "ETH": 0.0244}, "brackets": {"BTC": 796}},
         "signal": sig, "received_at": now - 2.5, "last_drop": "", "pending": None,
         "limits": {}, "started": now - 3 * 3600 - 420,
         "book": {"BTC": {"entry": 58911.0, "mark": 58520.0}, "ETH": {"entry": 1630.1, "mark": 1642.4}},
-        "protected": {"coin": "BTC", "units": -0.0027, "tp": 58029.0, "sl": 59442.0, "id": 796},
+        "protected": {"BTC": {"coin": "BTC", "units": -0.0027, "tp": 58029.0, "sl": 59442.0, "id": 796, "score": 13}},
         "day": day, "day_start": 2460.0, "stopped_day": None})
     tx = "0x" + "c3" * 32
     rows = [{"t": now - 3 * 3600, "mode": "mainnet", "coin": "BTC", "asked": -0.0035, "units": -0.0035,

@@ -2,16 +2,18 @@
 
 Every venue has:
   live, settle_s          True for a real exchange; seconds to wait after an order before reading the account back
-  account(fresh=False)    {"balance", "positions": {coin: units}, "brackets": [ids of scalp parts still protected],
-                          "guards": {coin: {"units", "stop", "ref", "t"}} for each emergency stop still resting}
-                          fresh=True: read now, never a cached reading (always after an order)
-  price(coin)             the venue's own last price, or None
+  account(fresh=False)    {"balance", "positions": {coin: units}, "brackets": {coin: id of the scalp part whose take
+                          profit / stop loss still rests}, "guards": {coin: {"units", "stop", "ref", "t"}} for each
+                          emergency stop still resting, "absent": [coins this exchange lists no market for]}
+                          fresh=True: read now, never a cached reading (always after an order); the open orders of a
+                          coin with an order of ours since its last read, or whose position moved, are read with it
+  price(coin)             the venue's own last price, or None (also for a coin it has no market for)
   round(coin, units)      units rounded toward zero to the size step the exchange accepts
   tradable(coin, units, px)   at least the exchange's smallest order
   market(coin, units, ref_px, worst=None, reduce_only=False)   buy (units > 0) or sell at market, never at a price
                           worse than `worst`; returns the transaction hash on a real exchange
   protect(coin, units, tp, sl, id)   rest a reduce-only take profit and stop loss, one cancels the other, for `units`
-  cancel(coin)            remove that coin's take profit / stop loss (never its emergency stop)
+  cancel(coin)            remove that coin's take profit / stop loss (never its emergency stop); one pair per coin
   guard(coin, units, stop, ref)   rest ONE reduce-only stop order, the emergency stop (follow.guard_plan), for `units`
                           of the position (units > 0: a long, sold when the price falls to `stop`); `ref` is the price
                           it was set from. It replaces the one resting on that coin

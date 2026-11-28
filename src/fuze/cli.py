@@ -54,6 +54,13 @@ def _num(text: str) -> float:
         raise ValueError(f"{text!r} is not a number") from None
 
 
+def _whole(text: str) -> int:
+    v = _num(text)
+    if not v.is_integer():
+        raise ValueError("risk allowed is a whole number from 0 to 100")
+    return int(v)
+
+
 def _cap(text: str):
     return None if text.strip().lower() in ("none", "off", "no") else _num(text)
 
@@ -64,10 +71,19 @@ def _loss(value: float) -> float:
     return value / 100
 
 
+def _coins(text: str) -> list:
+    """BTC,ETH (or "all") as a list of coins; commas or spaces between them, any case."""
+    from fuze.protocol import COINS
+    words = [w for w in text.replace(",", " ").upper().split() if w]
+    return list(COINS) if words == ["ALL"] else config.coins(words)
+
+
 def _asked(args) -> dict:
     """The config fields given as flags (to `fuze init` or `fuze limits`)."""
-    out = {k: getattr(args, k) for k in ("size_mode", "percent", "fixed_usd", "max_x")
+    out = {k: getattr(args, k) for k in ("size_mode", "percent", "fixed_usd", "max_x", "risk_allowed")
            if getattr(args, k) is not None}
+    if args.coins is not None:
+        out["coins"] = _coins(args.coins)
     if args.max_position_usd is not None:
         out["max_position_usd"] = _cap(args.max_position_usd)
     if args.max_balance_usd is not None:
@@ -196,6 +212,9 @@ def cmd_run(args) -> int:
     setup_logging()
     link = ex.link()
     print(f"FUZE agent ({BANNER[cfg['mode']]})" + (f", account {link}" if link else "") + ". Ctrl+C to stop.")
+    if getattr(ex, "absent", None):
+        print(f"Lighter {cfg['mode']} lists no {' or '.join(ex.absent)} market: the agent does not trade "
+              f"{' or '.join(ex.absent)} there.")
     print(report.status_line(cfg))
     try:  # reporting never stops the agent from starting
         rep = report.Reporter(cfg)
@@ -259,6 +278,13 @@ def cmd_status(args) -> int:
         print("Positions: " + (", ".join(f"{c} {u:+g}" for c, u in held.items()) or "none"))
     stops = {c: g for c, g in (a.get("guards") or {}).items() if isinstance(g, dict)
              and all(isinstance(g.get(k), (int, float)) and not isinstance(g.get(k), bool) for k in ("units", "stop"))}
+    num = (int, float)
+    pairs = {c: p for c, p in (s.get("protected") or {}).items() if isinstance(p, dict) and all(
+        isinstance(p.get(k), num) and not isinstance(p.get(k), bool) for k in ("units", "tp", "sl"))}
+    if pairs:
+        print("Take profit and stop loss (each short-term part): "
+              + ", ".join(f"{c} {p['units']:+g}, take profit {p['tp']:,.2f}, stop loss {p['sl']:,.2f}"
+                          for c, p in pairs.items()))
     if stops:
         print("Emergency stops (for the part with no take profit or stop loss of its own): "
               + ", ".join(f"{c} {g['units']:+g} at {g['stop']:,.2f}" for c, g in stops.items()))
@@ -434,7 +460,7 @@ def switch_mode(cfg, target: str) -> int:
             if input("Type CLOSED to confirm: ").strip() != "CLOSED":
                 print("Not changed.")
                 return 1
-            a = {"positions": {}, "brackets": []}
+            a = {"positions": {}, "brackets": {}}
         if _held(a) and (code := _close_first(cfg, cur, a)):
             return code
         bal = config.current_balance(cfg)
@@ -713,8 +739,8 @@ def _lighter_account(cfg, net: str):
                  "wallet you have, make a sub-account for FUZE (Sub-accounts, New Sub-Account) and transfer into it "
                  "only that amount. Either way, only money you can afford to lose completely."))
         print(f"  2. Open {APP[net]}/apikeys with that account selected, press Generate API key, choose index 4, "
-              "leave Maker only off" + ("" if net == "testnet" else ", and restrict the key to the BTC and ETH "
-                                        "markets") + ". Your wallet signs it.")
+              "leave Maker only off" + ("" if net == "testnet" else ", and restrict the key to the markets "
+                                        "of the coins you follow (BTC, ETH, HYPE, LIT)") + ". Your wallet signs it.")
         print("  3. The page shows the private key once, and your account index. Type both here. The key is hidden "
               "as you type, stored on this computer only, and never shown again. Never type your wallet's own key "
               "or recovery phrase anywhere.")
@@ -832,6 +858,11 @@ def _interview(cfg) -> dict:
         lambda t: {"max_x": _num(t)})
     ask("Daily loss stop, in percent of the balance (1 to 50)", f"{cfg['daily_loss_frac'] * 100:g}",
         lambda t: {"daily_loss_frac": _loss(_num(t))})
+    ask("How much risk may a part of a position carry? 0 to 100, standard 60. A part scores how much of the balance it "
+        "can lose on a bad day, in tenths of a percent: 20 means 2%.", f"{cfg['risk_allowed']}",
+        lambda t: {"risk_allowed": _whole(t)})
+    ask("Which coins? BTC, ETH, HYPE, LIT, standard all four", ",".join(cfg["coins"]),
+        lambda t: {"coins": _coins(t)})
     return cfg
 
 
@@ -1008,6 +1039,10 @@ def _sizing_args(p) -> None:
     p.add_argument("--max-balance-usd", dest="max_balance_usd",
                    help='balance ceiling: the most of the account the agent counts as your balance, or "off"')
     p.add_argument("--daily-loss", dest="daily_loss", type=float, help="daily loss stop in percent, 1 to 50")
+    p.add_argument("--risk-allowed", dest="risk_allowed", type=int,
+                   help="0 to 100 (standard 60): a part of a position is followed when its risk score is at or under "
+                        "this; 20 means it can lose 2%% of the balance on a bad day")
+    p.add_argument("--coins", help='the coins to follow, among BTC, ETH, HYPE, LIT: "BTC,ETH", or "all"')
 
 
 def main(argv=None) -> int:

@@ -37,13 +37,13 @@ class Server:
                     self.send_response(302)
                     self.send_header("Location", "http://example.com/")
                     self.end_headers()
-                elif self.path == "/v1/stream" and stream:
+                elif self.path == "/v2/stream" and stream:
                     self.send_response(200)
                     self.send_header("Content-Type", "text/event-stream")
                     self.end_headers()
                     for i, e in enumerate(events):
                         self.wfile.write(f"id: {i}\ndata: {json.dumps(e)}\n\n".encode())
-                elif self.path == "/v1/signal":
+                elif self.path == "/v2/signal":
                     body = json.dumps(VECTORS["valid"][0]).encode()
                     self.send_response(200)
                     self.end_headers()
@@ -75,23 +75,25 @@ def test_end_to_end_stream(fuze_home):
     st = run_agent(fuze_home, Server(), lambda s: (s.get("signal") or {}).get("seq") == 3)
     assert st["signal"]["rev"] == 2 and st["mode"] == "simulation"
     acct = st["account"]
-    assert acct["positions"] == {"ETH": pytest.approx(-0.4 * 0.1 * 1000 / 2000)} and acct["brackets"] == []
+    # revision 2: the Bitcoin short-term trade closed, its trend part stays; LIT's $2 is under the smallest change
+    assert acct["positions"] == {"BTC": pytest.approx(-0.001, rel=1e-3), "ETH": pytest.approx(-0.02)}
+    assert acct["brackets"] == {}
     trades = [json.loads(x) for x in (fuze_home / "trades.jsonl").read_text().splitlines()]
     assert [(t["coin"], t["units"]) for t in trades] == [
-        ("BTC", pytest.approx(-0.003)), ("ETH", pytest.approx(-0.02)), ("BTC", pytest.approx(0.003))]
+        ("BTC", pytest.approx(-0.003)), ("ETH", pytest.approx(-0.02)), ("BTC", pytest.approx(0.002, rel=1e-3))]
     assert config.read_json(fuze_home / "guard.json") == {"ts": st["signal"]["ts"]}
 
 
 def test_end_to_end_polling_fallback(fuze_home):
     st = run_agent(fuze_home, Server(stream=False), lambda s: (s.get("signal") or {}).get("seq") == 1)
     assert st["account"]["positions"]["BTC"] == pytest.approx(-0.003)
-    assert st["account"]["brackets"] == [7]
+    assert st["account"]["brackets"] == {"BTC": 7}
 
 
 def test_redirects_are_not_followed():
     s = Server(redirect=True)
     with pytest.raises(urllib.error.HTTPError):
-        opener().open(s.url + "/v1/signal", timeout=5)
+        opener().open(s.url + "/v2/signal", timeout=5)
     s.httpd.shutdown()
 
 
@@ -119,7 +121,7 @@ def test_tls_certificate_is_checked(tmp_path):
     ctx.load_cert_chain(tmp_path / "c.pem", tmp_path / "k.pem")
     s.httpd.socket = ctx.wrap_socket(s.httpd.socket, server_side=True)
     with pytest.raises(urllib.error.URLError, match="CERTIFICATE_VERIFY_FAILED"):
-        opener().open(f"https://localhost:{s.httpd.server_address[1]}/v1/signal", timeout=5)
+        opener().open(f"https://localhost:{s.httpd.server_address[1]}/v2/signal", timeout=5)
     s.httpd.shutdown()
 
 
@@ -172,14 +174,14 @@ def test_a_stop_moved_into_profit_and_an_added_entry_are_followed(fuze_home, sig
             scalp={"coin": "BTC", "x": scalp_x, "tp": 59100.0, "sl": sl, "id": 7}))))
 
     step(1, 1, 60000.0, -1.2, 60600.0)  # short, the scalp part under a stop 1% above its entry
-    assert agent.memory["prot"]["sl"] == 60600.0 and agent.acct["positions"]["BTC"] == pytest.approx(-0.003)
+    assert agent.memory["prots"]["BTC"]["sl"] == 60600.0 and agent.acct["positions"]["BTC"] == pytest.approx(-0.003)
     step(2, 2, 59640.0, -1.2, 59850.0)  # 60 bps in profit: the stop moved to 25 bps in profit
-    assert agent.memory["prot"]["sl"] == 59850.0 and agent.acct["brackets"] == [7]
+    assert agent.memory["prots"]["BTC"]["sl"] == 59850.0 and agent.acct["brackets"] == {"BTC": 7}
     assert agent.acct["positions"]["BTC"] == pytest.approx(-0.003)  # nothing traded
     step(3, 3, 59640.0, -1.8, 59850.0)  # an entry is added, the stop is kept
     assert agent.acct["positions"]["BTC"] == pytest.approx(-240 / 59640, rel=1e-2)
-    assert agent.memory["prot"]["sl"] == 59850.0 and agent.memory["prot"]["units"] == pytest.approx(-180 / 59640, rel=1e-2)
+    assert agent.memory["prots"]["BTC"]["sl"] == 59850.0 and agent.memory["prots"]["BTC"]["units"] == pytest.approx(-180 / 59640, rel=1e-2)
     step(4, 3, 59860.0, -1.8, 59850.0)  # the price comes back through the moved stop
-    assert agent.acct["brackets"] == [] and agent.acct["positions"]["BTC"] == pytest.approx(-60 / 59640, rel=5e-2)
+    assert agent.acct["brackets"] == {} and agent.acct["positions"]["BTC"] == pytest.approx(-60 / 59640, rel=5e-2)
     step(5, 3, 59700.0, -1.8, 59850.0)  # still the same revision: the closed scalp part stays closed
-    assert agent.acct["brackets"] == [] and agent.acct["positions"]["BTC"] == pytest.approx(-60 / 59640, rel=5e-2)
+    assert agent.acct["brackets"] == {} and agent.acct["positions"]["BTC"] == pytest.approx(-60 / 59640, rel=5e-2)

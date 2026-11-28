@@ -32,7 +32,7 @@
   * [Reading a message](signal/reading.md)
   * [Verifying a message yourself](signal/verify.md)
   * [Freshness and states](signal/states.md)
-  * [Protocol, version 1](PROTOCOL.md)
+  * [Protocol, version 2](PROTOCOL.md)
 * [The public record](record/README.md)
   * [Balance and test periods](record/balance.md)
   * [Account leverage, margin and size](record/leverage.md)

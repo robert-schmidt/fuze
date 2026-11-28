@@ -56,7 +56,11 @@ def test_mainnet_running_snapshot(fuze_home):
     btc, eth = d["positions"]
     assert (btc["side"], eth["side"]) == ("short", "long")
     assert btc["usd"] == pytest.approx(0.0035 * 58520) and btc["result"] == pytest.approx(-0.0035 * (58520 - 58911))
-    assert d["short"]["protected"] and d["short"]["tp"] == 58029.0 and d["short"]["held"]
+    short, hype = d["shorts"]  # one per coin: the BTC part held, the HYPE trade only in the signal
+    assert short["protected"] and short["tp"] == 58029.0 and short["held"] and short["coin"] == "BTC"
+    assert hype["coin"] == "HYPE" and not hype["held"] and hype["score"] == 1
+    assert d["signal"]["scalps"][1]["name"] == "HYPE" and d["signal"]["targets"][0]["trend_score"] == 14
+    assert d["limits"]["risk_allowed"] == 60 and d["limits"]["values"]["coins"] == "BTC, ETH, HYPE, LIT"
     assert "REAL money" in d["signal"]["note"] and d["signal"]["fresh"] and d["signal"]["origin"] == "agent"
     assert d["keys"]["mainnet"]["key"] == "set" and d["rehearsal"] == "passed"
     assert d["limits"]["daily"]["used"] == pytest.approx(28.2 / 123)
@@ -82,7 +86,7 @@ def test_states_without_a_running_agent(fuze_home):
     assert ui.snapshot()["agent"]["state"] == "never"
     mainnet_home(pid=dead_pid())
     d = ui.snapshot()
-    assert d["agent"]["state"] == "stopped" and d["short"]["held"]
+    assert d["agent"]["state"] == "stopped" and d["shorts"][0]["held"]
     mainnet_home()
     (fuze_home / "PAUSE").touch()
     assert ui.snapshot()["agent"]["state"] == "paused"
@@ -224,4 +228,14 @@ def test_agent_writes_what_the_page_needs(fuze_home):
 
     st = run_agent(fuze_home, Server(stream=False), lambda s: (s.get("signal") or {}).get("seq") == 1)
     assert st["started"] and st["book"]["BTC"]["entry"] > 0 and st["book"]["BTC"]["mark"] > 0
-    assert st["protected"]["coin"] == "BTC" and st["day"]
+    assert st["protected"]["BTC"]["id"] == 7 and st["day"]
+    assert st["limits"]["risk_allowed"] == 60 and st["limits"]["coins"] == ["BTC", "ETH", "HYPE", "LIT"]
+
+
+def test_a_status_written_by_0_5_0_still_shows_its_pair(fuze_home):
+    mainnet_home()
+    st = config.read_json(fuze_home / "status.json")
+    st["protected"], st["account"]["brackets"] = st["protected"]["BTC"], [796]  # 0.5.0's form
+    config.write_json(fuze_home / "status.json", st)
+    d = ui.snapshot()
+    assert d["shorts"][0]["coin"] == "BTC" and d["shorts"][0]["held"] and d["shorts"][0]["protected"]

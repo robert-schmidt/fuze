@@ -32,7 +32,7 @@ key, the switch. It skips what is already done, so you can stop at any question 
    account. Each new version of FUZE asks for a new testnet rehearsal before mainnet unlocks again.
 
 > **Warning:** on mainnet the protection for your money is on the exchange side: a sub-account of its own holding only
-> what you can lose, and an API key restricted to the BTC and ETH markets. See [Security model](../security.md).
+> what you can lose, and an API key restricted to the markets of the coins you follow. See [Security model](../security.md).
 
 ## Rules that apply to every switch
 

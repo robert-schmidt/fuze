@@ -41,7 +41,8 @@ def setup_report(read_account: bool = False) -> list:
         add(True, "config.json is valid", f"mode {cfg['mode']}, {size} follows the signal, "
                                           f"cap per position {fmt('max_position_usd', cfg['max_position_usd'])}, "
                                           f"cap {cfg['max_x']:g}x, balance ceiling {fmt('max_balance_usd', cfg['max_balance_usd'])}, "
-                                          f"daily loss stop {cfg['daily_loss_frac']:.0%}")
+                                          f"daily loss stop {cfg['daily_loss_frac']:.0%}, "
+                                          f"risk allowed {cfg['risk_allowed']}, coins {fmt('coins', cfg['coins'])}")
     except (ValueError, OSError) as e:
         cfg = None
         add(False, "config.json is valid", str(e))

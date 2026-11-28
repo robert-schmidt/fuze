@@ -1,23 +1,27 @@
 """A fake Lighter client: the raw calls of fuze.lighter_venue.LighterClient, in Lighter's integer units, no network.
 
-Market ids, decimals and minimums as Lighter's orderBookDetails showed them (ETH 0, BTC 1). Knobs:
+Market ids, decimals and minimums as Lighter's orderBookDetails showed them (ETH 0, BTC 1), HYPE 24 (size step 0.01,
+smallest 0.07 HYPE and $10) and LIT 120 (smallest 1 LIT and $10). Knobs:
   fill   "full", "half", "none", or "lost" (fills, but the answer never comes back: the call raises)
   pair   "ok", "hidden" (accepted but never shown on the account), "refused" (raises)
   stop   the same three, for the emergency stop
   down   True: reading a transaction back fails as if testnet could not be reached
+  listed the symbols the market list shows (a testnet may not list every coin)
 Every transaction it returns a hash for is kept in `txs`, as Lighter's /api/v1/tx shows it, for tx().
 """
 
 import time
 
-COINS = {0: "ETH", 1: "BTC"}
-DEC = {0: (4, 2), 1: (5, 1)}  # market id -> (size decimals, price decimals)
+COINS = {0: "ETH", 1: "BTC", 24: "HYPE", 120: "LIT"}
+DEC = {0: (4, 2), 1: (5, 1), 24: (2, 4), 120: (1, 5)}  # market id -> (size decimals, price decimals)
+MIN_BASE = {0: "0.0050", 1: "0.00020", 24: "0.07", 120: "1.0"}
 
 
 class FakeLighter:
     def __init__(self, balance=1000.0, account=77, key_index=4):
-        self.px = {"BTC": 60000.0, "ETH": 2000.0}
+        self.px = {"BTC": 60000.0, "ETH": 2000.0, "HYPE": 34.0, "LIT": 2.5}
         self.bal, self.pos, self.orders, self.sent = balance, {0: 0.0, 1: 0.0}, {}, []
+        self.listed = {"BTC", "ETH", "HYPE", "LIT", "SOL"}
         self.fill, self.pair, self.stop, self.next = "full", "ok", "ok", 100
         self.account_index, self.key_index, self.txs, self.down = account, key_index, {}, False
 
@@ -34,12 +38,12 @@ class FakeLighter:
         return self.txs[h]
 
     def markets(self):
-        return [{"symbol": "ETH", "market_id": 0, "size_decimals": 4, "price_decimals": 2,
-                 "min_base_amount": "0.0050", "min_quote_amount": "10.000000", "last_trade_price": self.px["ETH"]},
-                {"symbol": "BTC", "market_id": 1, "size_decimals": 5, "price_decimals": 1,
-                 "min_base_amount": "0.00020", "min_quote_amount": "10.000000", "last_trade_price": self.px["BTC"]},
-                {"symbol": "SOL", "market_id": 2, "size_decimals": 3, "price_decimals": 3,
-                 "min_base_amount": "0.050", "min_quote_amount": "10.000000", "last_trade_price": 150.0}]
+        out = [{"symbol": c, "market_id": m, "size_decimals": DEC[m][0], "price_decimals": DEC[m][1],
+                "min_base_amount": MIN_BASE[m], "min_quote_amount": "10.000000", "last_trade_price": self.px[c]}
+               for m, c in COINS.items()]
+        out.append({"symbol": "SOL", "market_id": 2, "size_decimals": 3, "price_decimals": 3,
+                    "min_base_amount": "0.050", "min_quote_amount": "10.000000", "last_trade_price": 150.0})
+        return [d for d in out if d["symbol"] in self.listed]
 
     def account(self):
         return {"total_asset_value": f"{self.bal:.6f}",
@@ -52,7 +56,7 @@ class FakeLighter:
     def market_order(self, market_id, client_index, base, price, is_ask, reduce_only):
         self.sent.append(("market", market_id, base, price, is_ask, reduce_only))
         sd, pd = DEC[market_id]
-        units, held = base / 10 ** sd * (-1 if is_ask else 1), self.pos[market_id]
+        units, held = base / 10 ** sd * (-1 if is_ask else 1), self.pos.get(market_id, 0.0)
         if reduce_only:
             assert held * units < 0, "reduce-only order that would open or add"
             units = max(-abs(held), min(abs(held), units))

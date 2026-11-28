@@ -16,8 +16,8 @@ This page takes you from simulation to Lighter's test exchange, where the agent 
    # a clone: cd fuze && ~/.fuze-venv/bin/pip install '.[mcp,lighter]'
    ```
 
-2. **Make a Lighter testnet account and API key.** Use a sub-account of its own, and a key restricted to the BTC and ETH
-   markets. Step by step: [Lighter account and API key](../../lighter-setup.md).
+2. **Make a Lighter testnet account and API key.** Use a sub-account of its own, and a key restricted to the markets of the
+coins you follow. Step by step: [Lighter account and API key](../../lighter-setup.md).
 
 3. **Give FUZE the key**, in your terminal (never in a chat):
 
@@ -55,7 +55,9 @@ This page takes you from simulation to Lighter's test exchange, where the agent 
 Lighter's testnet is a separate chain (chain ID 300; mainnet is 304) that settles on Ethereum's Sepolia test network,
 and "A transaction signed for `304` will be rejected by testnet, and vice versa." Its faucet "gives test USDC and LIT
 but no ETH" (https://docs.lighter.xyz/developers/getting-started/environments.md). Its markets have other ids and larger
-smallest orders than mainnet; FUZE reads both from Lighter. Lighter's own advice to developers is "Default to testnet in
+smallest orders than mainnet (testnet's Bitcoin market is 4096); FUZE finds each coin's market by its symbol and reads
+the smallest orders from Lighter. A coin with no market on testnet is said in `fuze run` and `fuze status` and not
+traded there. Lighter's own advice to developers is "Default to testnet in
 examples and tests." (https://docs.lighter.xyz/developers/ai-and-agents/agent-instructions.md)
 
 ## Watching it

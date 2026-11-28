@@ -34,7 +34,11 @@ This page lists messages and situations you may meet, what they mean, and what t
 | A coin is not opened, or the position looks smaller than expected | A change under the larger of $10 and 2% of your balance is skipped; or a cap cut it | `fuze status` shows per coin what the signal asks for and what you hold, and says when the difference is under that step; see [Limits](limits.md#when-a-size-is-too-small-to-trade) |
 | `Your limits changed: resized to them.` | You (or your AI tool) changed a limit | Nothing: the agent resized the held position |
 | `Re-check: the held position was further from ...` | The 5-minute re-check found a coin more than 10% off | Nothing: it corrected it |
-| `The scalp part is not opened: ...` | The short-term part's stop is more than 1.5% from the price or on the wrong side, it already closed, or it is under the exchange's smallest order | Nothing; the rest of the position is followed |
+| `The Bitcoin short-term trade is not opened: ...` (or Ether, HYPE, LIT) | That coin's short-term trade's stop is more than 1.5% from the price or on the wrong side, it already closed, or it is under the exchange's smallest order | Nothing; the rest of the position is followed |
+| `The Ether trend part scores 70, above your risk allowed of 60: not followed.` (or a short-term trade) | That part's risk score is above your risk allowed | Nothing, or raise the risk allowed with `fuze limits --risk-allowed` (asks for `RAISE`) |
+| `HYPE is not among your coins: ...` | The coin is not in your `coins` | Nothing, or add it with `fuze limits --coins all` (asks for `RAISE`) |
+| `The exchange lists no LIT market here: LIT is not traded.` | That network has no market for the coin (some coins are missing on Lighter testnet) | Nothing; the other coins are followed |
+| `a version 1 message: this agent reads version 2 of the signal (/v2/signal)` | The server address in your settings serves only version 1 | Use `https://fuze.trade`, the standard server |
 | `No fresh signal: holding what we have and opening nothing new.` | No valid message for 60 seconds | Check your internet connection and [fuze.trade](https://fuze.trade). The agent falls back to polling every 2 seconds |
 | `The signal says it is offline` | Our side has no fresh reading of the account | Nothing; it holds. Set `stale_flat_min` if you prefer to close after a while |
 | `Daily loss stop: ...` | The balance fell by your daily loss stop since the UTC day began | It stays flat until the next UTC day |

@@ -18,6 +18,7 @@ from __future__ import annotations
 import asyncio
 import atexit
 import json
+import logging
 import math
 import time
 import urllib.error
@@ -30,16 +31,60 @@ from fuze.config import read_json, write_json
 from fuze.protocol import COINS
 from fuze.venue import CHAIN_ID, HOSTS, SLIP_ADD, SLIP_REDUCE, TESTNET_SLIP, Venue, account_link
 
-READ_EVERY_S = 5.0  # the account. A standard Lighter account gets 60 requests a rolling minute, orders included:
-# the account 12, the scalp's pair 12 while one rests, prices 2 and the emergency stops 2 leave half of it for orders
+log = logging.getLogger("fuze")
+
+# Lighter's request limit: a standard account gets 60 requests in a rolling minute, orders included. In a quiet minute
+# the reads must leave half of it for orders. Each coin's open orders are one request (Lighter's accountActiveOrders,
+# per market), so they are read only as often as the budget allows:
+#   the account                         every READ_EVERY_S (5 s)                          12 a minute
+#   prices (the market list)            every PRICE_EVERY_S (30 s)                         2
+#   coins under a take profit and stop loss (n of them): each every n x 5 s               12 in all, for any n
+#   a coin with only an emergency stop: every GUARD_READ_S (60 s)                         1 each
+# One short-term trade and emergency stops on the other three coins: 12 + 2 + 12 + 3 = 29; four short-term trades:
+# 12 + 2 + 12 = 26 (their emergency stops are in the same read). Besides that, a coin's orders are read at once when
+# the account read shows its position moved (a take profit, stop loss or emergency stop that fills moves it) and after
+# every order of ours on it.
+# What the slower check costs, with four pairs (each read every 20 s): a pair that FILLS is still seen at the next
+# account read, at most 5 s later, because the position moves. What can go unseen for up to 20 s is an order that went
+# WITHOUT a fill (cancelled on the exchange, or expired). Lighter cancels the other half of a filled pair itself (the
+# two are grouped, one cancels the other); if it ever left the stop order of a filled take profit resting, that order
+# is reduce-only, so it can only close part of what is held, never open or add, and it is found and cancelled when
+# that coin's orders are next read (at most 5 s later, as the position moved).
+READ_EVERY_S = 5.0  # the account
 PRICE_EVERY_S = 30.0  # the market list's price: it places the emergency stop (20% away) and is read fresh for an order
 TOKEN_LIFE_S, TOKEN_S = 600, 480.0  # the read token for open orders is asked for 10 minutes and renewed after 8
-GUARD_READ_S = 60.0  # a coin with only an emergency stop resting: its open orders are read this often (the request limit)
+GUARD_READ_S = 60.0  # a coin with only an emergency stop resting: its open orders are read this often
+READ_CAP = 45  # a busy step (four short-term trades opening at once is about 40 requests) must not run into the limit:
+#                a read waits while 45 requests went out in the last minute, so orders always have the last 15 of 60
 GUARD_SLIP = 0.04  # the emergency stop's worst price, past its trigger: it must fill in a fast market (Lighter checks
 #                    a trigger order's price against its trigger, with a threshold it does not publish; its 5% bound
 #                    from the mark price is for limit orders)
 GUARD_TYPE = "stop-loss"  # how Lighter's order list names the emergency stop's order type
 MAX_BODY = 4_000_000
+
+
+class Pace:
+    """Lighter's request limit, kept on this side. A read (account, open orders, the market list, a transaction) waits
+    while READ_CAP requests went out in the last minute; an order, a cancel or a take profit / stop loss never waits, it
+    is only counted. So a step that sends many orders slows down instead of having one refused: a refused take profit /
+    stop loss would close the short-term part it was for."""
+
+    def __init__(self, clock=time.monotonic, sleep=time.sleep, cap=READ_CAP, window=60.0):
+        self.clock, self.sleep, self.cap, self.window, self.t = clock, sleep, cap, window, []
+
+    def _count(self) -> int:
+        now = self.clock()
+        self.t = [x for x in self.t if now - x < self.window]
+        return len(self.t)
+
+    def read(self) -> None:
+        while self._count() >= self.cap:
+            self.sleep(max(0.05, self.t[0] + self.window - self.clock()))
+        self.t.append(self.clock())
+
+    def send(self) -> None:
+        self._count()
+        self.t.append(self.clock())
 
 
 class LighterClient:
@@ -57,6 +102,7 @@ class LighterClient:
         self.url, self.account_index, self.key_index = HOSTS[net], account, key_index
         self.http, self.Req = opener or tls_opener(), CreateOrderTxReq
         self.loop, self.token, self.token_t = asyncio.new_event_loop(), None, 0.0
+        self.pace = Pace()
 
         async def make():  # the SDK's HTTP session wants a running event loop
             return lighter.SignerClient(url=self.url, account_index=account, api_private_keys={key_index: key},
@@ -111,6 +157,7 @@ class LighterClient:
         return r
 
     def get(self, path: str, headers=None, **params) -> dict:
+        self.pace.read()
         url = f"{self.url}/api/v1/{path}?" + urllib.parse.urlencode(params)
         req = urllib.request.Request(url, headers={"Accept": "application/json", **(headers or {})})
         with self.http.open(req, timeout=10) as r:
@@ -140,6 +187,7 @@ class LighterClient:
 
     def _send(self, coro, what: str):
         """Sign and send one transaction. A 200 means accepted, not filled: the account read decides."""
+        self.pace.send()
         _, resp, err = self.loop.run_until_complete(asyncio.wait_for(coro, 15))
         if err or resp is None or getattr(resp, "code", None) != 200:
             raise RuntimeError(f"{what} refused by Lighter: {str(err or getattr(resp, 'message', resp))[:160]}")
@@ -207,29 +255,42 @@ class LighterVenue(Venue):
         self.pairs = read_json(self.path, {}) or {}  # coin -> the protective pair we placed {"id", "units", "tp", "sl"}
         self.gpath = self.path.with_name(self.path.stem + "-guards.json")
         self.guards = read_json(self.gpath, {}) or {}  # coin -> the emergency stop we placed {"units", "stop", "ref", "t"}
-        self.g_seen = {}  # coin -> when its emergency stop was last seen resting
-        self.m, self.m_t, self.cache, self.cache_t, self.seen = {}, 0.0, None, 0.0, {}
+        self.o_seen = {}  # coin -> when its open orders were last read
+        self.dirty = set()  # coins with an order of ours sent since their orders were last read
+        self.held = {}  # the positions at the last account read: a coin whose position moved has its orders read
+        self.m, self.m_t, self.cache, self.cache_t, self.seen, self.absent = {}, 0.0, None, 0.0, {}, []
         self._markets()
+        if self.absent:
+            log.warning("Lighter %s lists no %s market: the agent does not trade %s there.", net,
+                        " or ".join(self.absent), "it" if len(self.absent) == 1 else "them")
         self.client_index = int(clock() * 1000)  # unique per order, also across restarts
 
     # --- reading ------------------------------------------------------------------------------------------------
     def _markets(self) -> None:
+        """Each coin's market, found by its symbol in Lighter's own market list, on mainnet and testnet alike (their
+        market numbers differ: Bitcoin is 1 on mainnet, 4096 on testnet). A coin the list does not have is not traded
+        on this network (`absent`); a market once found is kept, so a position on it never drops out of the account."""
         m = {}
         for d in self.c.markets():
-            if d.get("symbol") in COINS:
+            if d.get("symbol") in COINS and d["symbol"] not in m:
                 m[d["symbol"]] = {"id": int(d["market_id"]), "sd": int(d["size_decimals"]),
                                   "pd": int(d["price_decimals"]), "min_base": _num(d.get("min_base_amount")),
                                   "min_quote": _num(d.get("min_quote_amount")),
                                   "px": _num(d.get("last_trade_price")) or _num(d.get("mark_price")) or None}
-        missing = set(COINS) - set(m)
-        if missing:
-            raise RuntimeError(f"Lighter's market list has no {', '.join(sorted(missing))} market")
-        self.m, self.m_t = m, self.clock()
+        m = {**self.m, **m}
+        if not m:
+            raise RuntimeError(f"Lighter's market list has none of the markets FUZE trades ({', '.join(COINS)})")
+        self.m, self.m_t, self.absent = m, self.clock(), [c for c in COINS if c not in m]
 
     def price(self, coin: str, fresh: bool = False) -> float | None:
         if fresh or self.clock() - self.m_t > PRICE_EVERY_S:
             self._markets()
-        return self.m[coin]["px"]
+        return self.m[coin]["px"] if coin in self.m else None
+
+    def _market(self, coin: str) -> dict:
+        if coin not in self.m:
+            raise ValueError(f"Lighter {self.net} lists no {coin} market: FUZE does not trade {coin} there")
+        return self.m[coin]
 
     def flatten(self) -> list:
         self._markets()  # a close is priced from a price read now, not one up to PRICE_EVERY_S old
@@ -237,9 +298,11 @@ class LighterVenue(Venue):
 
     def _ours(self, coin: str) -> tuple:
         """Our orders resting on this coin (reduce-only with a trigger price): (the scalp part's take profit and stop
-        loss, the emergency stop)."""
-        mine = [o for o in self.c.active_orders(self.m[coin]["id"])
+        loss, the emergency stop). One request."""
+        mine = [o for o in self.c.active_orders(self._market(coin)["id"])
                 if o.get("reduce_only") and _num(o.get("trigger_price")) > 0]
+        self.o_seen[coin] = self.clock()
+        self.dirty.discard(coin)
         return ([o for o in mine if o.get("type") != GUARD_TYPE], [o for o in mine if o.get("type") == GUARD_TYPE])
 
     def account(self, fresh: bool = False) -> dict:
@@ -257,27 +320,35 @@ class LighterVenue(Venue):
                 value = _num(p.get("position_value"))  # display only: fields as Lighter's docs name them
                 self.seen[coin] = {"entry": _num(p.get("avg_entry_price")) or None,
                                    "mark": value / abs(units) if value > 0 else self.m[coin]["px"]}
-        brackets, guards = [], {}
-        for coin in COINS:
-            g = self.guards.get(coin)
-            if coin not in self.pairs and (not g or (not fresh and now - self.g_seen.get(coin, -1e18) < GUARD_READ_S)):
-                if g:  # seen resting within the last minute: not read again, the request limit is for orders
+        brackets, guards = {}, {}
+        every = READ_EVERY_S * max(1, sum(1 for c in self.m if c in self.pairs))  # see the request limit, at the top
+        for coin in self.m:
+            pair, g = self.pairs.get(coin), self.guards.get(coin)
+            if not pair and not g:
+                continue
+            due = (coin in self.dirty or pos.get(coin, 0.0) != self.held.get(coin, 0.0)
+                   or now - self.o_seen.get(coin, -1e18) >= (every if pair else GUARD_READ_S))
+            if not due:  # read within its interval, nothing of ours sent on it since, its position unchanged
+                if pair:
+                    brackets[coin] = pair["id"]
+                if g:
                     guards[coin] = dict(g)
                 continue
-            pair, stop = self._ours(coin)
-            if coin in self.pairs:
-                if pair:
-                    brackets.append(self.pairs[coin]["id"])
+            shown, stop = self._ours(coin)
+            if pair:
+                if shown:
+                    brackets[coin] = pair["id"]
                 else:  # gone: one of the pair filled (the other is cancelled with it), or it was cancelled
                     self.pairs.pop(coin)
                     write_json(self.path, self.pairs)
             if g and stop:
-                guards[coin], self.g_seen[coin] = dict(g), now
+                guards[coin] = dict(g)
             elif g:  # gone: it filled, Lighter let it expire, or it was cancelled on the exchange
                 self.guards.pop(coin)
                 write_json(self.gpath, self.guards)
+        self.held = pos
         self.cache, self.cache_t = {"balance": _num(a.get("total_asset_value")), "positions": pos,
-                                    "brackets": brackets, "guards": guards}, now
+                                    "brackets": brackets, "guards": guards, "absent": list(self.absent)}, now
         return self.cache
 
     def link(self):
@@ -289,15 +360,19 @@ class LighterVenue(Venue):
     # --- sizes --------------------------------------------------------------------------------------------------
     def _base(self, coin: str, units: float) -> int:
         """Units in Lighter's integer size units, rounded toward zero (1e-6: 0.59999999 is 0.6)."""
-        return int(math.floor(abs(units) * 10 ** self.m[coin]["sd"] + 1e-6))
+        return int(math.floor(abs(units) * 10 ** self._market(coin)["sd"] + 1e-6))
 
     def _px(self, coin: str, px: float) -> int:
-        return int(round(px * 10 ** self.m[coin]["pd"]))
+        return int(round(px * 10 ** self._market(coin)["pd"]))
 
     def round(self, coin: str, units: float) -> float:
+        if coin not in self.m:  # no market here: nothing of it can be traded
+            return 0.0
         return math.copysign(self._base(coin, units) / 10 ** self.m[coin]["sd"], units)
 
     def tradable(self, coin: str, units: float, px) -> bool:
+        if coin not in self.m:
+            return False
         m, units = self.m[coin], abs(self.round(coin, units))
         return units > 0 and units >= m["min_base"] - 1e-12 and units * (px or m["px"] or 0) >= m["min_quote"] - 1e-9
 
@@ -316,6 +391,7 @@ class LighterVenue(Venue):
             worst = self.worst(ref_px or self.price(coin, fresh=True), units, reduce_only)
         self.client_index += 1
         self.cache = None
+        self.dirty.add(coin)
         return self.c.market_order(self.m[coin]["id"], self.client_index, base, self._px(coin, worst),
                                    units < 0, bool(reduce_only))
 
@@ -327,16 +403,20 @@ class LighterVenue(Venue):
         self.pairs[coin] = {"id": id, "units": units, "tp": tp, "sl": sl}
         write_json(self.path, self.pairs)  # first: a pair that was sent but not recorded would be left behind
         self.cache = None
+        self.dirty.add(coin)
         return self.c.tp_sl(self.m[coin]["id"], base, units > 0, self._px(coin, tp),
                             self._px(coin, tp * (1 + away * SLIP_ADD)), self._px(coin, sl),
                             self._px(coin, sl * (1 + away * SLIP_REDUCE)))
 
     def cancel(self, coin: str) -> None:
+        if coin not in self.m:
+            return
         for o in self._ours(coin)[0]:
             self.c.cancel_order(self.m[coin]["id"], int(o["order_index"]))
         if self.pairs.pop(coin, None) is not None:
             write_json(self.path, self.pairs)
         self.cache = None
+        self.dirty.add(coin)
 
     def guard(self, coin: str, units: float, stop: float, ref: float) -> str | None:
         base = self._base(coin, units)
@@ -344,24 +424,27 @@ class LighterVenue(Venue):
             raise ValueError(f"{coin} emergency stop of {units} is smaller than Lighter's size step")
         self.unguard(coin)  # ponytail: cancelled, then placed, so for about a second none rests; placing first would
         #                     leave two reduce-only stops for more than the position, which Lighter may refuse
-        pd = 10 ** self.m[coin]["pd"]
+        pd = 10 ** self._market(coin)["pd"]
         stop = self._px(coin, stop) / pd
         away = -1 if units > 0 else 1  # a long is closed by selling: its worst price sits under the trigger
         self.client_index += 1
         self.guards[coin] = {"units": units, "stop": stop, "ref": ref, "t": self.clock()}
         write_json(self.gpath, self.guards)  # first: a stop that was sent but not recorded would not be shown
         self.cache = None
+        self.dirty.add(coin)
         return self.c.stop_order(self.m[coin]["id"], self.client_index, base, units > 0, self._px(coin, stop),
                                  self._px(coin, stop * (1 + away * GUARD_SLIP)))
 
     def unguard(self, coin: str) -> bool:
+        if coin not in self.m:
+            return False
         resting = self._ours(coin)[1]  # every stop-loss order of ours on this coin, recorded or not
         for o in resting:
             self.c.cancel_order(self.m[coin]["id"], int(o["order_index"]))
-        self.g_seen.pop(coin, None)
         if self.guards.pop(coin, None) is not None:
             write_json(self.gpath, self.guards)
         self.cache = None
+        self.dirty.add(coin)
         return bool(resting)
 
     def mark(self, prices: dict) -> None:

@@ -19,12 +19,13 @@ starts the page first if it is not running.
 - Whether the agent is running, paused or stopped, and since when.
 - The mode, with real money impossible to miss.
 - Your balance and today's result, and how much of today's loss stop is used.
-- Each position with its size, entry, current price, result and emergency stop; the short-term part between its take
-  profit and stop loss.
+- Each position with its size, entry, current price, result and emergency stop; each short-term trade (one per coin at
+  most) between its take profit and stop loss, with its risk score.
 - Per coin, what the signal asks for at your limits next to what you hold, in dollars, and a note when the difference
   is under the smallest change the agent makes (so a small size that holds nothing is explained).
 - The signal: state, revision, age, whether the signature checked out, and which of our accounts it comes from.
-- Your sizing and limits in plain words.
+- Your sizing and limits in plain words, with your risk allowed and your coins, and each part of the signal skipped and
+  why.
 - Recent orders, with explorer links in testnet and mainnet.
 - The setup checks, and whether keys are "set" or "missing".
 

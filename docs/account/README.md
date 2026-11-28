@@ -21,7 +21,7 @@ A **book** here means one set of trading rules and the position it wants.
 | Book | Holds | Decided by | Changes |
 |---|---|---|---|
 | [Short-term trades](short-term/README.md) (the "scalping book") | Bitcoin only, minutes to hours | On each busy 5-minute candle, an AI (Claude Opus) or our own hand-written algorithm reads the market and answers long, short or skip | When a trade opens, adds, or ends at its take profit, stop loss or time limit |
-| [Slow trend](trend.md) (the "trend book") | Bitcoin and Ether, days to weeks | A fixed rule on the last two weeks to two months of prices, paced by market mood | Every 4 hours, when the change is large enough |
+| [Slow trend](trend.md) (the "trend book") | Bitcoin, Ether, HYPE and LIT, days to weeks | A fixed rule on the last two weeks to two months of prices, paced by market mood | Every 4 hours, when the change is large enough |
 
 Both books size their positions on the same balance. The account holds their **sum**: one position per coin. How that
 works, and what protects each part, is on [How the two books become one account](netting.md).

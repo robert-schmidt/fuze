@@ -1,6 +1,6 @@
 {
   "title": "FUZE docs",
-  "description": "How FUZE works: vibe trading with a signed Bitcoin and Ether futures signal, our own trading account, and the open-source agent and MCP server that follows it on your own account, inside your limits.",
+  "description": "How FUZE works: vibe trading with a signed futures signal on Bitcoin, Ether, HYPE and LIT, our own trading account, and the open-source agent and MCP server that follows it on your own account, inside your limits.",
   "language": "en",
   "plugins": ["-sharing"],
   "styles": {
@@ -9,7 +9,7 @@
   "links": {
     "sidebar": {
       "fuze.trade": "https://fuze.trade",
-      "The live signal": "https://fuze.trade/v1/signal"
+      "The live signal": "https://fuze.trade/v2/signal"
     }
   },
   "pluginsConfig": {

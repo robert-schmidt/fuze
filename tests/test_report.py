@@ -18,7 +18,7 @@ from fuze.report import Equity, Reporter, handle
 
 BASE = {"v", "seq", "ts", "kind", "ver", "mode", "public"}
 CONTRACT = {"hello": BASE | {"settings", "handle"}, "beat": BASE | {"equity", "x", "state"},
-            "trade": BASE | {"coin", "side", "why", "part", "x", "px", "ref", "rev", "late", "result"},
+            "trade": BASE | {"coin", "side", "why", "part", "risk", "x", "px", "ref", "rev", "late", "result"},
             "prove": BASE | {"wallet"}, "bye": BASE}
 SETTINGS = {"size_mode", "percent", "max_x", "daily_loss_frac", "ceiling", "cap", "risk_allowed", "coins"}
 
@@ -69,22 +69,26 @@ def test_envelopes_verify_and_carry_only_fields_from_the_contract(fuze_home):
     r.beat(1234.5, {"BTC": -0.003}, {"BTC": 60000.0}, "following")
     r.trade("BTC", "sell", "open", 0.18, 59994.0, ref=60000.0, rev=3, late=0.4, part=None, result=None,
             snap=(1234.5, {"BTC": -0.003}, {"BTC": 60000.0}))
-    r.trade("BTC", "buy", "tp", 0.12, 59400.0, part="scalp", result=0.36)
+    r.trade("BTC", "buy", "tp", 0.12, 59400.0, part="scalp", result=0.36, risk=12)
+    r.trade("ETH", "buy", "close", 0.1, 2000.0, part="trend", risk=101)  # not a score: left out
     r.bye()
     r._drain()
-    assert [p["kind"] for p in wire.payloads()] == ["hello", "beat", "trade", "trade", "bye"]
+    assert [p["kind"] for p in wire.payloads()] == ["hello", "beat", "trade", "trade", "trade", "bye"]
     for env in wire.bodies:
         raw = base64.b64decode(env["key"])
         Ed25519PublicKey.from_public_bytes(raw).verify(base64.b64decode(env["sig"]), env["payload"].encode())
         assert hashlib.sha256(raw).hexdigest()[:16] == r.id
         p = json.loads(env["payload"])
         assert set(p) <= CONTRACT[p["kind"]], p
-        assert p["v"] == 1 and p["ver"] == "0.5.0" and p["mode"] == "simulation" and p["public"] is True
+        assert p["v"] == 1 and p["ver"] == "0.6.0" and p["mode"] == "simulation" and p["public"] is True
         assert env["payload"] == json.dumps(p, separators=(",", ":")) and len(json.dumps(env)) <= report.MAX_BODY
         assert "1234" not in env["payload"] and "500" not in env["payload"]  # no balance, no dollar cap
     hello, beat, trade = wire.payloads()[:3]
     st = hello["settings"]
     assert set(st) <= SETTINGS and st["cap"] is True and st["ceiling"] is False
+    assert st["risk_allowed"] == 60 and st["coins"] == ["BTC", "ETH", "HYPE", "LIT"]
+    tp, close = wire.payloads()[3:5]
+    assert (tp["part"], tp["risk"]) == ("scalp", 12) and close["part"] == "trend" and "risk" not in close
     assert hello["handle"] == "https://github.com/Octo"
     assert beat["equity"] == 1.0 and beat["state"] == "following"
     assert beat["x"] == {"BTC": round(-0.003 * 60000 / 1234.5, 4)}
@@ -251,7 +255,7 @@ def test_a_sender_that_always_raises_changes_nothing_in_trading(fuze_home, signe
 
     rep = Reporter(config.validate({}), home=config.ensure_home(), send=boom)
     a = signal_run(rep, signer)
-    assert a.acct["positions"]["BTC"] == pytest.approx(-0.003) and a.acct["brackets"] == [7]
+    assert a.acct["positions"]["BTC"] == pytest.approx(-0.003) and a.acct["brackets"] == {"BTC": 7}
     time.sleep(0.2)
     assert rep.thread.is_alive()
 
@@ -302,15 +306,18 @@ def test_a_full_run_reports_hello_trades_a_beat_and_bye(fuze_home):
     assert names[0] == "hello" and names[-1] == "bye" and names.count("hello") == 1 and "beat" in names
     trades = [(a, kw) for a, kw in rec.of("trade")]
     assert [(a[0], a[1], a[2]) for a, _ in trades] == [("BTC", "sell", "open"), ("ETH", "sell", "open"),
-                                                       ("BTC", "buy", "close")]
+                                                       ("BTC", "buy", "reduce")]  # revision 2 ends the short-term trade
     (btc, kw), (eth, kw2), (close, kw3) = trades
     assert btc[3] == pytest.approx(0.18, rel=1e-3) and btc[4] == pytest.approx(60000 * (1 - 0.0001))  # the fill price
     assert kw["ref"] == 60000.0 and kw["rev"] == 1 and kw["late"] == 0.0 and kw["result"] is None
     assert eth[3] == pytest.approx(0.04, rel=1e-3) and kw2["ref"] == 2000.0
+    assert (kw2["part"], kw2["risk"]) == ("trend", 6)  # Ether has only its trend part
     # a close's fill price is not known: the result is worked out at the reference price, from the entry
-    assert kw3["rev"] == 2 and kw3["result"] == pytest.approx(-0.003 * (60000 - 59994) / 1000 * 100, rel=1e-3)
+    assert kw3["rev"] == 2 and kw3["result"] == pytest.approx(-0.002 * (60000 - 59994) / 1000 * 100, rel=1e-2)
+    assert (kw3["part"], kw3["risk"]) == ("scalp", 12)  # the part that explains it, and the score it had
+    assert kw.get("part") is None and kw.get("risk") is None  # opening both parts at once: no single part explains it
     balance, units, prices = kw3["snap"]
-    assert units == {"ETH": pytest.approx(-0.02)} and prices["ETH"] == 2000.0
+    assert units == {"BTC": pytest.approx(-0.001, rel=1e-3), "ETH": pytest.approx(-0.02)} and prices["ETH"] == 2000.0
     beat = rec.of("beat")[0][0]
     assert beat[3] == "no_signal"  # the first step comes from the tampered message, which is dropped
 
@@ -438,7 +445,7 @@ def test_share_prove_github_and_lighter(fuze_home, monkeypatch, wire, capsys):
 
 def test_init_asks_public_or_private_and_says_what_is_sent(fuze_home, monkeypatch, capsys):
     from test_cli import answers
-    answers(monkeypatch, "", "", "", "", "", "", "yes", "github.com/octo", "")
+    answers(monkeypatch, "", "", "", "", "", "", "", "", "yes", "github.com/octo", "")
     assert cli.main(["init"]) == 0
     c = config.load()
     assert c["public"] is True and c["handle"] == "https://github.com/octo"
@@ -452,7 +459,7 @@ def test_status_and_mcp_say_public_or_private(fuze_home, capsys):
     from fuze.mcp_server import build
     config.save(dict(config.DEFAULTS))
     config.write_json(fuze_home / "status.json", {"t": 0, "mode": "simulation", "reason": "r",
-                                                  "account": {"balance": 1000.0, "positions": {}, "brackets": []}})
+                                                  "account": {"balance": 1000.0, "positions": {}, "brackets": {}}})
     assert cli.main(["status"]) == 0
     assert "reports its trades and results" in capsys.readouterr().out
     app = build()

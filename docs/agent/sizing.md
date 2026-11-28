@@ -15,7 +15,9 @@ Bitcoin worth 1.8 times our balance (negative is short). You choose how much of 
 | **A share of your balance** (default) | `--percent 10` (1 to 100, default 10) | x times 10% of your balance. Grows and shrinks with your balance | $180 of Bitcoin; $360 once your balance is $2,000 |
 | **A fixed amount** | `--size-mode fixed --fixed-usd 500` (10 to 1,000,000) | x times $500, whatever your balance: the size your position has when ours equals our whole balance | $900 of Bitcoin, also at $2,000 |
 
-Then your caps apply (see [Limits and safety switches](limits.md)): a cap per position, and an exposure cap of at most
+The x that is sized is the sum of the parts you follow: a part whose risk score is above your risk allowed, or a coin
+not among your coins, counts as 0 (see [Limits: Risk allowed](limits.md#risk-allowed)). The examples below follow every
+part. Then your caps apply (see [Limits and safety switches](limits.md)): a cap per position, and an exposure cap of at most
 `max_x` times your real balance across coins, in both choices.
 
 ## Worked examples on a $1,000 balance

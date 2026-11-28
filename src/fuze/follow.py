@@ -1,6 +1,12 @@
 """The follow decision: a pure function from (signal, account, limits, flags, memory) to target positions.
 
-No I/O here. `memory` is a small dict the agent keeps between calls; decide() returns the updated copy.
+No I/O here. `memory` is a small dict the agent keeps between calls; decide() returns the updated copy. Per coin it
+remembers the take profit and stop loss the agent placed (`prots`) and the short-term trade that already closed at one
+of them (`done`), so that trade is never opened again.
+
+Which parts of the signal are followed (followed()): per coin, the trend part when its risk score is at or under the
+user's `risk_allowed`, plus the coin's short-term trade (scalp) on the same rule; a coin not in the user's `coins`, or
+one the exchange lists no market for, is wanted at 0. Then every limit applies as before (sizing.fit).
 """
 
 from __future__ import annotations
@@ -9,7 +15,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from fuze.config import LIMITS
-from fuze.protocol import COINS
+from fuze.protocol import COINS, NAMES, scalp_of
 from fuze.sizing import base_usd, counted, fit
 
 MIN_DIFF_USD = 10.0  # ignore changes smaller than this ...
@@ -29,16 +35,68 @@ GUARD_FRAC = 0.20  # how far from the price the stop is set
 GUARD_STEP = 0.05  # it is set again once the price is this far from where it was set
 GUARD_AGE_S = 14 * 86400.0  # ... or once it is this old: placed for 28 days (the SDK's default; Lighter allows 5 min
 #                             to 30 days)
+PART_MOVED = 0.02  # for the trade report: a part counts as changed when its x moved by more than this share of it
 
 
 @dataclass
 class Decision:
-    act: bool  # True: bring positions to `targets` and replace brackets with `bracket`
+    act: bool  # True: bring positions to `targets` and the take profit / stop loss pairs to `brackets`
     targets: dict  # coin -> units (negative = short); empty when holding
-    bracket: dict | None  # {"coin", "units", "tp", "sl", "id"} for the scalp part
+    brackets: dict  # coin -> {"coin", "units", "tp", "sl", "id", "score"} for that coin's short-term part
     px: dict  # coin -> the signal price to trade at (missing = use the exchange's own price)
     reason: str
     memory: dict
+    parts: dict = None  # coin -> (part, score) when one part of the signal explains this change, for the trade report
+
+
+def migrate(memory) -> dict:
+    """The memory of agent 0.5.0 in this version's form. It kept one protected short-term part, `prot`, the trade it
+    decided, `scalp`, and the id of one that closed at its take profit or stop loss, `scalp_done` (version 1 of the
+    signal has one short-term trade, always on Bitcoin). Each becomes the entry of its coin, so a take profit and stop
+    loss resting on the exchange at the update is still known, and a closed trade is still not opened again."""
+    m = dict(memory or {})
+    if "prot" in m:
+        p = m.pop("prot")
+        if isinstance(p, dict) and p.get("coin") in COINS:
+            m["prots"] = {**(m.get("prots") or {}), p["coin"]: p}
+    m.pop("scalp", None)  # what was decided; `prots` holds what was placed and confirmed
+    if "scalp_done" in m:
+        d = m.pop("scalp_done")
+        if isinstance(d, int) and not isinstance(d, bool):
+            m["done"] = {**(m.get("done") or {}), "BTC": d}
+    return m
+
+
+def followed(signal, cfg, absent=(), held=None) -> tuple:
+    """The parts of a live signal this agent follows: ({coin: trend x, 0 when skipped}, {coin: scalp}, notes).
+
+    Per coin, as docs/PROTOCOL.md says: not in the user's `coins` (or no market for it on this exchange): 0, and the
+    coin's scalp is ignored; otherwise its trend part when the part's score is at or under `risk_allowed`, plus its
+    scalp on the same rule. A part is followed whole or skipped whole. The notes say each skip in plain words."""
+    trend, scalps, notes, held = {}, {}, [], held or {}
+    ra, mine = cfg["risk_allowed"], cfg["coins"]
+    for c, t in signal["targets"].items():
+        name, sc, tr = NAMES[c], scalp_of(signal, c), t["trend"]
+        trend[c] = 0.0
+        if c not in mine:
+            if t["x"] or held.get(c):
+                notes.append(f"{name} is not among your coins: " + ("what you hold of it is closed."
+                                                                     if held.get(c) else "not followed."))
+            continue
+        if c in absent:
+            if t["x"]:
+                notes.append(f"The exchange lists no {c} market here: {name} is not traded.")
+            continue
+        if tr["score"] <= ra:
+            trend[c] = tr["x"]
+        elif tr["x"]:
+            notes.append(f"The {name} trend part scores {tr['score']}, above your risk allowed of {ra}: not followed.")
+        if sc and sc["score"] <= ra:
+            scalps[c] = sc
+        elif sc:
+            notes.append(f"The {name} short-term trade scores {sc['score']}, above your risk allowed of {ra}: "
+                         "not followed.")
+    return trend, scalps, notes
 
 
 def min_change(bal: float) -> float:
@@ -47,11 +105,13 @@ def min_change(bal: float) -> float:
 
 
 def asked_usd(signal, cfg, bal: float) -> dict:
-    """Coin -> the position value in dollars the signal asks for at these limits, caps included (scalp part as sent)."""
-    if not signal or signal.get("state") != "live":
+    """Coin -> the position value in dollars the signal asks for at these limits, caps included: the parts at or under
+    the risk allowed, on the user's coins (a scalp part as sent)."""
+    if not signal or signal.get("state") != "live" or signal.get("v") != 2:  # a status.json older than version 2
         return {}
     base = base_usd(cfg, bal)
-    usd = {c: t["x"] * base for c, t in signal["targets"].items()}
+    trend, scalps, _ = followed(signal, cfg)
+    usd = {c: (x + (scalps[c]["x"] if c in scalps else 0.0)) * base for c, x in trend.items()}
     k, _ = fit(usd, cfg, bal)
     return {c: v * k[c] for c, v in usd.items()}
 
@@ -143,23 +203,38 @@ def guard_plan(held: float, covered: float, px: float, resting, now: float, foll
     return "place", {"units": rest, "stop": px * (1 - GUARD_FRAC if rest > 0 else 1 + GUARD_FRAC), "ref": px}
 
 
+def _explain(before, after) -> tuple | None:
+    """(part, score) when one part of a coin changed and the other did not; None when both or neither did (a resize
+    to new limits, a re-check, a resync). before/after: {"trend": [x, score], "scalp": [x, score]}."""
+    moved = {k: abs(after[k][0] - before[k][0]) > PART_MOVED * max(abs(after[k][0]), abs(before[k][0])) + 1e-9
+             for k in ("trend", "scalp")}
+    if moved["trend"] == moved["scalp"]:
+        return None
+    part = "trend" if moved["trend"] else "scalp"
+    return part, after[part][1] if after[part][0] else before[part][1]
+
+
 def decide(signal, received_at, now, account, cfg, flags, memory) -> Decision:
-    m = dict(memory)
+    m = migrate(memory)
     real, held = account["balance"], account["positions"]
+    shown = account.get("brackets") or {}  # coin -> the id of the pair the exchange shows resting
     bal = counted(cfg, real)  # what sizes are worked out on: never more than the user's balance ceiling
     today = utc_day(now)
     if m.get("day") != today:
         m["day"], m["day_start"] = today, real
     m.setdefault("live_at", now)
-    if m.get("scalp") and m["scalp"]["id"] not in account["brackets"]:
-        m["scalp_done"], m["scalp"] = m["scalp"]["id"], None  # its stop loss or take profit fired
+    prots, done = dict(m.get("prots") or {}), dict(m.get("done") or {})
+    for c, p in prots.items():
+        if shown.get(c) != p["id"]:  # its stop loss or take profit fired (or it was cancelled on the exchange)
+            done[c] = p["id"]  # the entry stays in `prots` until the order step cancels whatever is left of the pair
+    m["prots"], m["done"] = prots, done
 
     def close(reason):
-        m.update(rev=None, set={c: 0.0 for c in COINS}, scalp=None, wanted={c: 0.0 for c in COINS})
-        return Decision(True, {c: 0.0 for c in COINS}, None, {}, reason, m)
+        m.update(rev=None, set={c: 0.0 for c in COINS}, wanted={c: 0.0 for c in COINS}, parts={})
+        return Decision(True, {c: 0.0 for c in COINS}, {}, {}, reason, m, {})
 
     def hold(reason):
-        return Decision(False, {}, None, {}, reason, m)
+        return Decision(False, {}, {}, {}, reason, m, {})
 
     if flags.get("flatten"):
         return close("FLATTEN is on: everything is closed and stays closed until you run `fuze unflatten`.")
@@ -204,17 +279,19 @@ def decide(signal, received_at, now, account, cfg, flags, memory) -> Decision:
         notes.append("Your limits changed: resized to them.")
     elif same and drift:
         notes.append("Resync: the held position no longer matched what we last set.")
-    usd = {c: t["x"] * base for c, t in signal["targets"].items()}  # position value in dollars, before caps
-    sc, scalp_usd = signal["scalp"], 0.0
-    if sc:
-        held_scalp = same and (m.get("scalp") or {}).get("id") == sc["id"]  # open and protected: keep it
-        problem = "it already closed at its stop loss or take profit" if sc["id"] == m.get("scalp_done") \
-            else "" if held_scalp else scalp_problem(sc, px[sc["coin"]])
+    trend, scalps, skipped = followed(signal, cfg, account.get("absent") or (), held)
+    notes += skipped
+    usd = {c: (x + (scalps[c]["x"] if c in scalps else 0.0)) * base for c, x in trend.items()}  # before caps
+    scalp_usd = {}
+    for c, sc in scalps.items():
+        kept = same and (prots.get(c) or {}).get("id") == sc["id"]  # open and protected: keep it
+        problem = "it already closed at its stop loss or take profit" if sc["id"] == done.get(c) \
+            else "" if kept else scalp_problem(sc, px[c])
         if problem:
-            usd[sc["coin"]] -= sc["x"] * base
-            notes.append(f"The scalp part is not opened: {problem}.")
+            usd[c] -= sc["x"] * base
+            notes.append(f"The {NAMES[c]} short-term trade is not opened: {problem}.")
         else:
-            scalp_usd = sc["x"] * base
+            scalp_usd[c] = sc["x"] * base
     k, cut = fit(usd, cfg, bal)  # the caps: one factor per coin, the scalp part shrinks with its coin
     notes += cut
 
@@ -230,13 +307,23 @@ def decide(signal, received_at, now, account, cfg, flags, memory) -> Decision:
         if all(abs(targets[c] - held.get(c, 0.0)) < 1e-12 for c in COINS):
             return hold(f"Following revision {rev}; nothing to change.")
         notes.insert(0, "Re-check: the held position was further from what the signal asks for than the dead band.")
-    bracket = None
-    if scalp_usd and targets[sc["coin"]] * scalp_usd > 0:
-        units = scalp_usd * k[sc["coin"]] / px[sc["coin"]]
-        units = min(abs(units), abs(targets[sc["coin"]])) * (1 if units > 0 else -1)
-        bracket = {"coin": sc["coin"], "units": units, "tp": sc["tp"], "sl": sc["sl"], "id": sc["id"]}
-    m.update(rev=rev, set=targets, limits=limits,
-             scalp={"id": sc["id"], "coin": sc["coin"]} if bracket else None)
+    brackets = {}
+    for c, su in scalp_usd.items():
+        if targets[c] * su > 0:
+            units = su * k[c] / px[c]
+            units = min(abs(units), abs(targets[c])) * (1 if units > 0 else -1)
+            sc = scalps[c]
+            brackets[c] = {"coin": c, "units": units, "tp": sc["tp"], "sl": sc["sl"], "id": sc["id"],
+                           "score": sc["score"]}
+    parts, explained = {}, {}
+    for c in COINS:
+        t = signal["targets"].get(c)
+        parts[c] = {"trend": [trend.get(c, 0.0), t["trend"]["score"] if t else 0],
+                    "scalp": [scalps[c]["x"] if c in brackets else 0.0, scalps[c]["score"] if c in scalps else 0]}
+        why = _explain((m.get("parts") or {}).get(c) or {"trend": [0.0, 0], "scalp": [0.0, 0]}, parts[c])
+        if why:
+            explained[c] = why
+    m.update(rev=rev, set=targets, limits=limits, parts=parts)
 
     def words(v):
         return "none" if abs(v) < 0.005 else f"{'short' if v < 0 else 'long'} ${abs(v):,.0f}"
@@ -250,4 +337,4 @@ def decide(signal, received_at, now, account, cfg, flags, memory) -> Decision:
     if small:
         notes.append(f"The change on {' and '.join(small)} is under ${tol:,.0f}, the smallest change the agent makes "
                      "(the larger of $10 and 2% of your balance), so it is not traded.")
-    return Decision(True, targets, bracket, px, " ".join([head] + notes), m)
+    return Decision(True, targets, brackets, px, " ".join([head] + notes), m, explained)

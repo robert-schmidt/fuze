@@ -59,7 +59,7 @@ move, which is why the account itself should hold no more.
 Lighter has sub-accounts, each with its own index, balances and API keys. The app's **Sub-accounts** page
 (`/sub-accounts`) has "New Sub-Account" and "Transfer"; underneath, a sub-account is created with a `CreateSubAccount`
 transaction signed for your account, and funds move between your accounts with transfers. Follow FUZE only on a sub-account of its own, and put in it only money you can afford to lose
-completely. FUZE treats every reduce-only trigger order on BTC and ETH in that account as its own take profit or stop
+completely. FUZE treats every reduce-only trigger order on BTC, ETH, HYPE and LIT in that account as its own take profit or stop
 loss and may cancel it, and `fuze mode` refuses an account that already holds positions or orders.
 
 A standard account can create up to 4 sub-accounts, and Lighter's fee page says "Sub accounts cannot be deleted."
@@ -89,7 +89,7 @@ What Lighter's docs say (https://docs.lighter.xyz/developers/integration-guides/
 - **You can restrict a key to a list of markets.** Such a key can only create, modify and cancel orders in those
   markets; every other transaction fails, including withdrawals and transfers. Restrictions are set with your wallet's
   signature (https://docs.lighter.xyz/api/api-keys/set-api-key-restrictions.md). **We recommend a key restricted to the
-  BTC and ETH markets for FUZE.**
+  markets of the coins you follow for FUZE** (on mainnet: BTC 1, ETH 0, HYPE 24, LIT 120).
 - You can give a key an expiry (`valid_until`, at most 180 days ahead). After it, the key cannot sign. Expiry does not
   cancel the key's open orders.
 - You can restrict a key to up to 16 IP addresses, for example the fixed address of a server that runs FUZE.
@@ -117,7 +117,7 @@ installs). Its example `examples/system_setup.py`, in Lighter's `lighter-python`
 
 That example signs step 3 with your wallet's private key inside a script. If you use it, run it yourself on a machine you
 trust, outside any AI tool, never paste the wallet key into a chat, and delete it from the script afterwards. Use a
-sub-account index for FUZE, then restrict the key to the BTC and ETH markets.
+sub-account index for FUZE, then restrict the key to the markets of the coins you follow (BTC, ETH, HYPE, LIT).
 
 What this means: a leaked FUZE key cannot (per Lighter's docs) send your money to someone else's address, but an
 unrestricted one can trade it away. Restrict it to markets, keep only what you can lose on that sub-account, and never
@@ -168,7 +168,7 @@ with this version of FUZE (`fuze mode` tells you; `fuze mode mainnet` also asks 
 orders). Then:
 
 ```sh
-fuze keys mainnet      # a separate mainnet API key, restricted to BTC and ETH, on a sub-account of its own
+fuze keys mainnet      # a separate mainnet API key, restricted to the coins you follow, on a sub-account of its own
 fuze check
 fuze mode mainnet      # agent stopped, nothing open in the current mode; type RAISE, then REAL MONEY
 fuze run

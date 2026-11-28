@@ -23,11 +23,11 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
 PINNED = {"k1": "4YwkvSXI90nvycvuDte8h9N1ULf00v+PM95Yj3+8iNU="}  # from the protocol page, never from the server
 
-env = json.load(urllib.request.urlopen("https://fuze.trade/v1/signal"))
+env = json.load(urllib.request.urlopen("https://fuze.trade/v2/signal"))
 key = Ed25519PublicKey.from_public_bytes(base64.b64decode(PINNED[env["kid"]]))
 key.verify(base64.b64decode(env["sig"]), env["payload"].encode())  # raises InvalidSignature if forged
 msg = json.loads(env["payload"])                                    # parse only after verifying
-assert msg["v"] == 1 and time.time() < msg["expires"]
+assert msg["v"] == 2 and time.time() < msg["expires"]
 print(msg["state"], msg["rev"], msg["why"])
 ```
 
@@ -38,12 +38,14 @@ If the signature is wrong, `verify` raises `InvalidSignature` and nothing after 
 
 1. The `kid` is one you pinned, and the signature verifies over the payload **text**. Never re-format the JSON before
    verifying: the signature covers the exact bytes.
-2. `v` is 1.
+2. `v` is 2. A version 1 message (from `/v1/signal`) is refused by agent 0.6.0.
 3. `ts` is newer than the newest message you accepted before. Keep that timestamp on disk, so a restart cannot be fed an
    old message. (The agent keeps it in its `guard.json` file.)
 4. Now is before `expires`, and `ts` is not more than 30 seconds in the future.
 
-Then check every field's type and range. Anything that fails is dropped without acting.
+Then check every field's type and range, and the rules of [the protocol](../PROTOCOL.md#rules): only the four coins,
+at most one short-term trade per coin, each coin's trend part equal to its x less its short-term trade, scores whole
+numbers from 0 to 100. Anything that fails is dropped without acting.
 
 ## What a signature does and does not prove
 

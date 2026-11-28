@@ -140,17 +140,33 @@ def test_init_force_refuses_while_in_a_live_mode(fuze_home):
 
 
 def test_init_asks_on_a_terminal(fuze_home, monkeypatch, capsys):
-    answers(monkeypatch, "", "fixed", "250", "none", "", "5", "", "")  # the mode first (Enter keeps simulation), then
-    #                                                                   the sizing, private (Enter), save (Enter)
+    answers(monkeypatch, "", "fixed", "250", "none", "", "5", "", "", "", "")  # the mode first (Enter keeps
+    #               simulation), then the sizing, risk allowed and coins (Enter keeps both), private, save (Enter)
     assert cli.main(["init"]) == 0
     cfg = config.load()
     assert (cfg["size_mode"], cfg["fixed_usd"], cfg["max_position_usd"], cfg["max_x"], cfg["daily_loss_frac"]) \
         == ("fixed", 250.0, None, 3.0, 0.05)
-    assert "$450 of Bitcoin" in capsys.readouterr().out
+    assert cfg["risk_allowed"] == 60 and cfg["coins"] == ["BTC", "ETH", "HYPE", "LIT"]
+    out = capsys.readouterr().out
+    assert "$450 of Bitcoin" in out and "Risk allowed: 60." in out and "Coins: BTC, ETH, HYPE, LIT." in out
+
+
+def test_init_asks_risk_allowed_and_coins_in_one_plain_sentence_each(fuze_home, monkeypatch, capsys):
+    asked = []
+    answers(monkeypatch, "", "", "", "", "", "", "101", "20", "doge", "eth btc", "", "")
+    monkeypatch.setattr("builtins.input", lambda q="", _f=__import__("builtins").input: (asked.append(q), _f(q))[1])
+    assert cli.main(["init"]) == 0
+    cfg = config.load()
+    assert cfg["risk_allowed"] == 20 and cfg["coins"] == ["BTC", "ETH"]  # stored in the fixed order
+    assert ("How much risk may a part of a position carry? 0 to 100, standard 60. A part scores how much of the balance "
+            "it can lose on a bad day, in tenths of a percent: 20 means 2%. [60]: ") in asked
+    assert "Which coins? BTC, ETH, HYPE, LIT, standard all four [BTC,ETH,HYPE,LIT]: " in asked
+    out = capsys.readouterr().out
+    assert "whole number from 0 to 100" in out and "coins must be among" in out
 
 
 def test_init_asks_again_after_a_bad_answer_and_can_be_declined(fuze_home, monkeypatch, capsys):
-    answers(monkeypatch, "", "", "500", "abc", "20", "", "", "", "", "n")
+    answers(monkeypatch, "", "", "500", "abc", "20", "", "", "", "", "", "", "n")
     assert cli.main(["init"]) == 1 and not (fuze_home / "config.json").exists()
     out = capsys.readouterr().out
     assert "between 1 and 100" in out and "not a number" in out and "Not saved" in out
@@ -164,7 +180,7 @@ def test_init_yes_on_a_terminal_asks_nothing(fuze_home, monkeypatch):
 # --- adjusting: every change that can raise risk needs RAISE typed at a terminal ----------------------------------
 
 START = ["--percent", "10", "--fixed-usd", "50", "--max-position-usd", "500", "--max-x", "3", "--daily-loss", "10",
-         "--stale-flat-min", "30"]
+         "--stale-flat-min", "30", "--risk-allowed", "40", "--coins", "btc eth"]
 
 
 @pytest.mark.parametrize("flags", [
@@ -175,6 +191,8 @@ START = ["--percent", "10", "--fixed-usd", "50", "--max-position-usd", "500", "-
     ["--max-x", "4"],
     ["--daily-loss", "20"],
     ["--stale-flat-min", "off"],
+    ["--risk-allowed", "70"],
+    ["--coins", "BTC,ETH,HYPE,LIT"],
 ])
 def test_every_raise_needs_confirmation(fuze_home, monkeypatch, capsys, flags):
     cli.main(["init"])
@@ -202,10 +220,12 @@ def test_lowering_needs_no_confirmation(fuze_home, monkeypatch):
     cli.main(["init"])
     monkeypatch.setattr("sys.stdin", io.StringIO(""))
     for flags in (["--percent", "5"], ["--fixed-usd", "20"], ["--max-position-usd", "300"], ["--max-x", "1"],
-                  ["--daily-loss", "3"], ["--size-mode", "fixed"], ["--max-position-usd", "200"]):
+                  ["--daily-loss", "3"], ["--size-mode", "fixed"], ["--max-position-usd", "200"],
+                  ["--risk-allowed", "25"], ["--coins", "BTC,LIT"], ["--coins", "LIT"]):
         assert cli.main(["limits"] + flags) == 0, flags
     cfg = config.load()
     assert (cfg["size_mode"], cfg["fixed_usd"], cfg["max_position_usd"]) == ("fixed", 20.0, 200.0)
+    assert (cfg["risk_allowed"], cfg["coins"]) == (25, ["LIT"])
 
 
 def test_limits_shows_the_sizing(fuze_home, capsys):
@@ -227,15 +247,17 @@ def test_ctrl_d_at_a_question_saves_nothing(fuze_home, monkeypatch):
 
 # --- status in plain words, the small-size warning, the MCP settings helper -----------------------------------------
 
-SIGNAL = {"rev": 5, "state": "live", "source": "paper", "why": "We hold short.", "scalp": None, "seq": 1, "ts": 1.0,
-          "expires": 61.0, "targets": {"BTC": {"x": -1.7, "px": 58000.0}, "ETH": {"x": -0.33, "px": 1600.0}}}
+SIGNAL = {"v": 2, "rev": 5, "state": "live", "source": "paper", "why": "We hold short.", "scalps": [], "seq": 1,
+          "ts": 1.0, "expires": 61.0,
+          "targets": {"BTC": {"x": -1.7, "px": 58000.0, "trend": {"x": -1.7, "score": 31}},
+                      "ETH": {"x": -0.33, "px": 1600.0, "trend": {"x": -0.33, "score": 8}}}}
 
 
 def test_status_is_plain_words_not_python_dicts(fuze_home, capsys):
     cli.main(["init", "--size-mode", "fixed", "--fixed-usd", "10"])
     config.write_json(fuze_home / "status.json", {
         "t": 0, "mode": "simulation", "reason": "Following revision 5; nothing to change.",
-        "account": {"balance": 1000.0, "positions": {}, "brackets": []}, "flags": {"pause": False, "flatten": True},
+        "account": {"balance": 1000.0, "positions": {}, "brackets": {}}, "flags": {"pause": False, "flatten": True},
         "signal": SIGNAL, "min_change_usd": 20.0, "wanted": {"BTC": -17 / 58000, "ETH": -3.3 / 1600}})
     capsys.readouterr()
     assert cli.main(["status"]) == 0
@@ -249,7 +271,7 @@ def test_status_is_plain_words_not_python_dicts(fuze_home, capsys):
 def test_limits_warns_when_the_amount_can_never_open_anything(fuze_home, capsys):
     cli.main(["init"])
     config.write_json(fuze_home / "status.json", {"t": 0, "signal": SIGNAL,
-                                                  "account": {"balance": 1000.0, "positions": {}, "brackets": []}})
+                                                  "account": {"balance": 1000.0, "positions": {}, "brackets": {}}})
     capsys.readouterr()
     assert cli.main(["limits", "--percent", "8"]) == 0  # $136 of Bitcoin: fine
     assert "Warning" not in capsys.readouterr().out

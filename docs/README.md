@@ -1,6 +1,6 @@
 # FUZE
 
-FUZE publishes, signed, the position that one trading account holds on Bitcoin and Ether futures, and gives you an
+FUZE publishes, signed, the position that one trading account holds on Bitcoin, Ether, HYPE and LIT futures, and gives you an
 open-source agent that can follow that position on your own account, at the size and inside the limits you choose.
 This page says what FUZE is, who it is for, what can go wrong, and how the rest of these docs are laid out.
 
@@ -17,7 +17,7 @@ is doing; it does not make the trades win, and anything that raises your risk is
 
 | Part | What it is | Where |
 |---|---|---|
-| The account | One account that trades Bitcoin and Ether perpetual futures: short-term trades on top of a slow trend position. Today it trades practice money at a real exchange's prices | [Part 1](account/README.md) |
+| The account | One account that trades Bitcoin, Ether, HYPE and LIT perpetual futures: short-term trades on top of a slow trend position. Today it trades practice money at a real exchange's prices | [Part 1](account/README.md) |
 | The signal | What that account holds, published every few seconds with a digital signature, free and public | [The signal](signal/README.md) |
 | The agent | A small program on your computer that checks the signature and copies the position on your own account. An MCP server lets your AI coding tool watch it and make it safer, never riskier | [Part 2](agent/README.md) |
 

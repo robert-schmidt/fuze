@@ -37,6 +37,9 @@ def test_describe_in_plain_words():
     ({"size_mode": "fixed"}, []),  # $100 fixed = 10% of $1,000: not larger
     ({"size_mode": "fixed", "fixed_usd": 50}, []),
     ({"size_mode": "fixed", "fixed_usd": 500}, ["size_mode"]),
+    ({"risk_allowed": 61}, ["risk_allowed"]),  # parts with higher scores would be followed
+    ({"risk_allowed": 20}, []),
+    ({"coins": ["BTC", "ETH"]}, []),  # fewer coins
 ])
 def test_what_raises_risk(change, up):
     assert raised(BASE, cfg(**change), 1000.0) == up
@@ -59,3 +62,26 @@ def test_switching_mode_is_judged_at_the_current_balance():
     fixed = cfg(size_mode="fixed", fixed_usd=500)
     assert raised(fixed, cfg(fixed_usd=500), 1000.0) == []  # 10% of $1,000 = $100 < $500
     assert raised(fixed, cfg(fixed_usd=500), 10000.0) == ["size_mode"]  # 10% of $10,000 = $1,000 > $500
+
+
+def test_adding_a_coin_raises_risk_and_removing_one_does_not():
+    two = cfg(coins=["ETH", "BTC"])
+    assert two["coins"] == ["BTC", "ETH"]
+    assert raised(two, cfg(coins=["BTC", "ETH", "LIT"]), 1000.0) == ["coins"]
+    assert raised(two, cfg(coins=["LIT"]), 1000.0) == ["coins"]  # a swap adds one
+    assert raised(two, cfg(coins=["BTC"], risk_allowed=10), 1000.0) == []
+
+
+def test_describe_says_the_risk_allowed_and_the_coins():
+    text = " ".join(describe(cfg(risk_allowed=20, coins=["BTC", "HYPE"]), 1000))
+    assert "Risk allowed: 20." in text and "20 or less" in text and "2% of the balance on a bad day" in text
+    assert "nothing about how likely the part is to win" in text and "Coins: BTC, HYPE." in text
+
+
+def test_lighters_highest_leverage_caps_a_coin():
+    from fuze.sizing import fit
+    f, notes = fit({"LIT": 8000.0, "HYPE": 1000.0, "BTC": 1000.0}, cfg(max_x=25), 1000.0)
+    assert f["LIT"] == pytest.approx(5000 / 8000) and f["HYPE"] == 1.0 and f["BTC"] == 1.0
+    assert notes == ["Cut LIT to 5 times your balance, the highest leverage Lighter allows on it."]
+    f, _ = fit({"HYPE": 30000.0}, cfg(max_x=25, max_balance_usd=1000.0), 5000.0)  # on the counted balance
+    assert f["HYPE"] == pytest.approx(20000 / 30000)

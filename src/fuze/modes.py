@@ -179,8 +179,9 @@ def rehearse(ex, sleep=time.sleep, say=print, coin: str = "BTC") -> dict:
             return rec
         tx = ex.protect(coin, half, px * 1.03, px * 0.97, 0)
         a = read()
-        ok = 0 in a["brackets"] and coin in a["guards"]
-        if not step("protect", ok, tx, "take profit and stop loss " + ("shown" if 0 in a["brackets"] else "NOT shown")
+        paired = a["brackets"].get(coin) == 0  # the pair is told apart per coin, by the id it was placed with
+        ok = paired and coin in a["guards"]
+        if not step("protect", ok, tx, "take profit and stop loss " + ("shown" if paired else "NOT shown")
                     + " on the account" + ("" if coin in a["guards"] else "; the emergency stop is gone")):
             return rec
         ex.cancel(coin)

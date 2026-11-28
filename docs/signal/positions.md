@@ -30,9 +30,16 @@ amounts are never needed.
 
 ## The short-term part travels with its bracket
 
-The short-term trade is published separately (its own x, take profit and stop loss), and it is always included in the
-coin's total. So a follower can place the same take profit and stop loss on its own exchange, sized to that part, and
-stay protected even if its agent or our signal goes down.
+Each coin can have one short-term trade, published separately (its own x, take profit, stop loss and risk score), and it
+is always included in the coin's total. So a follower can place the same take profit and stop loss on its own exchange,
+sized to that part, one pair per coin, and stay protected even if its agent or our signal goes down. The rest of the
+coin's position is the trend part, published with its own x and score.
+
+## Parts are followed whole
+
+Because each part carries its own score, a follower can take some parts and skip others: the agent follows a part whole
+when its score is at or under the user's risk allowed, and skips it whole otherwise. It never takes half a part. The
+score says how much a part can lose, not how likely it is to win.
 
 ## Why a follower must not hold a fixed dollar size
 

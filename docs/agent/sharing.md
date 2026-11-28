@@ -49,6 +49,8 @@ and the agent's public key with the signature.
 | `settings.percent` | The share, in percent. Only in percent mode; the fixed amount is dollars and is never sent |
 | `settings.max_x` | Your exposure cap, as a multiple of your balance |
 | `settings.daily_loss_frac` | Your daily loss stop (0.1 is 10%) |
+| `settings.risk_allowed` | Your risk allowed, 0 to 100 (see [Limits](limits.md#risk-allowed)) |
+| `settings.coins` | The coins you follow, for example `["BTC", "ETH", "HYPE", "LIT"]` |
 | `settings.ceiling` | Yes or no: whether a balance ceiling is set (never its amount) |
 | `settings.cap` | Yes or no: whether a cap per position is set (never its amount) |
 | `handle` | Your X or GitHub profile link. Only when public and set |
@@ -66,10 +68,11 @@ filled on the exchange.
 
 | Field | What it is |
 |---|---|
-| `coin` | `BTC` or `ETH` |
+| `coin` | `BTC`, `ETH`, `HYPE` or `LIT` |
 | `side` | `buy` or `sell` |
 | `why` | `open`, `add`, `reduce`, `close`, `tp` (take profit), `sl` (stop loss), `stop` (emergency stop) or `flatten`. When the agent cannot tell a take profit from a stop loss it says `close` |
-| `part` | `scalp` (the short-term part) or `trend`, when known |
+| `part` | `scalp` (the short-term part) or `trend`, when one part explains the trade |
+| `risk` | That part's risk score, 0 to 100, when one part explains the trade |
 | `x` | The trade's size as a multiple of your balance |
 | `px` | The fill price; where the agent cannot know it, the price the order was sent at |
 | `ref`, `rev` | The signal's price and revision the order followed |

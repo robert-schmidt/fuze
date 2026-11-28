@@ -18,7 +18,7 @@ This page covers following with real money on Lighter. Read it to the end before
   agent's positions.
 - A **balance ceiling**: `fuze go-live` asks how many dollars of the account the agent may count as your balance, and
   sizes on no more than that even if the account holds more. See [Limits](../limits.md#the-balance-ceiling).
-- A **separate** mainnet API key, restricted to the BTC and ETH markets, on that account. See
+- A **separate** mainnet API key, restricted to the markets of the coins you follow (BTC, ETH, HYPE, LIT), on that account. See
   [Lighter account and API key](../../lighter-setup.md).
 - Small sizes: for example 5% of the balance, a cap per position, an exposure cap of 2 and a daily loss stop of 5%.
 
@@ -45,7 +45,7 @@ fuze run
 
 - `fuze status` shows a REAL MONEY warning, the account's explorer link, what it holds and why.
 - The short-term part rests under its take profit and stop loss on Lighter, so it stays protected while the agent is
-  down. The rest of each position rests under its [emergency stop](../following.md#5-the-emergency-stop), about 20%
+  down. The rest of each position rests under its [emergency stop](../following.md#6-the-emergency-stop), about 20%
   from the price the agent last saw. The agent places it for 28 days (Lighter allows 5 minutes to 30 days) and again
   after 14, so an agent that is off for more than 28 days leaves the position without it.
 - A stop loss triggers on the mark price. On Lighter its order price is the worst price it may fill at once triggered,

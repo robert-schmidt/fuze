@@ -92,3 +92,20 @@ def test_current_balance(fuze_home):
     assert config.current_balance(cfg) == 1234.5
     (fuze_home / "status.json").write_text("not json")
     assert config.current_balance(cfg) == 1000.0
+
+
+def test_risk_allowed_and_coins_defaults_and_rules(fuze_home):
+    config.ensure_home()
+    (fuze_home / "config.json").write_text('{"mode": "simulation", "percent": 5.0}')  # a 0.5.0 config without them
+    cfg = config.load()
+    assert cfg["risk_allowed"] == 60 and cfg["coins"] == ["BTC", "ETH", "HYPE", "LIT"]
+    assert config.validate({"coins": ["LIT", "BTC", "LIT"]})["coins"] == ["BTC", "LIT"]  # fixed order, no repeats
+    assert config.validate({"risk_allowed": 20.0})["risk_allowed"] == 20
+    for bad, why in (({"risk_allowed": 101}, "0 to 100"), ({"risk_allowed": -1}, "0 to 100"),
+                     ({"risk_allowed": 2.5}, "whole number"), ({"risk_allowed": True}, "whole number"),
+                     ({"coins": []}, "at least one"), ({"coins": ["DOGE"]}, "among BTC"), ({"coins": "BTC"}, "list"),
+                     ({"coins": ["btc"]}, "among BTC")):
+        with pytest.raises(ValueError, match=why):
+            config.validate(bad)
+    from fuze.protocol import COINS
+    assert tuple(config.DEFAULTS["coins"]) == COINS and {"risk_allowed", "coins"} <= set(config.LIMITS)

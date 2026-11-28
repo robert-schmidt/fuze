@@ -53,14 +53,15 @@ SENT = [
     "Every report: the agent's id (from a key it made on this computer), the time, a counter, the kind of report, the "
     "FUZE version, the mode (simulation, testnet or mainnet), and whether you chose public.",
     "At start and when a setting changes: the sizing in words (a share of the balance or a fixed amount, the share in "
-    "percent), the exposure cap as a multiple of the balance, the daily loss stop in percent, and yes or no for a "
-    "balance ceiling and for a cap per position (never their amounts).",
+    "percent), the exposure cap as a multiple of the balance, the daily loss stop in percent, the risk allowed, the "
+    "coins followed, and yes or no for a balance ceiling and for a cap per position (never their amounts).",
     "Every 5 minutes: the result since the start as a multiple (1.02 is 2% up, with deposits and withdrawals left "
     "out), each position as a multiple of the balance, and what the agent is doing (following, paused, flat, stopped "
     "for the day, no signal).",
     "After each order that filled, and when a take profit, stop loss or emergency stop filled: the coin, buy or sell, "
     "why (open, add, reduce, close, take profit, stop loss, emergency stop, flatten), its size as a multiple of the "
-    "balance, the price, the signal's price and revision, the seconds between the signal and the order, and on a "
+    "balance, the price, the signal's price and revision, the seconds between the signal and the order, the part of "
+    "the signal it follows (trend or short-term) and that part's risk score when one part explains it, and on a "
     "closing trade its result in percent of the balance.",
     "When the agent stops: that it stopped.",
 ]
@@ -168,9 +169,9 @@ def settings_of(cfg) -> dict:
          "ceiling": cfg.get("max_balance_usd") is not None, "cap": cfg.get("max_position_usd") is not None}
     if cfg["size_mode"] == "percent":  # in fixed mode the share is not in use; the fixed amount is dollars: never sent
         s["percent"] = cfg["percent"]
-    for k in ("risk_allowed", "coins"):  # settings later versions add: sent only once the config has them
+    for k in ("risk_allowed", "coins"):  # in every config since 0.6.0 (config.validate adds the defaults)
         if k in cfg:
-            s[k] = cfg[k]
+            s[k] = list(cfg[k]) if k == "coins" else cfg[k]
     return s
 
 
@@ -283,15 +284,17 @@ class Reporter:
             log.debug("Report not queued: %s", type(e).__name__)
 
     def trade(self, coin: str, side: str, why: str, x, px, ref=None, rev=None, late=None, part=None, result=None,
-              snap=None) -> None:
-        """One trade. x: its value as a multiple of the balance; result: on a closing trade, percent of the balance."""
+              snap=None, risk=None) -> None:
+        """One trade. x: its value as a multiple of the balance; result: on a closing trade, percent of the balance;
+        part and risk: the part of the signal that explains the order and its risk score, when one part does."""
         try:
             if side not in ("buy", "sell") or why not in WHY or not (_num(x) and x > 0) or not (_num(px) and px > 0):
                 return
             t = {"coin": coin, "side": side, "why": why, "x": round(min(float(x), 50.0), 4), "px": float(px)}
             for k, v, ok in (("ref", ref, _num(ref) and ref > 0), ("rev", rev, isinstance(rev, int) and rev >= 0),
                              ("late", late, _num(late) and late >= 0), ("part", part, part in ("trend", "scalp")),
-                             ("result", result, _num(result))):
+                             ("result", result, _num(result)),
+                             ("risk", risk, isinstance(risk, int) and not isinstance(risk, bool) and 0 <= risk <= 100)):
                 if ok:
                     t[k] = round(max(-100.0, min(1000.0, v)), 4) if k == "result" else \
                         round(min(v, 86400.0), 3) if k == "late" else v
