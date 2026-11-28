@@ -354,6 +354,7 @@ holds a mainnet key.**
 
 ## More
 
+- [CHANGELOG.md](CHANGELOG.md): what changed in each version, and when mainnet asks for a new rehearsal
 - [SECURITY.md](SECURITY.md): threat model, safe installs, reporting a vulnerability
 - [docs/lighter-setup.md](docs/lighter-setup.md): a Lighter account and API key, testnet first
 - Development: `python3 -m venv .venv && .venv/bin/pip install -e '.[test]' && .venv/bin/python -m pytest -q`
