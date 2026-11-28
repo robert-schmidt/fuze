@@ -34,7 +34,7 @@ from urllib.parse import urlsplit
 from fuze import __version__, config, keys, modes
 from fuze.checks import setup_report
 from fuze.protocol import COINS, PINNED, clean, verify
-from fuze.sizing import LABELS, describe, fmt
+from fuze.sizing import LABELS, counted, describe, fmt
 from fuze.venue import EXPLORER, account_link
 
 HOST = "127.0.0.1"  # never anything else: this page is for the person at this computer
@@ -250,8 +250,8 @@ def snapshot(now: float | None = None, peeker: Peeker | None = None) -> dict:
     frac = cfg["daily_loss_frac"]
     daily = None
     if today_known:
-        allowed, lost = day_start * frac, max(0.0, day_start - bal)
-        daily = {"day_start": day_start, "floor": day_start * (1 - frac), "allowed": allowed, "lost": lost,
+        allowed, lost = counted(cfg, day_start) * frac, max(0.0, day_start - bal)
+        daily = {"day_start": day_start, "floor": day_start - allowed, "allowed": allowed, "lost": lost,
                  "used": min(1.0, lost / allowed) if allowed else None}
 
     # the short-term part: what the agent placed (memory "prot"), else what the signal has

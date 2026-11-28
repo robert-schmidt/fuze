@@ -34,6 +34,7 @@ from fuze import __version__
 from fuze.config import LIMITS, ensure_home, load, read_json, write_json
 from fuze.follow import GUARD_FRAC, decide, guard_plan, min_change
 from fuze.protocol import COINS, PINNED, Guard
+from fuze.sizing import counted
 from fuze.venue import open_venue, tx_link
 
 log = logging.getLogger("fuze")
@@ -255,7 +256,7 @@ class Agent:
             if not px:
                 continue
             covered = prot["units"] if prot and prot["coin"] == c and prot["id"] in acct["brackets"] else 0.0
-            what, g = guard_plan(held, covered, px, resting.get(c), now, following, min_change(acct["balance"]) / px)
+            what, g = guard_plan(held, covered, px, resting.get(c), now, following, min_change(counted(self.cfg, acct["balance"])) / px)
             if what == "place":
                 g["units"] = ex.round(c, g["units"])
                 if not ex.tradable(c, g["units"], px):  # under the exchange's smallest order: nothing can rest

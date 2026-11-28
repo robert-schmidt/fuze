@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 
 from fuze.config import LIMITS
 from fuze.protocol import COINS
-from fuze.sizing import base_usd, fit
+from fuze.sizing import base_usd, counted, fit
 
 MIN_DIFF_USD = 10.0  # ignore changes smaller than this ...
 MIN_DIFF_FRAC = 0.02  # ... or than 2% of the balance, unless the target is zero
@@ -145,10 +145,11 @@ def guard_plan(held: float, covered: float, px: float, resting, now: float, foll
 
 def decide(signal, received_at, now, account, cfg, flags, memory) -> Decision:
     m = dict(memory)
-    bal, held = account["balance"], account["positions"]
+    real, held = account["balance"], account["positions"]
+    bal = counted(cfg, real)  # what sizes are worked out on: never more than the user's balance ceiling
     today = utc_day(now)
     if m.get("day") != today:
-        m["day"], m["day_start"] = today, bal
+        m["day"], m["day_start"] = today, real
     m.setdefault("live_at", now)
     if m.get("scalp") and m["scalp"]["id"] not in account["brackets"]:
         m["scalp_done"], m["scalp"] = m["scalp"]["id"], None  # its stop loss or take profit fired
@@ -162,8 +163,8 @@ def decide(signal, received_at, now, account, cfg, flags, memory) -> Decision:
 
     if flags.get("flatten"):
         return close("FLATTEN is on: everything is closed and stays closed until you run `fuze unflatten`.")
-    floor = m["day_start"] * (1 - cfg["daily_loss_frac"])
-    if m.get("stopped_day") == today or bal <= 0 or bal <= floor:
+    floor = m["day_start"] - cfg["daily_loss_frac"] * counted(cfg, m["day_start"])  # the loss counts on the ceiling too
+    if m.get("stopped_day") == today or real <= 0 or real <= floor:
         m["stopped_day"] = today
         return close(f"Daily loss stop: the balance fell {cfg['daily_loss_frac']:.0%} or more since the start of "
                      "the UTC day. Everything is closed until the next UTC day.")

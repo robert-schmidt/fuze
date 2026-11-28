@@ -10,6 +10,11 @@ as a multiple of its balance, the price it was computed at, which part is the sh
 stop loss, and a sentence saying the same in plain words. Each message is signed with a private key that never leaves
 our trading side. Anyone can check the signature against the public key printed in these docs and built into the agent.
 
+The signal does not know who follows it. It carries no dollar amount, no number of coins and nothing about any
+follower: only multiples of our own balance, and prices. The same message serves an agent with $50 and one with
+$50,000, in simulation, on the test exchange or with real money. Each agent turns the multiple into its own size from
+its own balance and its own limits, and tells us nothing.
+
 ## Where to read it
 
 | Address | Returns |

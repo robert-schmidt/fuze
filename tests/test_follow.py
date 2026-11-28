@@ -5,7 +5,7 @@ from fuze.follow import GUARD_AGE_S, RECHECK_S, compare, decide, guard_plan
 from fuze.protocol import clean
 
 CFG = {"size_mode": "percent", "percent": 10.0, "fixed_usd": 100.0, "max_position_usd": None, "max_x": 3.0,
-       "daily_loss_frac": 0.1, "stale_flat_min": None}
+       "max_balance_usd": None, "daily_loss_frac": 0.1, "stale_flat_min": None}
 DAY = 86400.0 * 20000  # a UTC midnight
 
 
@@ -328,3 +328,17 @@ def test_emergency_stop_follows_the_price_only_while_a_live_signal_is_followed()
     # Lighter drops an order after 28 days: placed again after 14, at the same price when no signal is followed
     assert plan(60500.0, False, 50.0 + GUARD_AGE_S) == ("place", {"units": -0.001, "stop": 72000.0, "ref": 60000.0})
     assert plan(60500.0, True, 50.0 + GUARD_AGE_S) == ("place", {"units": -0.001, "stop": 72600.0, "ref": 60500.0})
+
+
+def test_a_balance_ceiling_sizes_and_stops_as_if_the_account_held_no_more():
+    """The wallet holds $50,000, the user said $1,000: same positions as a $1,000 account, and the daily loss stop
+    fires after 10% of $1,000, not of $50,000. Below the ceiling the real balance counts."""
+    top = {"max_balance_usd": 1000.0}
+    small, d = run(sig()), run(sig(), bal=50_000.0, cfg=top)
+    assert d.targets == small.targets and d.bracket == small.bracket and d.memory["min_change"] == 20.0
+    hold = run(sig(seq=2), bal=49_950.0, pos=dict(d.targets), cfg=top, memory=d.memory)
+    assert not hold.act  # $50 down: inside the stop
+    out = run(sig(seq=2), bal=49_900.0, pos=dict(d.targets), cfg=top, memory=d.memory)
+    assert out.act and out.targets == {"BTC": 0.0, "ETH": 0.0} and "Daily loss" in out.reason
+    assert run(sig(), bal=600.0, cfg=top).targets["BTC"] == pytest.approx(-1.8 * 0.1 * 600 / 60000)
+    assert run(sig(), bal=50_000.0, cfg={**top, "max_x": 0.5}).targets == run(sig(), cfg={"max_x": 0.5}).targets

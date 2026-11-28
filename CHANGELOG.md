@@ -11,6 +11,15 @@ rehearsal (`fuze rehearse`) before mainnet unlocks on a computer again; the entr
   it: the agent is off, paused, or has no fresh signal. It is a safety net, not a trading rule. The agent places it
   for 28 days (Lighter allows an order to rest between 5 minutes and 30 days) and places it again after 14. See
   [The emergency stop](docs/agent/following.md#5-the-emergency-stop).
+- **Balance ceiling** (`max_balance_usd`, `fuze limits --max-balance-usd`). An account can hold more than you want to
+  trade: with a ceiling the agent counts no more than that amount as your balance, for sizes, the exposure cap and the
+  daily loss stop. `fuze go-live` and `fuze mode mainnet` show what the account holds and ask for it before real
+  money (an amount, or `all`); it is remembered across mode changes. It limits the size of the positions, not what the
+  exchange can take: the docs now say to use an account of its own, a wallet used for nothing else or a sub-account,
+  holding only the money to trade.
+- Fewer requests to Lighter: the price from its market list is read every 30 seconds instead of every 5 (and fresh
+  before an order that needs it). A quiet minute with a short-term trade open takes 27 of a standard account's 60
+  requests, down from 35. The read token for open orders is asked for 10 minutes explicitly.
 - The emergency stop is told apart from a short-term trade's take profit and stop loss by Lighter's own order type, so
   cancelling one never touches the other.
 - `fuze status`, the local page (`fuze ui`) and the MCP tools show each position's emergency stop. In simulation the

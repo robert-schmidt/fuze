@@ -148,10 +148,11 @@ def test_mainnet_is_locked_without_the_rehearsal(exchanges, monkeypatch, capsys)
 
 def test_mainnet_after_the_rehearsal_needs_raise_and_the_phrase(exchanges, monkeypatch, capsys):
     rehearsed(exchanges)
-    answers(monkeypatch, "RAISE", "real money")
+    answers(monkeypatch, "all", "RAISE", "real money")
     assert cli.main(["mode", "mainnet"]) == 1 and config.load()["mode"] == "simulation"
-    answers(monkeypatch, "RAISE", "REAL MONEY")
+    answers(monkeypatch, "lots", "all", "RAISE", "REAL MONEY")  # the balance ceiling: an amount or `all`, nothing else
     assert cli.main(["mode", "mainnet"]) == 0 and config.load()["mode"] == "mainnet"
+    assert config.load()["max_balance_usd"] is None
     assert "app.lighter.xyz/explorer/accounts/5" in capsys.readouterr().out
 
 
@@ -159,7 +160,7 @@ def test_mainnet_unlock_asks_testnet_to_confirm_the_rehearsal(exchanges, monkeyp
     rec = rehearsed(exchanges)
     assert rec["account"] == 77 and rec["key_index"] == 4
     assert {s["step"]: s["tx"] for s in rec["steps"]}["open"] in exchanges["testnet"].txs
-    answers(monkeypatch, "RAISE", "REAL MONEY")
+    answers(monkeypatch, "all", "RAISE", "REAL MONEY")
     assert cli.main(["mode", "mainnet"]) == 0
     assert "Confirmed by Lighter testnet" in capsys.readouterr().out
     assert [s[0] for s in exchanges["mainnet"].sent] == []  # mainnet: read only
@@ -264,17 +265,21 @@ def test_go_live_walks_from_nothing_to_real_money_and_remembers_it(monkeypatch, 
     assert "Step 1 of 4" in out and "PASSED" in out and "carries on with real money" in out and KEY not in out
     assert not modes.rehearsal_problem()
     # again: steps 1 and 2 are skipped; mainnet account 5 + key, then RAISE and the phrase
-    answers(monkeypatch, "5", "", "RAISE", "REAL MONEY")
+    # ... and how much of that account the agent may count: it holds $500, $300 is said
+    answers(monkeypatch, "5", "", "300", "RAISE", "REAL MONEY")
     assert cli.main(["go-live"]) == 0 and config.load()["mode"] == "mainnet"
     out = capsys.readouterr().out
     assert "Passed on this computer with this version" in out and "Generate API key" in out and KEY not in out
+    assert "a wallet used for nothing else" in out and "holds only the money you want to trade" in out
+    assert config.load()["max_balance_usd"] == 300 and "Balance ceiling: $300" in out
     assert cli.main(["go-live"]) == 0 and "already trade real money" in capsys.readouterr().out
     # back to practice and to real money again: nothing is typed but the confirmations
     answers(monkeypatch)
     assert cli.main(["mode", "simulation"]) == 0 and config.load()["mode"] == "simulation"
     assert keys.state("mainnet") == "set" and config.load()["mainnet_account"] == 5 and not modes.rehearsal_problem()
-    answers(monkeypatch, "RAISE", "REAL MONEY")
+    answers(monkeypatch, "RAISE", "REAL MONEY")  # the ceiling is remembered too, and said again
     assert cli.main(["mode", "mainnet"]) == 0 and config.load()["mode"] == "mainnet"
+    assert "Your balance ceiling is $300: the agent counts that much" in capsys.readouterr().out
     answers(monkeypatch, "mainnet", "RAISE", "REAL MONEY")  # and go-live from simulation asks only where to go
     cli.main(["mode", "simulation"])
     assert cli.main(["go-live"]) == 0 and config.load()["mode"] == "mainnet"

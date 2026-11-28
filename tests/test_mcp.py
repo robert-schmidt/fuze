@@ -95,7 +95,7 @@ def test_no_tool_switches_the_mode_or_removes_a_cap():
 
     tools = {t.name: t for t in asyncio.run(build().list_tools())}
     props = set(tools["lower_limits"].input_schema["properties"])
-    assert props == {"percent", "fixed_usd", "max_position_usd", "max_x", "daily_loss_frac"}
+    assert props == {"percent", "fixed_usd", "max_position_usd", "max_x", "daily_loss_frac", "max_balance_usd"}
     assert not any("size_mode" in t.input_schema.get("properties", {}) for t in tools.values())
 
 

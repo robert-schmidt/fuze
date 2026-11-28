@@ -277,13 +277,14 @@ is between a share of your balance and a fixed amount, and both shrink when we s
 | `fixed_usd` | 10 – 1,000,000 | 100 | dollars that follow the signal (fixed mode) |
 | `max_position_usd` | off, or 10 – 1,000,000 | off | largest position on one coin, in dollars |
 | `max_x` | 0.1 – 25 | 3 | most you hold across coins, as a multiple of your balance |
+| `max_balance_usd` | off, or 10 and up | off | balance ceiling: the agent counts no more than this as your balance, whatever the account holds |
 | `daily_loss_frac` | 1% – 50% | 10% | if the balance falls this much in a UTC day, close everything until the next UTC day |
 | `stale_flat_min` | off, or minutes | off | close everything after this long without a live signal |
 
 `fuze limits` shows them with the worked example at your current balance. Lower any time: `fuze limits --percent 5`,
 `fuze limits --max-position-usd 300`; a running agent resizes to it within seconds. Anything that can raise risk is
 only possible in a terminal and asks you to type `RAISE` (it also applies without a restart): a higher percent, fixed amount, `max_x`, daily loss stop or `stale_flat_min`; removing or raising the cap per
-position; switching to the other choice when it gives a larger position at your current balance. `fuze init --force`
+position or the balance ceiling; switching to the other choice when it gives a larger position at your current balance. `fuze init --force`
 replaces an existing config under the same rule. Emergency controls: `fuze pause` (hold, no new orders),
 `fuze flatten` (close all and stay out); `fuze resume` and `fuze unflatten` undo them, only at a terminal and after you
 type `RESUME` or `UNFLATTEN`, like raising. The signal can never loosen your limits.

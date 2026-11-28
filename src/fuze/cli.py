@@ -14,7 +14,7 @@ from pathlib import Path
 
 from fuze import __version__, config, keys, modes
 from fuze.checks import setup_report
-from fuze.sizing import LABELS, describe, example, fmt, raised
+from fuze.sizing import LABELS, counted, describe, example, fmt, raised
 
 
 UNDO = {"PAUSE": ("resume", "The agent follows the signal again: it may open or add to positions at once."),
@@ -70,6 +70,8 @@ def _asked(args) -> dict:
            if getattr(args, k) is not None}
     if args.max_position_usd is not None:
         out["max_position_usd"] = _cap(args.max_position_usd)
+    if args.max_balance_usd is not None:
+        out["max_balance_usd"] = _cap(args.max_balance_usd)
     if args.daily_loss is not None:
         out["daily_loss_frac"] = _loss(args.daily_loss)
     if getattr(args, "stale_flat_min", None) is not None:
@@ -133,7 +135,7 @@ def _warn_too_small(cfg, bal: float) -> None:
     from fuze.follow import asked_usd, min_change
     sig = (config.read_json(config.home() / "status.json") or {}).get("signal")
     asked = {c: v for c, v in asked_usd(sig, cfg, bal).items() if abs(v) >= 0.005}
-    tol = min_change(bal)
+    tol = min_change(counted(cfg, bal))
     if asked and all(abs(v) < tol for v in asked.values()):
         print("Warning: at the current signal this asks for " + ", ".join(f"{c} ${abs(v):,.0f}" for c, v in
                                                                          asked.items())
@@ -232,7 +234,9 @@ def cmd_status(args) -> int:
     age = time.time() - s["t"] if isinstance(s.get("t"), (int, float)) else None
     print("Agent: " + ("running" if age is not None and age < 30 else "NOT running (start it with `fuze run`)")
           + (f", last step {age:,.0f} s ago" if age is not None else ""))
-    print(f"Balance: ${a.get('balance') or 0:,.2f}")
+    bal, top = a.get("balance") or 0, cfg["max_balance_usd"]
+    print(f"Balance: ${bal:,.2f}" + (f". The agent counts ${top:,.0f} of it, your balance ceiling; the rest of the "
+                                     "account still stands behind its positions." if top and bal > top else ""))
     rows, tol = from_status(s)
     if rows:
         print("Positions (what the signal asks for at your limits, and what you hold):")
@@ -435,6 +439,8 @@ def switch_mode(cfg, target: str) -> int:
                       "of its own (docs/lighter-setup.md), or close them on Lighter first. Nothing was changed.")
                 return 2
             bal = t["balance"] or bal
+            if target == "mainnet":
+                cfg = _ceiling(cfg, t["balance"])
         print("Your sizing on that balance (change it later with `fuze limits`):")
         _show(cfg, bal)
         if modes.RANK[target] > modes.RANK[cur]:
@@ -442,6 +448,8 @@ def switch_mode(cfg, target: str) -> int:
             if target == "mainnet":
                 print("The rehearsal on testnet passed on this machine. On mainnet you can lose everything you put on "
                       "this account. Keep only what you can lose there.")
+                if not cfg["max_balance_usd"]:
+                    print("No balance ceiling: money you add to this account later makes the positions bigger.")
             if input("Type RAISE to confirm: ").strip() != "RAISE":
                 print("Not changed.")
                 return 1
@@ -457,6 +465,28 @@ def switch_mode(cfg, target: str) -> int:
         return 0
     finally:
         lock.close()
+
+
+def _ceiling(cfg, held: float) -> dict:
+    """Before real money: the balance ceiling. Asked until one is set (an amount, or `all`), then remembered."""
+    print("Everything on this account stands behind the agent's positions and can be lost, whatever your limits say. "
+          "Safest is an account of its own, a new wallet or a sub-account, that holds only the money you want to "
+          "trade.")
+    top = cfg["max_balance_usd"]
+    if top is not None:
+        print(f"Your balance ceiling is ${top:,.0f}"
+              + (": the agent counts that much of it. The rest is still at risk; move it out for a hard limit."
+                 if held > top else "."))
+        return cfg
+    while True:
+        text = input("How many dollars of this account may the agent count as your balance? "
+                     "Type an amount, or all: ").strip().lower()
+        if text == "all":
+            return cfg
+        try:
+            return config.validate({**cfg, "max_balance_usd": _num(text)})
+        except ValueError as e:
+            print(f"  {e}")
 
 
 def _confirm_rehearsal(cfg) -> str:
@@ -542,8 +572,9 @@ def _lighter_account(cfg, net: str):
         print(f"  1. Open {APP[net]} and connect a wallet only you control."
               + (" Open the account panel (your address, top right) and press Request Funds: the account is created "
                  "with test money." if net == "testnet" else
-                 " Make a sub-account for FUZE (Sub-accounts, New Sub-Account) and transfer into it only money you "
-                 "can afford to lose completely."))
+                 " Best is a wallet used for nothing else, funded with only the amount you want to trade. Or, on the "
+                 "wallet you have, make a sub-account for FUZE (Sub-accounts, New Sub-Account) and transfer into it "
+                 "only that amount. Either way, only money you can afford to lose completely."))
         print(f"  2. Open {APP[net]}/apikeys with that account selected, press Generate API key, choose index 4, "
               "leave Maker only off" + ("" if net == "testnet" else ", and restrict the key to the BTC and ETH "
                                         "markets") + ". Your wallet signs it.")
@@ -611,8 +642,8 @@ def cmd_go_live(args) -> int:
                 print("When you have watched it work, `fuze go-live` carries on with real money.")
             return code
     print("\nStep 3 of 4: your Lighter account for real money.\n"
-          "You can lose everything on the account the agent trades. Use a sub-account of its own that holds only "
-          "money you can afford to lose completely.")
+          "You can lose everything on the account the agent trades. Give it an account of its own, a new wallet or "
+          "a sub-account, that holds only the money you want to trade and can afford to lose completely.")
     cfg, bal = _lighter_account(cfg, "mainnet")
     if bal is None:
         return 2
@@ -812,6 +843,8 @@ def _sizing_args(p) -> None:
     p.add_argument("--max-position-usd", dest="max_position_usd",
                    help='largest position on one coin in dollars, or "off"')
     p.add_argument("--max-x", dest="max_x", type=float, help="most you hold across coins, times your balance")
+    p.add_argument("--max-balance-usd", dest="max_balance_usd",
+                   help='balance ceiling: the most of the account the agent counts as your balance, or "off"')
     p.add_argument("--daily-loss", dest="daily_loss", type=float, help="daily loss stop in percent, 1 to 50")
 
 

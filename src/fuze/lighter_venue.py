@@ -30,8 +30,10 @@ from fuze.config import read_json, write_json
 from fuze.protocol import COINS
 from fuze.venue import CHAIN_ID, HOSTS, SLIP_ADD, SLIP_REDUCE, TESTNET_SLIP, Venue, account_link
 
-READ_EVERY_S = 5.0  # a standard Lighter account gets about 60 requests a minute, orders included
-TOKEN_S = 480.0  # the read token for open orders lasts 10 minutes; renew after 8
+READ_EVERY_S = 5.0  # the account. A standard Lighter account gets 60 requests a rolling minute, orders included:
+# the account 12, the scalp's pair 12 while one rests, prices 2 and the emergency stops 2 leave half of it for orders
+PRICE_EVERY_S = 30.0  # the market list's price: it places the emergency stop (20% away) and is read fresh for an order
+TOKEN_LIFE_S, TOKEN_S = 600, 480.0  # the read token for open orders is asked for 10 minutes and renewed after 8
 GUARD_READ_S = 60.0  # a coin with only an emergency stop resting: its open orders are read this often (the request limit)
 GUARD_SLIP = 0.04  # the emergency stop's worst price, past its trigger: it must fill in a fast market (Lighter checks
 #                    a trigger order's price against its trigger, with a threshold it does not publish; its 5% bound
@@ -128,7 +130,7 @@ class LighterClient:
 
     def active_orders(self, market_id: int) -> list:
         if not self.token or time.time() - self.token_t > TOKEN_S:
-            token, err = self.c.create_auth_token_with_expiry(api_key_index=self.key_index)
+            token, err = self.c.create_auth_token_with_expiry(TOKEN_LIFE_S, api_key_index=self.key_index)
             if err or not token:
                 raise RuntimeError("could not make a read token for open orders")
             self.token, self.token_t = token, time.time()
@@ -224,10 +226,14 @@ class LighterVenue(Venue):
             raise RuntimeError(f"Lighter's market list has no {', '.join(sorted(missing))} market")
         self.m, self.m_t = m, self.clock()
 
-    def price(self, coin: str) -> float | None:
-        if self.clock() - self.m_t > READ_EVERY_S:
+    def price(self, coin: str, fresh: bool = False) -> float | None:
+        if fresh or self.clock() - self.m_t > PRICE_EVERY_S:
             self._markets()
         return self.m[coin]["px"]
+
+    def flatten(self) -> list:
+        self._markets()  # a close is priced from a price read now, not one up to PRICE_EVERY_S old
+        return super().flatten()
 
     def _ours(self, coin: str) -> tuple:
         """Our orders resting on this coin (reduce-only with a trigger price): (the scalp part's take profit and stop
@@ -307,7 +313,7 @@ class LighterVenue(Venue):
         if base <= 0:
             raise ValueError(f"{coin} order of {units} is smaller than Lighter's size step")
         if worst is None:
-            worst = self.worst(ref_px or self.price(coin), units, reduce_only)
+            worst = self.worst(ref_px or self.price(coin, fresh=True), units, reduce_only)
         self.client_index += 1
         self.cache = None
         return self.c.market_order(self.m[coin]["id"], self.client_index, base, self._px(coin, worst),

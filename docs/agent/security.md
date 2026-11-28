@@ -41,12 +41,14 @@ this, and well-behaved ones follow it; it is a rule, not a barrier.
 
 **The real protection for your money is on the exchange side:**
 
-- a Lighter **sub-account of its own**, holding only what you can afford to lose;
+- a Lighter **account of its own**, holding only the money you want to trade and can afford to lose: a wallet used
+  for nothing else, or a sub-account. The agent's balance ceiling (`fuze limits --max-balance-usd`) keeps positions
+  small when an account holds more, but only an account that holds no more is a hard limit;
 - an API key **restricted to the BTC and ETH markets**. Per Lighter's documentation such a key can only create, modify
   and cancel orders in those markets; withdrawals and transfers fail;
 - never your wallet's private key or recovery phrase anywhere near FUZE or a chat.
 
-With that setup, the worst a misbehaving program on your machine can do is trade that sub-account's money away in
+With that setup, the worst a misbehaving program on your machine can do is trade that account's money away in
 Bitcoin and Ether. It cannot send it anywhere.
 
 Per Lighter's documentation (https://docs.lighter.xyz/developers/integration-guides/api-keys.md), no API key alone can

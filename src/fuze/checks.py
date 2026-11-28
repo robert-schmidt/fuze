@@ -40,7 +40,8 @@ def setup_report(read_account: bool = False) -> list:
         size = f"a fixed ${cfg['fixed_usd']:,.0f}" if fixed else f"{cfg['percent']:g}% of the balance"
         add(True, "config.json is valid", f"mode {cfg['mode']}, {size} follows the signal, "
                                           f"cap per position {fmt('max_position_usd', cfg['max_position_usd'])}, "
-                                          f"cap {cfg['max_x']:g}x, daily loss stop {cfg['daily_loss_frac']:.0%}")
+                                          f"cap {cfg['max_x']:g}x, balance ceiling {fmt('max_balance_usd', cfg['max_balance_usd'])}, "
+                                          f"daily loss stop {cfg['daily_loss_frac']:.0%}")
     except (ValueError, OSError) as e:
         cfg = None
         add(False, "config.json is valid", str(e))

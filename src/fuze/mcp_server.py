@@ -32,7 +32,7 @@ HONEST = ("What the confirmations protect against: the typed words (RAISE, REAL 
 SECRETISH = re.compile(r"mode|key|secret|private|seed|mnemonic|phrase|password|token|wallet|server|resume|unflatten",
                        re.I)
 FLAG = {"percent": "--percent", "fixed_usd": "--fixed-usd", "max_position_usd": "--max-position-usd", "max_x": "--max-x",
-        "daily_loss_frac": "--daily-loss"}  # the `fuze limits` flag for each limit, for the refusal that names the command
+        "max_balance_usd": "--max-balance-usd", "daily_loss_frac": "--daily-loss"}  # the `fuze limits` flag for each limit, for the refusal that names the command
 DOCS = {
     "following": "FUZE publishes the position its own account holds, signed: per coin, x = our position value "
                  "divided by our balance (negative is short). Your agent copies it on your account at your sizing "
@@ -52,11 +52,16 @@ DOCS = {
               "picks or switches the mode, at `fuze init` or with `fuze limits` in a terminal.",
     "limits": "max_position_usd (none, or 10 to 1,000,000): the largest position on one coin, in dollars. max_x (0.1 "
               "to 25): the most you hold across coins, as a multiple of your real balance, in both modes. "
+              "max_balance_usd (none, or 10 and up): the balance ceiling. The agent counts no more than this as the "
+              "balance, for sizes, max_x and the daily loss stop, whatever the account holds; the rest of the account "
+              "still stands behind the positions, so the safest setup is an account that holds only the money to "
+              "trade. "
               "daily_loss_frac (0.01 to 0.5): if the balance falls this much in a UTC day, everything closes until "
               "the next day. stale_flat_min: close everything after this many minutes without a live signal. When "
               "a cap cuts a position, its scalp part (with its stop loss and take profit) shrinks in the same "
-              "proportion. Through this server percent, fixed_usd, max_position_usd, max_x and daily_loss_frac can "
-              "only be lowered (a cap per position can be added, not removed).",
+              "proportion. Through this server percent, fixed_usd, max_position_usd, max_x, max_balance_usd and "
+              "daily_loss_frac can only be lowered (a cap per position or a balance ceiling can be added, not "
+              "removed).",
     "page": "`fuze ui` serves a read-only page on this computer only, http://127.0.0.1:3893 by default (`--port` to "
             "change it, `--open` to open the browser): running or not and since when, the mode, balance and today's "
             "result, each position with its entry, price and result, the short-term part between its take profit and "
@@ -232,17 +237,19 @@ def build() -> MCPServer:
 
     @app.tool(description="Lower one or more limits: percent (percent mode only), fixed_usd (fixed mode only), "
                           "max_position_usd (a cap per position can be added or lowered, never removed or raised), "
-                          "max_x, daily_loss_frac. Any change that would raise risk is refused, and the sizing mode "
+                          "max_x, max_balance_usd (a balance ceiling, the same rule as the cap), daily_loss_frac. Any change that would raise risk is refused, and the sizing mode "
                           "cannot be switched here. " + RULE)
     def lower_limits(percent: float | None = None, fixed_usd: float | None = None,
                      max_position_usd: float | None = None, max_x: float | None = None,
-                     daily_loss_frac: float | None = None) -> dict:
+                     daily_loss_frac: float | None = None, max_balance_usd: float | None = None) -> dict:
         _agent_here()
         cfg = config.load()
         asked = {k: v for k, v in {"percent": percent, "fixed_usd": fixed_usd, "max_position_usd": max_position_usd,
-                                   "max_x": max_x, "daily_loss_frac": daily_loss_frac}.items() if v is not None}
+                                   "max_x": max_x, "daily_loss_frac": daily_loss_frac,
+                                   "max_balance_usd": max_balance_usd}.items() if v is not None}
         if not asked:
-            raise ToolError("give at least one of percent, fixed_usd, max_position_usd, max_x, daily_loss_frac")
+            raise ToolError("give at least one of percent, fixed_usd, max_position_usd, max_x, daily_loss_frac, "
+                            "max_balance_usd")
         idle = "fixed_usd" if cfg["size_mode"] == "percent" else "percent"
         if idle in asked:
             raise ToolError(f"Positions are sized by {fmt('size_mode', cfg['size_mode'])}, so {idle} does not apply. "

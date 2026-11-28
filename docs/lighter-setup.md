@@ -41,7 +41,20 @@ trust. The wallet's private key never goes into FUZE, a config file, a chat or a
 Source: https://docs.lighter.xyz/developers/getting-started/environments.md and
 https://docs.lighter.xyz/developers/getting-started/core-concepts.md
 
-## 3. A dedicated sub-account holding only what you can lose
+## 3. An account of its own, holding only what you want to trade
+
+Everything on the account the agent trades stands behind its positions: Lighter takes losses from the whole account,
+not from the part you meant to trade. So give FUZE an account that holds only that amount. Two ways:
+
+- **A wallet used for nothing else** (the safest). Make a new address in your wallet app, send it only the money to
+  trade, and connect that address to Lighter. Nothing else you own is on that account, and the API key's withdrawals
+  can only go back to that address.
+- **A sub-account** of the wallet you already use, described below.
+
+The agent checks too: before real money, `fuze go-live` shows what the account holds and asks how many dollars of it
+the agent may count as your balance (the [balance ceiling](agent/limits.md#the-balance-ceiling)). It then sizes on no
+more than that. The ceiling limits the size of the positions; it does not protect the rest of the account in a fast
+move, which is why the account itself should hold no more.
 
 Lighter has sub-accounts, each with its own index, balances and API keys. The app's **Sub-accounts** page
 (`/sub-accounts`) has "New Sub-Account" and "Transfer"; underneath, a sub-account is created with a `CreateSubAccount`

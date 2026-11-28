@@ -12,13 +12,21 @@ from __future__ import annotations
 SIZE_FIELD = {"percent": "percent", "fixed_usd": "fixed"}  # the field that sizes each mode
 EXAMPLE_X = 1.8  # our position, as a multiple of our balance, in the worked example
 LABELS = {"size_mode": "sizing", "percent": "share of your balance", "fixed_usd": "fixed amount",
-          "max_position_usd": "cap per position", "max_x": "exposure cap", "daily_loss_frac": "daily loss stop",
+          "max_position_usd": "cap per position", "max_x": "exposure cap", "max_balance_usd": "balance ceiling",
+          "daily_loss_frac": "daily loss stop",
           "stale_flat_min": "close after no signal for"}
+
+
+def counted(cfg, bal: float) -> float:
+    """The balance the agent counts: the account's, or the user's ceiling when the account holds more. Sizes, the
+    exposure cap and the daily loss stop all use it, so money beyond the ceiling never makes a position bigger."""
+    cap = cfg.get("max_balance_usd")
+    return min(bal, cap) if cap else bal
 
 
 def base_usd(cfg, bal: float) -> float:
     """The money that follows the signal: a position of x times our balance becomes x times this."""
-    return cfg["fixed_usd"] if cfg["size_mode"] == "fixed" else cfg["percent"] / 100 * bal
+    return cfg["fixed_usd"] if cfg["size_mode"] == "fixed" else cfg["percent"] / 100 * counted(cfg, bal)
 
 
 def fit(usd: dict, cfg, bal: float) -> tuple:
@@ -29,7 +37,7 @@ def fit(usd: dict, cfg, bal: float) -> tuple:
     cap = cfg.get("max_position_usd")
     f = {c: cap / abs(v) if cap and abs(v) > cap else 1.0 for c, v in usd.items()}
     notes = [f"Cut to your cap of ${cap:,.0f} per position."] if any(k < 1 for k in f.values()) else []
-    total = sum(abs(v) * f[c] for c, v in usd.items())
+    total, bal = sum(abs(v) * f[c] for c, v in usd.items()), counted(cfg, bal)
     if total > cfg["max_x"] * bal:
         k = cfg["max_x"] * bal / total
         f = {c: x * k for c, x in f.items()}
@@ -57,6 +65,8 @@ def fmt(name: str, value) -> str:
         return f"{value:g}%"
     if name in ("fixed_usd", "max_position_usd"):
         return "no cap" if value is None else f"${value:,.0f}"
+    if name == "max_balance_usd":
+        return "none (the whole account)" if value is None else f"${value:,.0f}"
     if name == "max_x":
         return f"{value:g} times your balance"
     if name == "daily_loss_frac":
@@ -74,11 +84,13 @@ def describe(cfg, bal: float) -> list:
     else:
         head = (f"{cfg['percent']:g}% of your balance follows the signal. Your positions grow and shrink with "
                 "your balance.")
-    cap = cfg.get("max_position_usd")
+    cap, top = cfg.get("max_position_usd"), cfg.get("max_balance_usd")
     return [head,
             f"Largest position on one coin: {fmt('max_position_usd', cap)}.",
             f"Most you hold across coins: {cfg['max_x']:g} times your balance.",
             f"Daily loss stop: {cfg['daily_loss_frac']:.0%} of the balance in a UTC day closes everything.",
+            *([f"Balance ceiling: ${top:,.0f}. The agent counts no more than this as your balance, whatever the "
+               "account holds."] if top else []),
             example(cfg, bal)]
 
 
@@ -88,7 +100,7 @@ def raised(cur, new, bal: float) -> list:
     same = new["size_mode"] == cur["size_mode"]  # the amount of the mode not in use raises nothing by itself
     up = [k for k in ("percent", "fixed_usd") if same and new["size_mode"] == SIZE_FIELD[k] and new[k] > cur[k]]
     up += [k for k in ("max_x", "daily_loss_frac") if new[k] > cur[k]]
-    for k in ("max_position_usd", "stale_flat_min"):  # None (no cap, never) is the riskiest setting
+    for k in ("max_position_usd", "max_balance_usd", "stale_flat_min"):  # None (no cap, never) is the riskiest
         if cur.get(k) is not None and (new.get(k) is None or new[k] > cur[k]):
             up.append(k)
     if new["size_mode"] != cur["size_mode"] and base_usd(new, bal) > base_usd(cur, bal):

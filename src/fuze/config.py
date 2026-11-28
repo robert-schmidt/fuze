@@ -19,6 +19,7 @@ DEFAULTS = {
     "fixed_usd": 100.0,
     "max_position_usd": None,
     "max_x": 3.0,
+    "max_balance_usd": None,  # the most of the account's balance the agent counts; None: all of it
     "daily_loss_frac": 0.1,
     "stale_flat_min": None,
     "testnet_account": None,  # Lighter account index (public: it is in the explorer's address); set with `fuze keys`
@@ -27,10 +28,12 @@ DEFAULTS = {
     "mainnet_key_index": 4,
 }
 RANGES = {"percent": (1.0, 100.0), "fixed_usd": (10.0, 1e6), "max_position_usd": (10.0, 1e6),
+          "max_balance_usd": (10.0, 1e9),
           "max_x": (0.1, 25.0), "daily_loss_frac": (0.01, 0.5), "dry_balance": (10.0, 1e9),
           "stale_flat_min": (1.0, 10080.0)}
 SIZE_MODES = ("percent", "fixed")
-LIMITS = ("size_mode", "percent", "fixed_usd", "max_position_usd", "max_x", "daily_loss_frac", "stale_flat_min")
+LIMITS = ("size_mode", "percent", "fixed_usd", "max_position_usd", "max_x", "max_balance_usd", "daily_loss_frac",
+          "stale_flat_min")
 LOCAL_HOSTS = ("localhost", "127.0.0.1")
 MODES = ("simulation", "testnet", "mainnet")  # in order of how real the money is
 NETS = ("testnet", "mainnet")
@@ -185,7 +188,7 @@ def validate(cfg) -> dict:
         raise ValueError('size_mode must be "percent" (a share of your balance) or "fixed" (a fixed amount)')
     for name in ("dry_balance", "percent", "fixed_usd", "max_x", "daily_loss_frac"):
         out[name] = _number(name, out[name])
-    for name in ("max_position_usd", "stale_flat_min"):
+    for name in ("max_position_usd", "max_balance_usd", "stale_flat_min"):
         if out[name] is not None:
             out[name] = _number(name, out[name])
     return out

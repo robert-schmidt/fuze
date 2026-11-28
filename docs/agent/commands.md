@@ -25,7 +25,8 @@ This page lists every `fuze` command with its options, as printed by `fuze --hel
 
 ```text
 fuze init [--size-mode {percent,fixed}] [--percent PERCENT] [--fixed-usd FIXED_USD]
-          [--max-position-usd MAX_POSITION_USD] [--max-x MAX_X] [--daily-loss DAILY_LOSS]
+          [--max-position-usd MAX_POSITION_USD] [--max-x MAX_X]
+          [--max-balance-usd MAX_BALANCE_USD] [--daily-loss DAILY_LOSS]
           [--yes] [--force] [--mode {simulation,testnet,mainnet}]
 ```
 
@@ -36,6 +37,7 @@ fuze init [--size-mode {percent,fixed}] [--percent PERCENT] [--fixed-usd FIXED_U
 | `--fixed-usd` | Dollars in fixed mode, 10 to 1,000,000 |
 | `--max-position-usd` | Largest position on one coin in dollars, or `off` |
 | `--max-x` | Most you hold across coins, times your balance |
+| `--max-balance-usd` | Balance ceiling: the most of the account the agent counts as your balance, or `off` |
 | `--daily-loss` | Daily loss stop in percent, 1 to 50 |
 | `--yes` | Ask no questions; use the flags and the safe defaults |
 | `--force` | Replace an existing config (raising anything asks you to type `RAISE`) |
@@ -58,7 +60,8 @@ folder; a second one refuses to start. Ctrl+C stops it and leaves positions as t
 
 ```text
 fuze limits [--size-mode {percent,fixed}] [--percent PERCENT] [--fixed-usd FIXED_USD]
-            [--max-position-usd MAX_POSITION_USD] [--max-x MAX_X] [--daily-loss DAILY_LOSS]
+            [--max-position-usd MAX_POSITION_USD] [--max-x MAX_X]
+            [--max-balance-usd MAX_BALANCE_USD] [--daily-loss DAILY_LOSS]
             [--stale-flat-min STALE_FLAT_MIN]
 ```
 

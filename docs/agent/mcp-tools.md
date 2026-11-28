@@ -13,7 +13,7 @@ read; three only reduce risk.
 | `ui` | Read | none |
 | `pause` | Reduce risk | none |
 | `flatten` | Reduce risk | none |
-| `lower_limits` | Reduce risk | any of `percent`, `fixed_usd`, `max_position_usd`, `max_x`, `daily_loss_frac` |
+| `lower_limits` | Reduce risk | any of `percent`, `fixed_usd`, `max_position_usd`, `max_x`, `max_balance_usd`, `daily_loss_frac` |
 
 There is no tool to resume, unflatten, raise a limit, change the mode or the server, or take or show a key.
 
@@ -130,8 +130,8 @@ flatten()
 
 ## lower_limits
 
-Lowers one or more limits. `percent` only in percent mode and `fixed_usd` only in fixed mode; `max_position_usd` can be
-added or lowered, never removed or raised; `daily_loss_frac` is a fraction (0.05 = 5%). Anything that would raise risk
+Lowers one or more limits. `percent` only in percent mode and `fixed_usd` only in fixed mode; `max_position_usd` and
+`max_balance_usd` (the balance ceiling) can be added or lowered, never removed or raised; `daily_loss_frac` is a fraction (0.05 = 5%). Anything that would raise risk
 is refused, and it cannot switch the sizing mode. A running agent resizes the held position to it within seconds.
 
 ```text

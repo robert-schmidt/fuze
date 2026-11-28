@@ -13,8 +13,12 @@ This page covers following with real money on Lighter. Read it to the end before
   testnet cannot confirm them (also when testnet is down).
 - You do not give an AI tool unattended shell access on this machine: the typed confirmations do not stop a program
   that runs as you, and it could read the key. See [Security model](../security.md).
-- A **separate** mainnet sub-account holds only money you can afford to lose completely.
-- A **separate** mainnet API key, restricted to the BTC and ETH markets, on that sub-account. See
+- An account **of its own** holds only the money you want to trade and can afford to lose completely: best a wallet
+  used for nothing else, or a sub-account of the wallet you have. Everything on that account stands behind the
+  agent's positions.
+- A **balance ceiling**: `fuze go-live` asks how many dollars of the account the agent may count as your balance, and
+  sizes on no more than that even if the account holds more. See [Limits](../limits.md#the-balance-ceiling).
+- A **separate** mainnet API key, restricted to the BTC and ETH markets, on that account. See
   [Lighter account and API key](../../lighter-setup.md).
 - Small sizes: for example 5% of the balance, a cap per position, an exposure cap of 2 and a daily loss stop of 5%.
 

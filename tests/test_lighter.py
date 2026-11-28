@@ -242,7 +242,7 @@ def test_emergency_stop_moves_with_the_price_only_while_the_signal_is_live(fake,
     send(a, signer, c, scalp=None, targets={"BTC": {"x": -0.6, "px": 60000.0}})
     assert fake.stops_sent() == [BTC_GUARD]
     fake.px["BTC"] = 63600.0  # 6% against the short
-    c.t += 6
+    c.t += 31  # the exchange's price is read every 30 seconds: the emergency stop is 20% away, it can wait
     send(a, signer, c, seq=2, scalp=None, targets={"BTC": {"x": -0.6, "px": 63600.0}})
     assert fake.sent[-2:] == [("cancel", 1, 101), ("stop", 1, 100, False, 763200, 793728)]  # 20% over $63,600
     fake.px["BTC"] = 70000.0  # the signal goes quiet and the price runs on
@@ -358,3 +358,19 @@ def test_an_unreadable_account_sends_nothing(fake, signer):
     fake.account = down
     send(a, signer, c)
     assert fake.sent == [] and "Could not read the account" in a.last_reason
+
+
+def test_a_quiet_minute_leaves_half_of_lighters_request_limit_for_orders(fake, signer, monkeypatch):
+    """A standard Lighter account gets 60 requests a rolling minute, orders included. With a scalp and both emergency
+    stops resting, a minute of nothing to do must stay at half of that."""
+    reads = []
+    for name in ("markets", "account", "active_orders"):
+        monkeypatch.setattr(fake, name, lambda *a, _f=getattr(fake, name), _n=name: (reads.append(_n), _f(*a))[1])
+    c = Clock()
+    a = agent(fake, signer, c)
+    send(a, signer, c)  # a short with its scalp pair on BTC, an emergency stop on BTC and ETH
+    del reads[:]
+    for _ in range(60):  # one step a second, a fresh signal each time, nothing changes
+        c.t += 1
+        send(a, signer, c)
+    assert len(reads) <= 30, {n: reads.count(n) for n in set(reads)}

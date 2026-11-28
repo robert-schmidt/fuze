@@ -12,11 +12,28 @@ and a running agent resizes your held position to it within seconds; raising one
 | Fixed amount | `--fixed-usd` | 10 to 1,000,000 | 100 | Fixed mode |
 | Cap per position | `--max-position-usd` | off, or 10 to 1,000,000 | off | No coin larger than this, in dollars |
 | Exposure cap | `--max-x` | 0.1 to 25 | 3 | Everything together at most this many times your real balance |
+| Balance ceiling | `--max-balance-usd` | off, or 10 and up | off | The agent counts no more than this as your balance, whatever the account holds (below) |
 | Daily loss stop | `--daily-loss` | 1 to 50 (percent) | 10 | If the balance falls this much in a UTC day, everything closes until the next UTC day |
 | Close after no signal | `--stale-flat-min` | off, or minutes | off | Close everything after this long without a live signal (`fuze limits` only) |
 
 When a cap cuts a coin's position, its short-term part (with its take profit and stop loss) shrinks in the same
 proportion. The signal can never loosen any of these.
+
+## The balance ceiling
+
+An account can hold more than you want to trade. With a balance ceiling the agent counts no more than that amount as
+your balance: the share that follows the signal, the exposure cap and the daily loss stop are all worked out on it.
+An account that holds $50,000 with a ceiling of $1,000 gets the positions of a $1,000 account, and the daily loss stop
+fires after 10% of $1,000. When the balance is under the ceiling, the real balance counts. Money you add later never
+makes a position bigger.
+
+`fuze go-live` and `fuze mode mainnet` ask for it before real money: an amount, or `all` for no ceiling. Set or change
+it any time with `fuze limits --max-balance-usd 1000`; raising or removing it asks you to type `RAISE`.
+
+> **Warning:** the ceiling limits the size of the positions, not what the exchange can take. Everything on the account
+> stands behind its positions, and a fast move with nothing running can cost more than the ceiling. The hard limit is
+> an account of its own that holds only the money you want to trade: a wallet used for nothing else, or a sub-account.
+> See [Lighter account and API key](../lighter-setup.md).
 
 ## Lowering and raising
 
