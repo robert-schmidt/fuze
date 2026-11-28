@@ -17,7 +17,7 @@ our trading side. Anyone can check the signature against the public key printed 
 | `https://fuze.trade/v1/signal` | The current message |
 | `https://fuze.trade/v1/stream` | A live stream (Server-Sent Events): the current message at once, then every new one |
 | `https://fuze.trade/v1/key` | The public key, for information only: never trust a key fetched from the server |
-| `https://fuze.trade/v1/record` | Unsigned public numbers for the website: balance, test period, balance curve, the short-term trades with their entries and time stamps, the trend position's entry |
+| `https://fuze.trade/v1/record` | Unsigned public numbers for the website: balance, test period, balance curve, the short-term trades with their entries and time stamps, the trend position's entry and emergency stop |
 
 Try it:
 
