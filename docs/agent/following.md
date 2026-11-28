@@ -57,7 +57,38 @@ cut the coin). On Lighter they rest on the exchange as reduce-only orders. That 
 
 The rest of the position is still followed.
 
-## 5. States, staleness and switches
+## 5. The emergency stop
+
+The rest of each position, the part that follows the slow trend, has no take profit or stop loss in the signal: the
+trend rule leaves when its trends turn, and on history every stop we tried on it did worse than none
+([what the tests found](../account/trend.md#what-the-tests-found-and-what-they-do-not-say)). Without an order behind it, that part would sit on the exchange unwatched
+whenever your agent is off. So the agent rests one stop order for it, the emergency stop:
+
+- **Where:** 20% from the price, on the losing side. One reduce-only order per coin, for exactly the part that has no
+  take profit and stop loss of its own.
+- **While the agent follows a live signal** it sets the stop again each time the price has moved 5% from where the
+  stop was set, in either direction, and when the size of that part changes. So it stays between 15% and 25% from the
+  price and is not part of how the account trades.
+- **When the agent is off, paused, or the signal is gone** nothing moves it, and it fills if the price reaches it. That
+  is its job: a position nobody is watching loses a bounded amount.
+- **When it filled:** the agent says so in its status. With a live signal it brings the position back to what the
+  signal asks for and rests a new stop.
+
+On history (Bitcoin and Ether, 2020 to 2026, the trend rule's own sizes), a position left alone for 30 days lost up
+to 69% of the account without this stop and up to 32% with it; left for 90 days, the whole account without it and up
+to 32% with it. It filled in about one case in three within 30 days, and the average result was not worse for it.
+
+What it does not do:
+
+- It is not a price guarantee. Once triggered it is a market order that fills no worse than 4% past its price; in a
+  gap larger than that it does not fill.
+- In a move of more than 15% within seconds, faster than the agent can move it, it can fill while the agent runs.
+  The position is then bought or sold back at the price of that moment.
+- Lighter keeps a resting order for 28 days at most. The agent places it again after 14 days; an agent that is off for
+  more than 28 days leaves the position without it.
+- In simulation the stop is checked only while the agent runs, like the simulated take profit and stop loss.
+
+## 6. States, staleness and switches
 
 | Situation | What the agent does |
 |---|---|
@@ -87,3 +118,6 @@ your balance grows.
   to reduce or close. On Lighter testnet, whose order book is thin, the bounds are 3% and 4%.
 - Sizes and prices are rounded to the decimals and smallest order Lighter publishes.
 - If the take profit and stop loss cannot be seen on the exchange after placing them, that part is closed.
+- The emergency stop is a different order type from the take profit and stop loss (a stop-loss market order beside a
+  take-profit-limit and a stop-loss-limit), so the agent never takes one for the other. If it cannot be placed, the
+  position stays, the agent says so and tries again after 60 seconds.

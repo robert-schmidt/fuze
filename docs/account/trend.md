@@ -40,7 +40,15 @@ included, and it also made money on a stretch of history that was never looked a
 lengths sit on a peak of past results, Bitcoin and Ether were chosen after another coin failed, and over the last three
 years the result is not statistically solid. History is not a forecast. Details: [What the tests found](../research/findings.md).
 
+We also tested giving the rule a stop of its own: a stop that follows the price 2 to 5 daily ranges behind, a breakout
+version of the rule, adding in steps, and cutting the size after losses. Chosen on 2020 to 2023 and judged on 2024 to
+2026, none beat the rule as it is. The rule returned 65% a year in the first period and 50% in the second, with a
+worst drop of 29% in both; the best following stop returned 37% and 40%. So the rule keeps no stop of its own.
+
 ## In the account
 
 The trend book is one of the [two books](README.md). How its position combines with the short-term trades is on
-[How the two books become one account](netting.md). The trend part has no take profit or stop loss of its own.
+[How the two books become one account](netting.md). The trend part has no take profit or stop loss: the rule above
+is its only exit. On the exchange it rests under an emergency stop, about 20% from the price, which is moved as the
+price moves and fills only when nothing is there to move it. See
+[the emergency stop](../agent/following.md#5-the-emergency-stop).

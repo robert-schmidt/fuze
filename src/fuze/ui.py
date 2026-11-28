@@ -222,6 +222,7 @@ def snapshot(now: float | None = None, peeker: Peeker | None = None) -> dict:
     held = a.get("positions") if isinstance(a.get("positions"), dict) else {}
     brackets = [b for b in a.get("brackets") or [] if isinstance(b, int)] if isinstance(a.get("brackets"), list) else []
     book = s.get("book") if isinstance(s.get("book"), dict) else {}
+    guards = a.get("guards") if isinstance(a.get("guards"), dict) else {}
     sig = _signal(s.get("signal"))
     received = _num(s.get("received_at"))
     sig_px = {x["coin"]: x["px"] for x in (sig or {}).get("targets", [])}
@@ -233,7 +234,9 @@ def snapshot(now: float | None = None, peeker: Peeker | None = None) -> dict:
         b = book.get(c) if isinstance(book.get(c), dict) else {}
         entry, mark = _num(b.get("entry")) or None, _num(b.get("mark")) or sig_px.get(c)
         result = units * (mark - entry) if entry and mark else None
+        g = guards.get(c) if isinstance(guards.get(c), dict) else {}
         positions.append({"coin": c, "name": NAMES[c], "side": "short" if units < 0 else "long", "units": units,
+                          "stop": _num(g.get("stop")) or None, "stop_units": _num(g.get("units")) or None,
                           "usd": abs(units) * mark if mark else None, "entry": entry, "mark": mark,
                           "result": result, "result_pct": result / (abs(units) * entry) * 100 if result is not None
                           else None})

@@ -9,7 +9,11 @@ One code path for every mode. The order step follows these rules on every venue:
   - reductions are reduce-only and every market order has a worst price (venue.SLIP_ADD / SLIP_REDUCE);
   - the scalp part rests under its own take profit and stop loss on the venue, sized to that part, re-placed when its
     size or levels change and cancelled when it closes; if the venue does not show them after placing, the scalp part
-    is closed.
+    is closed;
+  - the rest of each position (the trend part, which has no take profit or stop loss) rests under an emergency stop
+    on the venue, far from the price (follow.guard_plan): it is moved with the price while a live signal is followed
+    and stays where it is when the agent is off or the signal is gone, so a position nobody is watching has an order
+    behind it.
 """
 
 from __future__ import annotations
@@ -28,7 +32,7 @@ from pathlib import Path
 
 from fuze import __version__
 from fuze.config import LIMITS, ensure_home, load, read_json, write_json
-from fuze.follow import decide
+from fuze.follow import GUARD_FRAC, decide, guard_plan, min_change
 from fuze.protocol import COINS, PINNED, Guard
 from fuze.venue import open_venue, tx_link
 
@@ -218,7 +222,69 @@ class Agent:
                 self.acct = self.ex.account(fresh=True)
             except Exception as e:
                 self.notes.append(f"Could not read the account after the orders ({_plain(e)}).")
+        try:
+            self.keep_guards(now, flags)
+        except Exception as e:  # the next step tries again
+            log.error("Emergency stop: %s", _plain(e))
+            self.memory["guard_retry"] = now + MISS_WAIT_S
+            self.notes.append(f"The emergency stop could not be set ({_plain(e)}); the next try is in "
+                              f"{MISS_WAIT_S:g} s.")
         return " ".join([d.reason] + self.notes)
+
+    def keep_guards(self, now: float, flags: dict) -> None:
+        """The emergency stop of every coin (follow.guard_plan): placed, resized, moved with the price or removed."""
+        m, ex, acct = self.memory, self.ex, self.acct
+        if now < m.get("guard_retry", 0) or self.pending:
+            return
+        resting, mine = acct.get("guards") or {}, dict(m.get("guards") or {})
+
+        def gone(c):  # we placed it and the exchange no longer shows it
+            g = mine.pop(c)
+            log.warning("The %s emergency stop at %g is no longer on the exchange: it filled, expired or was "
+                        "cancelled there. With a live signal the position is brought back to what it asks for.",
+                        c, g["stop"])
+            self.notes.append(f"The {c} emergency stop at {g['stop']:,.2f} is no longer on the exchange (it filled, "
+                              "expired or was cancelled there).")
+
+        for c in [c for c in mine if c not in resting]:
+            gone(c)
+        following = m.get("live_at") == now and not flags.get("pause") and not flags.get("flatten")
+        prot, placed = m.get("prot"), {}
+        for c in COINS:
+            px, held = ex.price(c), acct["positions"].get(c, 0.0)
+            if not px:
+                continue
+            covered = prot["units"] if prot and prot["coin"] == c and prot["id"] in acct["brackets"] else 0.0
+            what, g = guard_plan(held, covered, px, resting.get(c), now, following, min_change(acct["balance"]) / px)
+            if what == "place":
+                g["units"] = ex.round(c, g["units"])
+                if not ex.tradable(c, g["units"], px):  # under the exchange's smallest order: nothing can rest
+                    what = "remove" if c in resting else "none"
+            if what == "remove":
+                if not ex.unguard(c) and c in mine:  # nothing left to close, and the stop went by itself: it filled
+                    gone(c)
+                mine.pop(c, None)
+            elif what == "place":
+                ex.guard(c, g["units"], g["stop"], g["ref"])
+                placed[c] = g
+        m["guards"] = mine
+        if not placed:
+            return
+        self.sleep(ex.settle_s)
+        self.acct = ex.account(fresh=True)
+        for c, g in placed.items():
+            shown = (self.acct.get("guards") or {}).get(c)
+            if shown:
+                m["guards"][c] = shown
+                log.info("Emergency stop for %+.6f %s at %g, %.0f%% from the price: it rests on the exchange for the "
+                         "part of the position with no take profit or stop loss of its own.", g["units"], c,
+                         shown["stop"], GUARD_FRAC * 100)
+            else:
+                m["guard_retry"] = now + MISS_WAIT_S
+                log.error("The %s emergency stop is not on the exchange after placing it; the next try is in %g s.",
+                          c, MISS_WAIT_S)
+                self.notes.append(f"The {c} emergency stop is not on the exchange after placing it; the next try is "
+                                  f"in {MISS_WAIT_S:g} s.")
 
     # --- orders: the same path for the simulated account and Lighter ---------------------------
     def read_back(self, coin: str, before: float, units: float) -> dict:

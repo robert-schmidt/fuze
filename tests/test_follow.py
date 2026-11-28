@@ -1,7 +1,7 @@
 import pytest
 
 from conftest import payload
-from fuze.follow import RECHECK_S, compare, decide
+from fuze.follow import GUARD_AGE_S, RECHECK_S, compare, decide, guard_plan
 from fuze.protocol import clean
 
 CFG = {"size_mode": "percent", "percent": 10.0, "fixed_usd": 100.0, "max_position_usd": None, "max_x": 3.0,
@@ -298,3 +298,33 @@ def test_a_moved_stop_the_price_already_crossed_closes_the_scalp_part():
     d2 = run(s, pos=dict(d.targets), brackets=[7], memory=d.memory)
     assert d2.bracket is None and "losing side" in d2.reason
     assert d2.targets["BTC"] == pytest.approx(-60 / 59900)  # the trend part stays
+
+
+# --- the emergency stop -------------------------------------------------------------------------------------------
+
+def test_emergency_stop_covers_what_the_pair_does_not():
+    plan = lambda held, covered, resting=None, px=60000.0, now=100.0, following=True: guard_plan(
+        held, covered, px, resting, now, following, 0.0002)
+    assert plan(-0.003, -0.002) == ("place", {"units": pytest.approx(-0.001), "stop": 72000.0, "ref": 60000.0})
+    assert plan(0.5, 0.0, px=2000.0) == ("place", {"units": 0.5, "stop": 1600.0, "ref": 2000.0})  # a long: under it
+    assert plan(0.0, 0.0) == ("none", None)
+    assert plan(-0.002, -0.002) == ("none", None)  # the pair closes all of it
+    assert plan(0.0015, 0.002) == ("none", None)  # a scalp against the trend part: its pair is the whole position
+    g = {"units": -0.001, "stop": 72000.0, "ref": 60000.0, "t": 50.0}
+    assert plan(0.0, 0.0, g) == ("remove", None) and plan(-0.002, -0.002, g) == ("remove", None)
+    assert plan(-0.003, -0.002, g) == ("keep", None)
+    assert plan(-0.0031, -0.002, g) == ("keep", None)  # a difference under the smallest change: not replaced
+    assert plan(-0.004, -0.002, g)[1]["units"] == pytest.approx(-0.002)  # the trend part grew
+    assert plan(0.001, 0.0, g) == ("place", {"units": 0.001, "stop": 48000.0, "ref": 60000.0})  # it changed sides
+
+
+def test_emergency_stop_follows_the_price_only_while_a_live_signal_is_followed():
+    g = {"units": -0.001, "stop": 72000.0, "ref": 60000.0, "t": 50.0}
+    plan = lambda px, following, now=100.0: guard_plan(-0.001, 0.0, px, g, now, following, 0.0002)
+    assert plan(62900.0, True) == ("keep", None)  # under 5% from where it was set
+    assert plan(63000.0, True) == ("place", {"units": -0.001, "stop": 75600.0, "ref": 63000.0})  # against: further away
+    assert plan(57000.0, True) == ("place", {"units": -0.001, "stop": 68400.0, "ref": 57000.0})  # in favour: closer
+    assert plan(71000.0, False) == ("keep", None)  # no live signal: it stays, so it can fill
+    # Lighter drops an order after 28 days: placed again after 14, at the same price when no signal is followed
+    assert plan(60500.0, False, 50.0 + GUARD_AGE_S) == ("place", {"units": -0.001, "stop": 72000.0, "ref": 60000.0})
+    assert plan(60500.0, True, 50.0 + GUARD_AGE_S) == ("place", {"units": -0.001, "stop": 72600.0, "ref": 60500.0})

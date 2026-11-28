@@ -3,7 +3,7 @@
   "name": "trade.fuze/fuze",
   "title": "FUZE agent",
   "description": "Status and risk-reducing controls (pause, flatten, lower limits) for the FUZE signal-following agent",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "websiteUrl": "https://fuze.trade",
   "repository": {
     "url": "https://github.com/robert-schmidt/fuze",
@@ -14,7 +14,7 @@
       "registryType": "pypi",
       "registryBaseUrl": "https://pypi.org",
       "identifier": "fuze-agent",
-      "version": "0.3.0",
+      "version": "0.4.0",
       "transport": {
         "type": "stdio"
       },

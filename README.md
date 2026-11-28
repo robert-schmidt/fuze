@@ -51,8 +51,9 @@ your mode risks more real money than the account you follow, for example real mo
   read in `~/.fuze`. It is never printed, logged, shown to an AI tool, or accepted as a command-line argument. Use an
   API key restricted to the BTC and ETH markets, on a sub-account holding only what you can lose:
   [docs/lighter-setup.md](docs/lighter-setup.md).
-- **The rehearsal** (`fuze rehearse`, testnet): opens the smallest Bitcoin position Lighter takes, places its take
-  profit and stop loss, cancels them and closes the position, confirming every step by reading the account, and
+- **The rehearsal** (`fuze rehearse`, testnet): opens a small Bitcoin position, places the emergency stop for one
+  half and a take profit and stop loss for the other, cancels them and closes the position, confirming every step by
+  reading the account, and
   records the account, key index, time, version and each order's transaction hash. Mainnet stays locked until this
   passed on this machine with this version of FUZE: each version changes code that sends orders, so a new version asks
   for a new rehearsal. `fuze mode mainnet` does not trust the record alone: it asks Lighter testnet whether those
@@ -66,7 +67,10 @@ your mode risks more real money than the account you follow, for example real mo
   the account instead of sending it again; reductions are reduce-only; every market order has a worst price (0.5%
   past the signal's price to open, 2% to close); sizes and prices are rounded to the decimals and minimum order
   Lighter publishes; the scalp part rests under its own take profit and stop loss on the exchange, sized to that part,
-  re-placed when it changes and cancelled when it closes, and if the exchange does not show them, that part is closed.
+  re-placed when it changes and cancelled when it closes, and if the exchange does not show them, that part is closed;
+  the rest of each position rests under an emergency stop about 20% from the price, moved with the price while a live
+  signal is followed, so a position nobody is watching has an order behind it
+  ([docs/agent/following.md](docs/agent/following.md#5-the-emergency-stop)).
 
 ## What it is not
 
@@ -228,7 +232,9 @@ where a key is stored. Links lead to [fuze.trade](https://fuze.trade) (our publi
    open anything at the current signal.
 4. The scalp part of a position gets its own take profit and stop loss (on Lighter: resting on the exchange). If the
    stop loss is on the wrong side of the price or more than 1.5% away, or the take profit is on the wrong side, or
-   the part is under the exchange's smallest order, that part is not opened (the rest is).
+   the part is under the exchange's smallest order, that part is not opened (the rest is). The rest of the position
+   has no take profit or stop loss; it rests under an emergency stop 20% from the price, which the agent moves with the
+   price and which fills only when the agent is off, paused or without a live signal.
 5. Signal says `flat`: close everything and stay out. Signal `offline`, expired, or nothing valid for 60 seconds: hold
    what you have, open nothing new. With `stale_flat_min` set, close everything after that many minutes without a
    live signal.

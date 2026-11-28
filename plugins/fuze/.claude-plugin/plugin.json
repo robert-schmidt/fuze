@@ -1,6 +1,6 @@
 {
   "name": "fuze",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "MCP server for the FUZE agent: status, the verified signal, the address of the local read-only page (`fuze ui`), and tools that can only reduce risk. Starts the command `fuze`, as installed by `uv tool install` or `pipx install` from https://github.com/robert-schmidt/fuze, with the default folder ~/.fuze. For a virtualenv install or another folder, use `fuze mcp-config`.",
   "author": {
     "name": "FUZE"

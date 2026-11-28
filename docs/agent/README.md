@@ -40,7 +40,7 @@ time of writing), and, if you use one, your AI tool's subscription.
 
 ## Version
 
-Version 0.3.0. It runs on macOS and Linux, and on Windows inside WSL; its installer fetches Python (3.10 or newer) by itself. It is installed from its
+Version 0.4.0. It runs on macOS and Linux, and on Windows inside WSL; its installer fetches Python (3.10 or newer) by itself. It is installed from its
 repository, https://github.com/robert-schmidt/fuze: see [Install](start/install.md).
 
 ## Where to go next

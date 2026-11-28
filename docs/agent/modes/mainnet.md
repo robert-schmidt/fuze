@@ -33,7 +33,9 @@ fuze run
 
 - `fuze status` shows a REAL MONEY warning, the account's explorer link, what it holds and why.
 - The short-term part rests under its take profit and stop loss on Lighter, so it stays protected while the agent is
-  down. The trend part has no stop.
+  down. The rest of each position rests under its [emergency stop](../following.md#5-the-emergency-stop), about 20%
+  from the price the agent last saw. Lighter keeps a resting order for 28 days at most, so an agent that is off longer
+  than that leaves the position without it.
 - A stop loss is a trigger order: in a fast market it can fill worse than its price, or not at all.
 
 ## Leaving mainnet

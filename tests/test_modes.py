@@ -56,8 +56,10 @@ def test_rehearsal_confirms_every_step_by_reading_the_account(exchanges):
     rec = rehearsed(exchanges)
     assert rec["ok"] and [s["step"] for s in rec["steps"]] == list(modes.STEPS) and all(s["ok"] for s in rec["steps"])
     f = exchanges["testnet"]
-    assert [s[0] for s in f.sent] == ["market", "tp_sl", "cancel", "cancel", "market"]
-    assert f.sent[0][2] == 20 and f.sent[-1][5] is True  # the smallest order, closed reduce-only
+    assert [s[0] for s in f.sent] == ["market", "stop", "tp_sl", "cancel", "cancel", "cancel", "market"]
+    assert f.sent[0][2] == 40 and f.sent[-1][5] is True  # twice the smallest order, closed reduce-only
+    assert f.sent[1] == ("stop", 1, 20, True, 480000, 460800)  # one half: sold at $48,000, 20% under the price
+    assert f.sent[2][:3] == ("tp_sl", 1, 20)  # the other half
     assert f.pos[1] == 0 and f.orders == {} and modes.rehearsal_problem() == ""
 
 
@@ -68,6 +70,21 @@ def test_failed_rehearsal_cleans_up_and_keeps_mainnet_locked(exchanges):
                                                   "detail": "take profit and stop loss NOT shown on the account"}
     assert exchanges["testnet"].pos[1] == 0  # closed again
     assert "did not pass" in modes.rehearsal_problem()
+
+
+@pytest.mark.parametrize("trouble,why", [("hidden", "NOT shown on the account"), ("refused", "refused by Lighter")])
+def test_rehearsal_fails_when_the_emergency_stop_does_not_rest(exchanges, trouble, why):
+    exchanges["testnet"].stop = trouble
+    rec = rehearsed(exchanges)
+    assert not rec["ok"] and rec["steps"][-1]["step"] == "guard" and why in rec["steps"][-1]["detail"]
+    assert exchanges["testnet"].pos[1] == 0 and "did not pass" in modes.rehearsal_problem()
+
+
+def test_rehearsal_fails_when_the_emergency_stop_is_taken_for_a_pair(exchanges, monkeypatch):
+    from fuze import lighter_venue
+    monkeypatch.setattr(lighter_venue, "GUARD_TYPE", "something-else")  # Lighter names the order type another way
+    rec = rehearsed(exchanges)
+    assert not rec["ok"] and rec["steps"][-1]["step"] == "guard" and exchanges["testnet"].orders == {}
 
 
 def test_rehearsal_says_why_when_the_opening_order_does_not_fill(exchanges):

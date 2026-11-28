@@ -9,17 +9,19 @@ On your Lighter testnet account, with test money, each step confirmed by reading
 
 | Step | Order | Passes when |
 |---|---|---|
-| open | Buy the smallest Bitcoin position Lighter accepts | The account shows the position |
-| protect | Place a reduce-only take profit (+3%) and stop loss (-3%) | The account shows them |
-| cancel | Cancel both | The account shows none |
+| open | Buy twice the smallest Bitcoin position Lighter accepts | The account shows the position |
+| guard | Place the emergency stop for one half, 20% under the price | The account shows it, and not as a take profit / stop loss |
+| protect | Place a reduce-only take profit (+3%) and stop loss (-3%) for the other half | The account shows them beside the emergency stop |
+| cancel | Cancel the take profit and stop loss | The account shows none, and the emergency stop still rests |
+| unguard | Cancel the emergency stop | The account shows none |
 | close | A reduce-only market order for the whole position | The account is flat |
 
 If a step fails, it cancels and closes what it opened and tells you to check the account on the explorer. It refuses to
 start if the testnet account already holds a position or protective orders.
 
 It writes `rehearsal.json` in your FUZE folder: the testnet account index and API key index, the time, the FUZE
-version, the machine, each step's result and the transaction hash of each order it sent (open, take profit / stop loss,
-close).
+version, the machine, each step's result and the transaction hash of each order it sent (open, emergency stop, take profit /
+stop loss, close).
 
 ```sh
 fuze rehearse          # agent stopped; asks you to type yes before sending the test orders

@@ -37,8 +37,9 @@ signal revision. A raise you confirmed with `RAISE` applies the same way, withou
 Not today. The signal is the whole account.
 
 **What happens if my computer sleeps or the agent stops?**
-Positions stay as they are. On Lighter the short-term part keeps its take profit and stop loss on the exchange; the
-trend part has no stop. When the agent starts again it reads the account and catches up with the latest signal.
+Positions stay as they are. On Lighter the short-term part keeps its take profit and stop loss on the exchange, and
+the rest of each position keeps its [emergency stop](following.md#5-the-emergency-stop), about 20% from the price the
+agent last saw. When the agent starts again it reads the account and catches up with the latest signal.
 
 **What happens if the FUZE server goes down?**
 After 60 seconds without a valid message the agent holds and opens nothing new. Set `stale_flat_min` to close everything

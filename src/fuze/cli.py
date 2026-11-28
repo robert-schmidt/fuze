@@ -197,8 +197,10 @@ def cmd_run(args) -> int:
     try:
         Agent(exchange=ex).run()
     except KeyboardInterrupt:
-        print("Stopped. Positions stay as they are" + (" (the scalp part keeps its take profit and stop loss on "
-                                                       "the exchange)." if ex.live else "."))
+        print("Stopped. Positions stay as they are" + (
+            " (on the exchange the scalp part keeps its take profit and stop loss, and the rest of each position its "
+            "emergency stop)." if ex.live else ". The simulated account checks its take profit, stop loss and "
+            "emergency stops only while the agent runs."))
     return 0
 
 
@@ -239,6 +241,11 @@ def cmd_status(args) -> int:
     else:
         held = {c: u for c, u in (a.get("positions") or {}).items() if u}
         print("Positions: " + (", ".join(f"{c} {u:+g}" for c, u in held.items()) or "none"))
+    stops = {c: g for c, g in (a.get("guards") or {}).items() if isinstance(g, dict)
+             and all(isinstance(g.get(k), (int, float)) and not isinstance(g.get(k), bool) for k in ("units", "stop"))}
+    if stops:
+        print("Emergency stops (for the part with no take profit or stop loss of its own): "
+              + ", ".join(f"{c} {g['units']:+g} at {g['stop']:,.2f}" for c, g in stops.items()))
     if sig:
         src = modes.SOURCE_NAMES.get(sig.get("source"), sig.get("source"))
         print(f"Signal: revision {sig['rev']}, {sig['state']}, from our {src} account. Why (data from the server): "
@@ -336,7 +343,7 @@ def cmd_keys(args) -> int:
 
 
 def _held(a) -> bool:
-    return bool(a["brackets"]) or any(abs(v) > 1e-12 for v in a["positions"].values())
+    return bool(a["brackets"] or a.get("guards")) or any(abs(v) > 1e-12 for v in a["positions"].values())
 
 
 def switch_mode(cfg, target: str) -> int:
@@ -478,8 +485,9 @@ def cmd_rehearse(args) -> int:
             print(f"Could not read your testnet account ({_plain(e)}).")
             return 2
         print(f"Rehearsal on Lighter testnet account {cfg['testnet_account']} (balance ${a['balance']:,.2f}), "
-              f"{ex.link()}:\n  open the smallest Bitcoin position, place its take profit and stop loss, cancel them, "
-              "close it. Each step is confirmed by reading the account. Test money only.")
+              f"{ex.link()}:\n  open a small Bitcoin position, place the emergency stop for one half and a take profit "
+              "and stop loss for the other, cancel them, close it. Each step is confirmed by reading the account. "
+              "Test money only.")
         if input("Type yes to send these test orders: ").strip().lower() != "yes":
             print("Nothing was sent.")
             return 1

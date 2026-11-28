@@ -46,7 +46,7 @@ Install FUZE only from `github.com/robert-schmidt/fuze`, with that address in th
    fuze --version
    ```
 
-   It prints the version, for example `0.3.0`. If it says `command not found`, run `uv tool update-shell`, open a new
+   It prints the version, for example `0.4.0`. If it says `command not found`, run `uv tool update-shell`, open a new
    terminal window and try again.
 
 **If step 2 or 3 says curl or git is missing:**

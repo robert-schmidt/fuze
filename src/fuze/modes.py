@@ -25,8 +25,8 @@ SOURCE_RANK = {"paper": 0, "testnet": 1, "mainnet": 2}
 SOURCE_NAMES = {"paper": "practice money (paper)", "testnet": "test money (Lighter testnet)",
                 "mainnet": "real money (Lighter mainnet)"}
 PHRASE = "REAL MONEY"  # typed, after RAISE, to switch to mainnet
-STEPS = ("open", "protect", "cancel", "close")
-SENT = ("open", "protect", "close")  # the steps that send a transaction; Lighter testnet must show each of them
+STEPS = ("open", "guard", "protect", "cancel", "unguard", "close")
+SENT = ("open", "guard", "protect", "close")  # the steps that send a transaction; Lighter testnet must show each of them
 TX_WINDOW_S = 3600.0  # a rehearsal transaction must be this close to the time the record gives
 
 
@@ -71,7 +71,7 @@ def confirm_on_testnet(cfg, client) -> str:
 
     `client` is a Lighter testnet client made with the stored testnet key (lighter_venue.connect), so making it already
     showed that Lighter accepts that key for this account and key index. Then each order the rehearsal sent (open,
-    take profit / stop loss, close) is read back by its transaction hash: it must exist on testnet, belong to this
+    emergency stop, take profit / stop loss, close) is read back by its transaction hash: it must exist on testnet, belong to this
     account, be signed with this key index, and be from the time the record gives. Reads only; sends nothing."""
     why = rehearsal_problem()
     if why:
@@ -127,10 +127,14 @@ def blockers(cfg, mode: str | None = None) -> list:
 
 def rehearse(ex, sleep=time.sleep, say=print, coin: str = "BTC") -> dict:
     """The testnet rehearsal, on a venue (normally Lighter testnet). Every step is confirmed by reading the account:
-      open     buy the smallest order Lighter takes; the account shows the position
-      protect  a reduce-only take profit (+3%) and stop loss (-3%), one cancels the other; the account shows them
+      open     buy twice the smallest order Lighter takes; the account shows the position
+      guard    the emergency stop for one half, as far from the price as the agent sets it; the account shows it, and
+               does not take it for a take profit / stop loss
+      protect  a reduce-only take profit (+3%) and stop loss (-3%) for the other half, one cancels the other; the
+               account shows them beside the emergency stop
                (3%: they trigger on the mark price, which on testnet's thin book can sit 1% from the last trade)
-      cancel   cancel them; the account shows none
+      cancel   cancel the take profit and stop loss; the account shows none, and the emergency stop still rests
+      unguard  cancel the emergency stop; the account shows none
       close    a reduce-only market order for the whole position; the account shows it flat
     On a failure it cancels and closes what it opened. Returns the record for rehearsal.json."""
     steps = []
@@ -148,14 +152,15 @@ def rehearse(ex, sleep=time.sleep, say=print, coin: str = "BTC") -> dict:
         return ok
 
     a = ex.account(fresh=True)
-    if a["positions"] or a["brackets"]:
+    if a["positions"] or a["brackets"] or a["guards"]:
         say("  The testnet account must hold no position and no take profit / stop loss to rehearse. Nothing was sent.")
         return rec
     px = ex.price(coin)
     if not px:
         say(f"  No {coin} price from the exchange. Nothing was sent.")
         return rec
-    units = ex.smallest(coin, px)
+    from fuze.follow import GUARD_FRAC
+    units = 2 * ex.smallest(coin, px)  # one half under the pair, one under the emergency stop, as when following
     try:
         worst = ex.worst(px, units, False)
         tx = ex.market(coin, units, px, worst, False)
@@ -164,14 +169,30 @@ def rehearse(ex, sleep=time.sleep, say=print, coin: str = "BTC") -> dict:
                 "" if held > 0 else f". Lighter took the order but nothing filled: nobody was selling at {worst:,.2f} "
                                     "or less. Its order book can be thin; try again in a few minutes")):
             return rec
-        tx = ex.protect(coin, held, px * 1.03, px * 0.97, 0)
-        shown = read()["brackets"]
-        if not step("protect", 0 in shown, tx, "take profit and stop loss " + ("shown" if 0 in shown else "NOT shown")
-                    + " on the account"):
+        half = ex.round(coin, held / 2)
+        tx = ex.guard(coin, half, px * (1 - GUARD_FRAC), px)
+        a = read()
+        ok = coin in a["guards"] and not a["brackets"]
+        if not step("guard", ok, tx, f"emergency stop for {half:g} {coin} at {px * (1 - GUARD_FRAC):,.2f} " + (
+                "shown on the account" if ok else "NOT shown on the account" if coin not in a["guards"]
+                else "shown, but taken for a take profit / stop loss")):
+            return rec
+        tx = ex.protect(coin, half, px * 1.03, px * 0.97, 0)
+        a = read()
+        ok = 0 in a["brackets"] and coin in a["guards"]
+        if not step("protect", ok, tx, "take profit and stop loss " + ("shown" if 0 in a["brackets"] else "NOT shown")
+                    + " on the account" + ("" if coin in a["guards"] else "; the emergency stop is gone")):
             return rec
         ex.cancel(coin)
-        shown = read()["brackets"]
-        if not step("cancel", not shown, None, "none left" if not shown else "still shown"):
+        a = read()
+        ok = not a["brackets"] and coin in a["guards"]
+        if not step("cancel", ok, None, "take profit and stop loss " + ("still shown" if a["brackets"] else "gone")
+                    + ("; the emergency stop still rests" if coin in a["guards"] else "; the emergency stop went too")):
+            return rec
+        ex.unguard(coin)
+        a = read()
+        if not step("unguard", coin not in a["guards"], None,
+                    "none left" if coin not in a["guards"] else "the emergency stop is still shown"):
             return rec
         tx = ex.market(coin, -held, px, ex.worst(px, -held, True), True)
         left = read()["positions"].get(coin, 0.0)
@@ -185,7 +206,7 @@ def rehearse(ex, sleep=time.sleep, say=print, coin: str = "BTC") -> dict:
             try:
                 ex.flatten()
                 left = read()
-                say("  Cleaned up: " + ("the account is flat." if not left["positions"] and not left["brackets"]
+                say("  Cleaned up: " + ("the account is flat." if not left["positions"] and not left["brackets"] and not left["guards"]
                                         else f"CHECK THE ACCOUNT, it still shows {left['positions']}."))
             except Exception as e:
                 from fuze.agent import _plain

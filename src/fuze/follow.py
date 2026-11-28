@@ -20,6 +20,14 @@ RECHECK_FRAC = 0.10  # ... and correct only a coin that is off by more than this
 #                      above): x drifting with the price alone must not cause small orders every few minutes
 STALE_S = 60.0  # no valid message for this long = offline
 SCALP_SL_MAX = 0.015  # a scalp stop loss further than 1.5% from the price is refused
+# The emergency stop: a stop order that rests on the exchange for the part of a position with no take profit / stop
+# loss of its own (the trend part). The signal's trend rule has no stop, and a history test of following stops on it
+# found every one worse than none, so this order is not a trading rule: while the agent follows a live signal it is
+# kept GUARD_FRAC from the price, on both sides of a move, and it fills only when nobody is moving it (the agent is
+# off, or the signal is gone or paused).
+GUARD_FRAC = 0.20  # how far from the price the stop is set
+GUARD_STEP = 0.05  # it is set again once the price is this far from where it was set
+GUARD_AGE_S = 14 * 86400.0  # ... or once it is this old: Lighter keeps a resting order 28 days at most
 
 
 @dataclass
@@ -113,6 +121,25 @@ def scalp_problem(scalp: dict, px: float) -> str:
     if (tp >= px) if short else (tp <= px):
         return "its take profit is not on the winning side of the price"
     return ""
+
+
+def guard_plan(held: float, covered: float, px: float, resting, now: float, following: bool, tol: float) -> tuple:
+    """The emergency stop one coin needs. Pure.
+
+    held: units on the account; covered: the units of them that rest under the scalp's own pair; resting: the stop
+    the exchange shows now ({"units", "stop", "ref", "t"}) or None; following: a live signal is being followed (the
+    only time the stop moves with the price); tol: a size difference in units too small to replace the order for.
+    Returns ("none" | "keep" | "remove" | "place", {"units", "stop", "ref"} for "place")."""
+    rest = held - covered
+    if held * rest <= 0:  # nothing held, or the scalp's pair closes all of it
+        return ("remove" if resting else "none"), None
+    if resting and resting["units"] * rest > 0 and abs(resting["units"] - rest) <= tol:
+        moved = following and abs(px / resting["ref"] - 1) >= GUARD_STEP
+        if not moved and now - resting["t"] < GUARD_AGE_S:
+            return "keep", None
+        if not following:  # only old: the same stop again, so a quiet signal never moves it
+            return "place", {"units": rest, "stop": resting["stop"], "ref": resting["ref"]}
+    return "place", {"units": rest, "stop": px * (1 - GUARD_FRAC if rest > 0 else 1 + GUARD_FRAC), "ref": px}
 
 
 def decide(signal, received_at, now, account, cfg, flags, memory) -> Decision:

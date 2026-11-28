@@ -17,7 +17,7 @@ and how you move between them.
 
 1. **Simulation**: watch the agent follow the live signal with no money.
 2. **Testnet, small sizes**: the same orders on Lighter's test exchange. `fuze rehearse` runs the whole order path once
-   (open, protect, unprotect, close) and records it.
+   (open, emergency stop, take profit and stop loss, cancel both, close) and records it.
 3. **Mainnet**: only after you have watched testnet work and accept that you can lose everything you put on that
    account. Each new version of FUZE asks for a new testnet rehearsal before mainnet unlocks again.
 

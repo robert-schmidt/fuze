@@ -1,6 +1,6 @@
 # Command reference
 
-This page lists every `fuze` command with its options, as printed by `fuze --help` in version 0.3.0. Commands marked
+This page lists every `fuze` command with its options, as printed by `fuze --help` in version 0.4.0. Commands marked
 "terminal only" refuse to run when input is not a terminal.
 
 | Command | What it does | Terminal only |

@@ -3,6 +3,7 @@
 Market ids, decimals and minimums as Lighter's orderBookDetails showed them (ETH 0, BTC 1). Knobs:
   fill   "full", "half", "none", or "lost" (fills, but the answer never comes back: the call raises)
   pair   "ok", "hidden" (accepted but never shown on the account), "refused" (raises)
+  stop   the same three, for the emergency stop
   down   True: reading a transaction back fails as if testnet could not be reached
 Every transaction it returns a hash for is kept in `txs`, as Lighter's /api/v1/tx shows it, for tx().
 """
@@ -17,7 +18,7 @@ class FakeLighter:
     def __init__(self, balance=1000.0, account=77, key_index=4):
         self.px = {"BTC": 60000.0, "ETH": 2000.0}
         self.bal, self.pos, self.orders, self.sent = balance, {0: 0.0, 1: 0.0}, {}, []
-        self.fill, self.pair, self.next = "full", "ok", 100
+        self.fill, self.pair, self.stop, self.next = "full", "ok", "ok", 100
         self.account_index, self.key_index, self.txs, self.down = account, key_index, {}, False
 
     def _tx(self, h):
@@ -70,20 +71,36 @@ class FakeLighter:
             raise RuntimeError("take profit and stop loss refused by Lighter: invalid order")
         if self.pair == "ok":
             pd = DEC[market_id][1]
-            for trig in (tp_trigger, sl_trigger):
+            for kind, trig in (("take-profit-limit", tp_trigger), ("stop-loss-limit", sl_trigger)):
                 self.next += 1
                 self.orders[self.next] = {"order_index": self.next, "market_index": market_id, "reduce_only": True,
-                                          "trigger_price": f"{trig / 10 ** pd}", "is_ask": is_ask, "base": base}
+                                          "trigger_price": f"{trig / 10 ** pd}", "is_ask": is_ask, "base": base,
+                                          "type": kind, "client_order_index": 0}
         return self._tx("cd" * 32)
+
+    def stop_order(self, market_id, client_index, base, is_ask, trigger, price):
+        self.sent.append(("stop", market_id, base, is_ask, trigger, price))
+        if self.stop == "refused":
+            raise RuntimeError("emergency stop refused by Lighter: invalid order")
+        if self.stop == "ok":
+            self.next += 1
+            self.orders[self.next] = {"order_index": self.next, "market_index": market_id, "reduce_only": True,
+                                      "trigger_price": f"{trigger / 10 ** DEC[market_id][1]}", "is_ask": is_ask,
+                                      "base": base, "type": "stop-loss", "client_order_index": client_index}
+        return self._tx("5a" * 32)
 
     def cancel_order(self, market_id, order_index):
         self.sent.append(("cancel", market_id, order_index))
         self.orders.pop(order_index)
         return self._tx("ef" * 32)
 
-    def stop_out(self, market_id):
-        """The exchange's stop loss fills: the position shrinks by the pair's size and both orders go."""
-        mine = self.active_orders(market_id)
+    def stops_sent(self):
+        return [s for s in self.sent if s[0] == "stop"]
+
+    def stop_out(self, market_id, kind="pair"):
+        """The exchange's stop loss fills: the position shrinks by the pair's size and both orders go. kind "guard":
+        the emergency stop fills instead."""
+        mine = [o for o in self.active_orders(market_id) if (o["type"] == "stop-loss") == (kind == "guard")]
         sd = DEC[market_id][0]
         self.pos[market_id] = round(self.pos[market_id] + mine[0]["base"] / 10 ** sd * (-1 if mine[0]["is_ask"] else 1),
                                     10)

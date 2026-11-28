@@ -16,6 +16,7 @@ folder is private to your user. Nothing in it is sent anywhere.
 | `dry.json` | The simulated account | Simulation |
 | `pending.json` | An order in flight, written before it is sent, so a restart never sends it twice | Testnet, mainnet |
 | `lighter-testnet.json`, `lighter-mainnet.json` | The take profit and stop loss the agent placed | Testnet, mainnet |
+| `lighter-testnet-guards.json`, `lighter-mainnet-guards.json` | The emergency stops the agent placed | Testnet, mainnet |
 | `rehearsal.json` | The last testnet rehearsal: each step's result, the testnet account and key index, time, version, machine and each order's transaction hash (which `fuze mode mainnet` asks Lighter testnet to confirm) | Testnet, mainnet |
 | `keys.json` | Where each key is kept (keyring or file), never the key | Testnet, mainnet |
 | `lighter-testnet.key`, `lighter-mainnet.key` | The API key, only when there is no OS keyring. Readable by you only | Testnet, mainnet |

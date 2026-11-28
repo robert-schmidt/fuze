@@ -90,7 +90,7 @@ def _live(cfg, add, read_account: bool) -> None:
         a = ex.account(fresh=True)
         add(True, f"Lighter {mode} account read (no order sent)",
             f"balance ${a['balance']:,.2f}, positions {a['positions'] or 'none'}, "
-            f"protected scalp parts {len(a['brackets'])}")
+            f"protected scalp parts {len(a['brackets'])}, emergency stops {len(a.get('guards') or {})}")
     except Exception as e:
         from fuze.agent import _plain
         add(False, f"Lighter {mode} account read (no order sent)", _plain(e))

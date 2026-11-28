@@ -1,7 +1,7 @@
 """The simulated account (mode "simulation"). No money, no keys, no network. The interface is in venue.py.
 
-Fills market orders at the signal's price plus SLIPPAGE, and checks its take profit / stop loss pairs on every price
-it is shown (mark).
+Fills market orders at the signal's price plus SLIPPAGE, and checks its take profit / stop loss pairs and its emergency
+stops on every price it is shown (mark).
 """
 
 from __future__ import annotations
@@ -40,6 +40,7 @@ class DryExchange(Venue):
         if abs(u) < 1e-12:
             u, entry = 0.0, 0.0
             self.s["brackets"].pop(coin, None)
+            self.s.get("guards", {}).pop(coin, None)
         self.s["pos"][coin] = {"units": u, "entry": entry}
         self.s["marks"].setdefault(coin, px)
         with open(self.log, "a", encoding="utf-8") as f:
@@ -50,7 +51,8 @@ class DryExchange(Venue):
         upnl = sum(p["units"] * (self.s["marks"].get(c, p["entry"]) - p["entry"]) for c, p in self.s["pos"].items())
         return {"balance": self.s["cash"] + upnl,
                 "positions": {c: p["units"] for c, p in self.s["pos"].items() if p["units"]},
-                "brackets": [b["id"] for b in self.s["brackets"].values()]}
+                "brackets": [b["id"] for b in self.s["brackets"].values()],
+                "guards": {c: dict(g) for c, g in (self.s.get("guards") or {}).items()}}
 
     def book(self) -> dict:
         return {c: {"entry": p["entry"], "mark": self.s["marks"].get(c)} for c, p in self.s["pos"].items() if p["units"]}
@@ -89,23 +91,44 @@ class DryExchange(Venue):
         if self.s["brackets"].pop(coin, None):
             self._save()
 
+    def guard(self, coin: str, units: float, stop: float, ref: float) -> None:
+        self.s.setdefault("guards", {})[coin] = {"units": units, "stop": stop, "ref": ref, "t": self.clock()}
+        self._save()
+
+    def unguard(self, coin: str) -> bool:
+        if self.s.get("guards", {}).pop(coin, None):
+            self._save()
+            return True
+        return False
+
     def mark(self, prices: dict) -> None:
         for coin, px in prices.items():
             self.s["marks"][coin] = px
-            b = self.s["brackets"].get(coin)
-            if not b:
-                continue
-            long = b["units"] > 0
+            self._pair(coin, px)
+            g = (self.s.get("guards") or {}).get(coin)  # after the pair: it is the closer one
             held = self.s["pos"].get(coin, {}).get("units", 0.0)
-            size = min(abs(b["units"]), abs(held)) * (-1 if long else 1)
-            stop = px <= b["sl"] if long else px >= b["sl"]
-            take = px >= b["tp"] if long else px <= b["tp"]
-            if not size:
-                stop = take = False
-            if stop:  # checked first: if both are crossed, assume the worse one happened
-                self._fill(coin, size, px * (1 - SLIPPAGE if long else 1 + SLIPPAGE), "stop_loss")
-            elif take:
-                self._fill(coin, size, b["tp"], "take_profit")
-            if stop or take:
-                self.s["brackets"].pop(coin, None)
+            if g and held * g["units"] > 0 and (px <= g["stop"] if g["units"] > 0 else px >= g["stop"]):
+                long = g["units"] > 0
+                self._fill(coin, min(abs(g["units"]), abs(held)) * (-1 if long else 1),
+                           px * (1 - SLIPPAGE if long else 1 + SLIPPAGE), "emergency_stop")
+                self.s["guards"].pop(coin, None)
         self._save()
+
+    def _pair(self, coin: str, px: float) -> None:
+        """The scalp part's take profit / stop loss at this price."""
+        b = self.s["brackets"].get(coin)
+        if not b:
+            return
+        long = b["units"] > 0
+        held = self.s["pos"].get(coin, {}).get("units", 0.0)
+        size = min(abs(b["units"]), abs(held)) * (-1 if long else 1)
+        stop = px <= b["sl"] if long else px >= b["sl"]
+        take = px >= b["tp"] if long else px <= b["tp"]
+        if not size:
+            stop = take = False
+        if stop:  # checked first: if both are crossed, assume the worse one happened
+            self._fill(coin, size, px * (1 - SLIPPAGE if long else 1 + SLIPPAGE), "stop_loss")
+        elif take:
+            self._fill(coin, size, b["tp"], "take_profit")
+        if stop or take:
+            self.s["brackets"].pop(coin, None)

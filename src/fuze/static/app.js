@@ -121,7 +121,8 @@ function positions(d) {
         h("div", null, h("dt", {text: "Size"}), h("dd", null, money(p.usd, 0), h("small", {text: units(p.units, p.coin)}))),
         h("div", null, h("dt", {text: "Entry"}), h("dd", {text: px(p.entry)})),
         h("div", null, h("dt", {text: "Price now"}), h("dd", {text: px(p.mark)})),
-        h("div", null, h("dt", {text: "Result"}), h("dd", {className: tone(p.result) || null}, signed(p.result), p.result == null ? null : h("small", {text: pct(p.result_pct)}))))));
+        h("div", null, h("dt", {text: "Result"}), h("dd", {className: tone(p.result) || null}, signed(p.result), p.result == null ? null : h("small", {text: pct(p.result_pct)}))),
+        h("div", null, h("dt", {text: "Emergency stop"}), h("dd", null, num(p.stop) ? px(p.stop) : "none", num(p.stop) ? h("small", {text: `for ${units(p.stop_units, p.coin)}`}) : null)))));
   });
   const asked = (d.asked && d.asked.lines) || [];  // what the signal asks for next to what is held, in dollars
   put($("pos-asked"), asked, () => asked.length ? [h("b", {text: "The signal and you"}), ...asked.map(t => h("span", {text: t}))] : []);
@@ -141,7 +142,7 @@ function positions(d) {
     const cap = $("short-cap"), live = d.mode.trading !== "simulation";
     cap.replaceChildren();
     if (s.held) cap.append(s.protected ? h("b", {text: live ? "Its take profit and stop loss rest on the exchange" : d.agent.running ? "Its take profit and stop loss are set in the simulated account" : "Its take profit and stop loss are set in the simulated account, which checks them only while the agent runs"}) : h("b", {text: "Its take profit and stop loss are not shown on the exchange right now"}),
-      `: it closes by itself when the price reaches either end of the line.${num(entry) ? ` The bright part runs from the entry, ${px(entry)}, to the price now.` : ""} The rest of the position follows the slow trend, without its own take profit or stop loss.`);
+      `: it closes by itself when the price reaches either end of the line.${num(entry) ? ` The bright part runs from the entry, ${px(entry)}, to the price now.` : ""} The rest of the position follows the slow trend. It has no take profit or stop loss; an emergency stop rests for it, far from the price, and fills only when the agent is not there to move it.`);
     else cap.append("Your agent holds no short-term part right now; its last step says why, at the top of this page.");
   }
   put($("pos-do"), [d.positions.length > 0, d.limits.percent, d.limits.fixed_usd, d.limits.size_mode], () => d.positions.length ? [
