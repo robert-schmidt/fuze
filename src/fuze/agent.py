@@ -32,7 +32,7 @@ from pathlib import Path
 
 from fuze import __version__
 from fuze.config import LIMITS, ensure_home, load, read_json, write_json
-from fuze.follow import GUARD_FRAC, decide, guard_plan, min_change
+from fuze.follow import GUARD_FRAC, STALE_S, decide, guard_plan, min_change, utc_day
 from fuze.protocol import COINS, PINNED, Guard
 from fuze.sizing import counted
 from fuze.venue import open_venue, tx_link
@@ -44,6 +44,7 @@ MISS_WAIT_S = 60.0  # after an order that did not fill in full: wait this long b
 INFLIGHT_WAIT_S = 10.0  # an order found in pending.json at a start: read the account only this long after it was sent
 READS = 3  # read-backs after an order, settle_s apart, before calling it not (fully) filled
 HEX = re.compile(r"(?:0x)?[0-9a-fA-F]{32,}")
+BEAT_S = 300.0  # a beat report (result, positions as multiples of the balance, state) this often
 
 
 class ScrubHex(logging.Filter):
@@ -78,7 +79,7 @@ NET_ERRORS = (OSError, urllib.error.URLError, http.client.HTTPException, ValueEr
 
 class Agent:
     def __init__(self, cfg=None, home: Path | None = None, keys=PINNED, clock=time.time, exchange=None,
-                 sleep=time.sleep):
+                 sleep=time.sleep, reporter=None):
         self.home = Path(home) if home else ensure_home()
         self.fixed_cfg, self.cfg = cfg is not None, cfg or load()
         self.server, self.clock, self.sleep, self.mode = self.cfg["server"], clock, sleep, self.cfg["mode"]
@@ -94,6 +95,9 @@ class Agent:
         self.started = clock()  # for `fuze ui`: running since
         self.http = opener()
         self.headers = {"User-Agent": f"fuze-agent/{__version__}"}
+        # reporting (report.Reporter, or None): it only queues, and every call to it is wrapped in _report
+        self.reporter, self.said, self.beat_at, self.read_ok = reporter, None, None, False
+        self.rev_seen, self.order, self.sig_px, self.flags = (None, None), None, {}, {}
 
     # --- network -----------------------------------------------------------------------------
     def stream(self, stop: threading.Event):
@@ -132,18 +136,23 @@ class Agent:
     def run(self, stop: threading.Event | None = None) -> None:
         stop = stop or threading.Event()
         failures = 0
-        while not stop.is_set():
-            try:
-                for text in self.stream(stop):
-                    failures = 0
-                    self.handle(text)
-            except NET_ERRORS as e:
-                log.warning("Stream unavailable (%s); polling every %g seconds.", e, POLL_S)
-            failures += 1
-            until = time.monotonic() + min(60, 2 ** failures)
-            while not stop.is_set() and time.monotonic() < until:
-                self.poll()
-                stop.wait(POLL_S)
+        try:
+            while not stop.is_set():
+                try:
+                    for text in self.stream(stop):
+                        failures = 0
+                        self.handle(text)
+                except NET_ERRORS as e:
+                    log.warning("Stream unavailable (%s); polling every %g seconds.", e, POLL_S)
+                failures += 1
+                until = time.monotonic() + min(60, 2 ** failures)
+                while not stop.is_set() and time.monotonic() < until:
+                    self.poll()
+                    stop.wait(POLL_S)
+        except KeyboardInterrupt:  # Ctrl+C: a clean stop
+            self._report("bye")
+            raise
+        self._report("bye")
 
     # --- one step ------------------------------------------------------------------------------
     def handle(self, text: str) -> None:
@@ -154,6 +163,8 @@ class Agent:
         msg = self.guard.accept(env, self.clock())
         if msg:
             self.signal, self.received_at, self.last_error = msg, self.clock(), None
+            if msg.get("rev") != self.rev_seen[0]:  # for the trade report: how late an order came after its revision
+                self.rev_seen = (msg.get("rev"), self.received_at)
             self.ex.mark({c: t["px"] for c, t in msg["targets"].items()})
         else:
             log.info("Dropped a message: %s.", self.guard.why)
@@ -174,8 +185,16 @@ class Agent:
             except (ValueError, OSError) as e:
                 log.error("config.json is not valid (%s); keeping the last good limits.", e)
         flags = {"pause": (self.home / "PAUSE").exists(), "flatten": (self.home / "FLATTEN").exists()}
+        self.flags = flags
+        said = (self.mode, *(self.cfg.get(k) for k in LIMITS), self.cfg.get("public"), self.cfg.get("handle"))
+        if said != self.said:  # at start, and when a setting or the sharing changes
+            self.said = said
+            self._report("hello", self.cfg)
         reason = self.step(now, flags)
         self.say(reason)
+        if self.read_ok and (self.beat_at is None or now - self.beat_at >= BEAT_S):
+            self.beat_at = now
+            self._beat(now, flags)
         write_json(self.home / "state.json", self.memory)
         src = (self.signal or {}).get("source")
         from fuze.modes import realer_note
@@ -198,6 +217,7 @@ class Agent:
 
     def step(self, now: float, flags: dict) -> str:
         """Read the account, settle an order left in flight, decide, trade. Returns the reason in plain words."""
+        self.read_ok, prev = False, self.acct
         try:
             if self.pending and now - self.pending["t"] < INFLIGHT_WAIT_S:
                 return ("An order sent just before the agent stopped may still be settling: waiting, then reading "
@@ -205,8 +225,11 @@ class Agent:
             self.acct = self.ex.account(fresh=bool(self.pending))
             if self.pending:
                 self.settle(self.acct, now)
+            elif prev:
+                self._found_fills(prev)
         except Exception as e:
             return f"Could not read the account ({_plain(e)}): no orders until it can be read."
+        self.read_ok = True
         if now < self.memory.get("retry_at", 0):
             return (f"An order did not fill in full; the next try is in {self.memory['retry_at'] - now:.0f} s, "
                     "sized from a new account read.")
@@ -305,6 +328,8 @@ class Agent:
         (self.home / "pending.json").unlink(missing_ok=True)
         got = acct["positions"].get(p["coin"], 0.0) - p["before"]
         full = abs(got - p["units"]) <= max(1e-9, 0.001 * abs(p["units"]))
+        if abs(got) > 1e-12:
+            self._report_fill(p, got)
         what = "filled" if full else "filled in part" if got * p["units"] > 0 else "did not fill"
         if self.ex.live:
             with open(os.open(self.home / "trades.jsonl", os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600), "a", encoding="utf-8") as f:
@@ -320,12 +345,13 @@ class Agent:
                         p["coin"], p["units"], what, got, MISS_WAIT_S)
         return full
 
-    def send(self, coin: str, units: float, ref: float, reduce_only: bool) -> bool:
+    def send(self, coin: str, units: float, ref: float, reduce_only: bool, part=None) -> bool:
         """One market order, read back. True if it filled in full."""
         held = self.acct["positions"].get(coin, 0.0)
         worst = self.ex.worst(ref, units, reduce_only)
         self.pending = {"t": self.clock(), "coin": coin, "units": units, "before": held, "worst": worst,
-                        "reduce_only": reduce_only}
+                        "reduce_only": reduce_only, "ref": ref}
+        self.order = {"t": self.pending["t"], "book": self.book(), "balance": self.acct.get("balance"), "part": part}
         write_json(self.home / "pending.json", self.pending)  # before sending: a restart must not send it again
         try:
             self.pending["tx"] = self.ex.market(coin, units, ref, worst, reduce_only)
@@ -357,6 +383,7 @@ class Agent:
 
     def apply(self, d, now: float) -> None:
         m, ex, want = self.memory, self.ex, dict(d.targets)
+        self.sig_px = dict(d.px)
         br = dict(d.bracket) if d.bracket else None
         if br:
             c = br["coin"]
@@ -410,8 +437,104 @@ class Agent:
         self.notes.append("The scalp part's take profit and stop loss could not be placed, so that part was closed.")
         ex.cancel(c)
         m.update(prot=None, scalp=None, scalp_done=br["id"])
-        if self.send(c, -units, ref, True):
+        if self.send(c, -units, ref, True, part="scalp"):
             m["set"] = {**m.get("set", {}), c: self.acct["positions"].get(c, 0.0)}
+
+    # --- reporting (report.py): every call is wrapped; nothing here may stop, delay or change a step ----------------
+    def _report(self, what: str, *args, **kw) -> None:
+        if self.reporter is None:
+            return
+        try:
+            getattr(self.reporter, what)(*args, **kw)
+        except Exception as e:
+            log.debug("Report not queued: %s", type(e).__name__)
+
+    def _prices(self) -> dict:
+        """Prices for the reports, without a request: the exchange's mark from the last account read, else the
+        signal's."""
+        px = {c: t["px"] for c, t in ((self.signal or {}).get("targets") or {}).items()}
+        for c, b in self.book().items():
+            if isinstance(b, dict) and isinstance(b.get("mark"), (int, float)) and b["mark"] > 0:
+                px[c] = b["mark"]
+        return px
+
+    def _snap(self) -> tuple:
+        a = self.acct or {}
+        return a.get("balance"), dict(a.get("positions") or {}), self._prices()
+
+    def _beat(self, now: float, flags: dict) -> None:
+        if self.reporter is None:
+            return
+        try:
+            sig = self.signal
+            fresh = bool(sig and self.received_at is not None and now < sig["expires"]
+                         and now - self.received_at <= STALE_S and sig["state"] != "offline")
+            state = ("flat" if flags.get("flatten") else "daily_stop" if self.memory.get("stopped_day") == utc_day(now)
+                     else "paused" if flags.get("pause") else "no_signal" if not fresh
+                     else "flat" if sig["state"] == "flat" else "following")
+            self._report("beat", *self._snap(), state)
+        except Exception as e:
+            log.debug("Report not queued: %s", type(e).__name__)
+
+    def _report_fill(self, p: dict, got: float) -> None:
+        """One order of ours that filled (in full or in part): why, its size as a multiple of the balance, its price."""
+        if self.reporter is None:
+            return
+        try:
+            c, before = p["coin"], p["before"]
+            after = before + got
+            ctx = self.order if self.order and self.order.get("t") == p["t"] else {}
+            why = ("open" if abs(before) < 1e-12 else "add" if before * got > 0 else
+                   ("flatten" if self.flags.get("flatten") else "close") if abs(after) <= 1e-9 * max(1.0, abs(before))
+                   else "reduce")
+            b0, b1 = (ctx.get("book") or {}).get(c) or {}, self.book().get(c) or {}
+            ref = p.get("ref") or b1.get("mark")
+            px, filled = ref, False  # filled: px is the real fill; else it is the price the order was sent at
+            e0 = b0.get("entry") if before else 0.0
+            if why in ("open", "add") and ref and b1.get("entry") and e0 is not None:  # the fill, from the new entry
+                fill = (b1["entry"] * after - e0 * before) / got
+                if abs(fill / ref - 1) < 0.1:
+                    px, filled = fill, True
+            bal = ctx.get("balance") or (self.acct or {}).get("balance")
+            if not px or not bal or bal <= 0:
+                return
+            result = -got * (px - e0) / bal * 100 if why in ("reduce", "close", "flatten") and e0 else None
+            rev = (self.signal or {}).get("rev") if ctx else None
+            late = p["t"] - self.rev_seen[1] if rev is not None and rev == self.rev_seen[0] else None
+            self._report("trade", c, "buy" if got > 0 else "sell", why, abs(got) * px / bal, px,
+                         # no real fill price: no ref, so the server measures no distance from the signal's price
+                         ref=self.sig_px.get(c) if ctx and filled else None, rev=rev, late=late, part=ctx.get("part"),
+                         result=result, snap=self._snap())
+        except Exception as e:
+            log.debug("Report not queued: %s", type(e).__name__)
+
+    def _found_fills(self, prev: dict) -> None:
+        """A take profit, stop loss or emergency stop that filled on the exchange since the last step: the order was
+        resting at the last read, is gone now, and the position shrank by about its size. One that was cancelled on the
+        exchange (the position did not move) is no trade."""
+        if self.reporter is None:
+            return
+        try:
+            m, acct, px = self.memory, self.acct, self._prices()
+            bal, h0, h1 = prev.get("balance"), prev.get("positions") or {}, acct.get("positions") or {}
+            found = []
+            pr = m.get("prot")
+            if pr and pr["id"] in (prev.get("brackets") or []) and pr["id"] not in acct["brackets"]:
+                c, u, now = pr["coin"], pr["units"], px.get(pr["coin"])
+                long = u > 0
+                why = "close" if not now else ("tp" if (now >= pr["tp"] if long else now <= pr["tp"]) else
+                                               "sl" if (now <= pr["sl"] if long else now >= pr["sl"]) else "close")
+                found.append((c, u, {"tp": pr["tp"], "sl": pr["sl"]}.get(why, now), why, "scalp"))
+            for c, g in (m.get("guards") or {}).items():
+                if c in (prev.get("guards") or {}) and c not in (acct.get("guards") or {}):
+                    found.append((c, g["units"], g["stop"], "stop", "trend"))
+            for c, u, at, why, part in found:
+                moved = (h0.get(c, 0.0) - h1.get(c, 0.0)) * (1 if u > 0 else -1)  # how much the position shrank
+                if at and bal and bal > 0 and moved >= 0.5 * abs(u):
+                    self._report("trade", c, "sell" if u > 0 else "buy", why, min(abs(u), moved) * at / bal, at,
+                                 part=part, snap=self._snap())
+        except Exception as e:
+            log.debug("Report not queued: %s", type(e).__name__)
 
 
 def _pair(p: dict) -> tuple:

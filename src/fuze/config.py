@@ -26,6 +26,8 @@ DEFAULTS = {
     "testnet_key_index": 4,  # the API key's index on that account; Lighter keeps 0 to 3 for its own apps
     "mainnet_account": None,
     "mainnet_key_index": 4,
+    "public": False,  # the agent reports either way (report.py); public: listed in the FUZE Fellowship on the site
+    "handle": None,  # shown with a public agent: an X or GitHub profile link (report.handle), stored as rebuilt there
 }
 RANGES = {"percent": (1.0, 100.0), "fixed_usd": (10.0, 1e6), "max_position_usd": (10.0, 1e6),
           "max_balance_usd": (10.0, 1e9),
@@ -191,6 +193,15 @@ def validate(cfg) -> dict:
     for name in ("max_position_usd", "max_balance_usd", "stale_flat_min"):
         if out[name] is not None:
             out[name] = _number(name, out[name])
+    if not isinstance(out["public"], bool):
+        raise ValueError("public must be true or false")
+    if out["handle"] is not None:
+        from fuze.report import handle
+        h = handle(out["handle"])
+        if not h:
+            raise ValueError("handle must be an X or a GitHub profile link, like https://x.com/name or "
+                             "https://github.com/name")
+        out["handle"] = h["url"]
     return out
 
 

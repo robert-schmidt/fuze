@@ -40,7 +40,9 @@ The agent's state: whether it is running, the folder it reads, mode in words, yo
 link (testnet and mainnet), whether API keys are "set" or "missing", balance and positions, and per coin **what the
 signal asks for and what you hold, in dollars** (`positions_usd`, `positions_in_words`), with the smallest change the
 agent makes and a note when a difference is under it; your limits, your sizing in words with the worked example, the
-pause and flatten flags, and the agent's last reason. It adds a REAL MONEY warning in mainnet.
+pause and flatten flags, and the agent's last reason. It adds a REAL MONEY warning in mainnet. `sharing` says
+`private` or `public` and `reporting` says in one line where the reports go ([What your agent reports](sharing.md));
+no tool changes them: the user does, with `fuze share` in a terminal.
 
 ```text
 status()

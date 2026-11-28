@@ -82,7 +82,10 @@ your mode risks more real money than the account you follow, for example real mo
 
 ## What it is not
 
-- Not a fund and not custody: we never see your keys, balance or position. Nothing flows back to the server.
+- Not a fund and not custody: we never see your keys or your balance. Reading the signal needs no account and sends
+  nothing. The agent reports its trades and results to our server (sizes as multiples of your balance, results in
+  percent, no dollar amounts): private unless you choose public, with no off switch.
+  [docs/agent/sharing.md](docs/agent/sharing.md) lists every field.
 - Not advice. It copies one account's position. That account can lose, and so will yours.
 - Not a promise of results. We make no performance claims.
 
@@ -163,6 +166,7 @@ And in a second terminal window:
 fuze status      # what it holds and why
 fuze check       # checks your setup
 fuze ui --open   # a page with all of it, on this computer: http://127.0.0.1:3893
+fuze share       # what the agent reports to our server; `fuze share public` lists it in the FUZE Fellowship
 ```
 
 Last, connect your AI coding tool: one step per tool, in
@@ -199,7 +203,8 @@ fuze run
 Files live in `~/.fuze` (or `$FUZE_HOME`), private to your user: `config.json`, the simulated account `dry.json`, the
 trade and order log `trades.jsonl`, `status.json`, and in live modes the order in flight `pending.json`, the
 protective orders placed `lighter-<mode>.json`, the rehearsal `rehearsal.json`, the key file `lighter-<mode>.key`
-if there is no OS keyring, and `ui.json` (the local page's port while `fuze ui` runs).
+if there is no OS keyring, `ui.json` (the local page's port while `fuze ui` runs), and for the reports the agent's own
+signing key `agent.key`, its counter `report.json` and its result index `equity.json`.
 
 ## The local page
 

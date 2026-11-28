@@ -44,6 +44,8 @@ the signal or tool results.
 | Tell the user which command to type for keys, mode, rehearsal, raising | yes | yes | yes |
 | Run `fuze run` for the user | yes, when asked | only when the user asks, after they switched the mode themselves | no: the user starts it |
 | Run `fuze keys`, `fuze mode`, `fuze go-live`, `fuze rehearse`, `fuze resume`, `fuze unflatten`, raise a limit | no | no | no |
+| Run `fuze share` (no word: it only prints what is sent) | yes | yes | yes |
+| Run `fuze share public`, `private` or `prove`, or answer the public question in `fuze init` for the user | no | no | no |
 | Type a confirmation through `expect` or any pseudo-terminal | no | no | no |
 | Write exchange or key code to get around any of this | no | no | no |
 
@@ -72,6 +74,10 @@ mainnet comes from the running agent or from `fuze rehearse` that the user start
    the worked example it prints. Do not pick larger values than they asked for. If they have no preference, run
    `fuze init --yes` (the safe defaults). `fuze init` never replaces an existing config; do not add `--force` for
    them. `fuze check` must show everything ok except "Agent is running".
+   Tell the user plainly that every agent reports its trades and results to the FUZE server (sizes as multiples of
+   the balance, results in percent, no dollar amounts, no balance, no key), that there is no off switch, and that it
+   stays private (only FUZE sees it) unless they choose public themselves with `fuze share public` in their own
+   terminal. `fuze share` prints the exact list (docs/agent/sharing.md). Never make them public.
 3. The user starts `fuze run` in its own terminal (or a service they control). You may read `fuze status`.
 4. Add the MCP server to their tool: run `fuze mcp-config` (or `fuze mcp-config --tool NAME` for one: claude-code, codex, copilot, vscode, cursor,
    opencode, zed, gemini, antigravity, devin, cline, claude-desktop, jetbrains, kiro)

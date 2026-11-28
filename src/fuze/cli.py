@@ -12,7 +12,7 @@ import sys
 import time
 from pathlib import Path
 
-from fuze import __version__, config, keys, modes
+from fuze import __version__, config, keys, modes, report
 from fuze.checks import setup_report
 from fuze.sizing import LABELS, counted, describe, example, fmt, raised
 
@@ -196,13 +196,24 @@ def cmd_run(args) -> int:
     setup_logging()
     link = ex.link()
     print(f"FUZE agent ({BANNER[cfg['mode']]})" + (f", account {link}" if link else "") + ". Ctrl+C to stop.")
+    print(report.status_line(cfg))
+    try:  # reporting never stops the agent from starting
+        rep = report.Reporter(cfg)
+        if rep.problem:
+            print(f"Reports are not sent: {rep.problem}")
+    except Exception as e:
+        rep = None
+        print(f"Reports are not sent ({_plain(e)}).")
     try:
-        Agent(exchange=ex).run()
+        Agent(exchange=ex, reporter=rep).run()
     except KeyboardInterrupt:
         print("Stopped. Positions stay as they are" + (
             " (on the exchange the scalp part keeps its take profit and stop loss, and the rest of each position its "
             "emergency stop)." if ex.live else ". The simulated account checks its take profit, stop loss and "
             "emergency stops only while the agent runs."))
+    finally:
+        if rep:
+            rep.close()  # a few seconds for the last report (the agent stopped) to go out
     return 0
 
 
@@ -229,6 +240,7 @@ def cmd_status(args) -> int:
     a, sig = s.get("account") or {}, s.get("signal") or {}
     for line in _mode_lines(cfg, s):
         print(line)
+    print(report.status_line(cfg))
     if s.get("mode") != cfg["mode"]:
         print(f"The agent last ran in {s.get('mode')}; restart it to trade in {cfg['mode']}.")
     age = time.time() - s["t"] if isinstance(s.get("t"), (int, float)) else None
@@ -508,6 +520,131 @@ def _confirm_rehearsal(cfg) -> str:
     return why
 
 
+# --- what the agent reports: public or private, terminal only --------------------------------------------------------
+
+def _share_show(cfg) -> int:
+    print(f"What this agent reports to {cfg['server']}, signed with a key it made on this computer:")
+    for line in report.SENT:
+        print("  - " + line)
+    print(report.PUBLIC_ADDS)
+    print(report.NEVER)
+    print("There is no switch to turn reporting off. The code that sends it is open: src/fuze/report.py.")
+    try:
+        aid = report.agent_id(report.load_key(config.ensure_home()))
+    except report.KeyProblem as e:
+        print(f"Reports are not sent: {e}")
+        return 1
+    if cfg["public"]:
+        print(f"This agent is PUBLIC, id {aid}" + (f", shown with {cfg['handle']}" if cfg["handle"] else "")
+              + f". Its page: {report.PAGE}{aid}")
+    else:
+        print(f"This agent is private (only FUZE sees its reports), id {aid}.")
+    print("Change it with `fuze share public` or `fuze share private` in a terminal. `fuze share prove` proves your "
+          "GitHub handle or your Lighter account.")
+    return 0
+
+
+def _hello_now(cfg) -> int:
+    """Send a hello at once and say what the server answered. The setting is saved either way."""
+    rep = report.Reporter(cfg, start=False)
+    if rep.problem:
+        print(f"Not sent: {rep.problem}")
+        return 1
+    st, ans = rep.send_hello()
+    if st != 200:
+        print(f"The server did not take it now ({ans.get('error') or f'answer {st}'}). A running agent sends it with "
+              "its next report.")
+        return 0
+    if not cfg["public"]:
+        print("The server has it: private, only FUZE sees this agent's reports.")
+        return 0
+    print(f"The server lists this agent publicly: {report.PAGE}{rep.id}")
+    h = ans.get("handle") if isinstance(ans.get("handle"), dict) else None
+    if h:
+        github = h.get("kind") == "github"
+        print(f"Handle {h.get('url')}: " + ("verified." if h.get("verified") else
+                                          "not verified yet (`fuze share prove` shows how)." if github else
+                                          "shown as you typed it (an X profile cannot be checked here)."))
+    return 0
+
+
+def _share_prove(cfg) -> int:
+    if not cfg["public"]:
+        print("Proofs are for a public agent: run `fuze share public` first.")
+        return 2
+    rep = report.Reporter(cfg, start=False)
+    if rep.problem:
+        print(f"Not sent: {rep.problem}")
+        return 1
+    h, did = report.handle(cfg["handle"]) if cfg["handle"] else None, False
+    if h and h["kind"] == "github":
+        print(f"To prove that {h['url']} is yours: on https://gist.github.com, signed in as {h['name']}, create a "
+              f"public gist whose description is fuze-{rep.id} (any file name, any text).")
+        input("Press Enter once the gist is there: ")
+        st, ans = rep.send_hello()
+        ok = st == 200 and isinstance(ans.get("handle"), dict) and ans["handle"].get("verified")
+        print("GitHub confirmed it: the handle is shown as verified." if ok else
+              f"Not confirmed ({ans.get('error') or 'GitHub did not show that gist'}). The server asks GitHub at most "
+              "4 times an hour; try again in a while.")
+        did = True
+    elif h:
+        print(f"{h['url']} is an X profile: it cannot be checked here and is shown as you typed it.")
+    if cfg["mode"] not in config.NETS:
+        if not did and not h:
+            print("Nothing to prove: no handle is set (`fuze share public --handle LINK`), and in simulation there is "
+                  "no Lighter account to show.")
+        return 0
+    net = cfg["mode"]
+    acct = cfg[f"{net}_account"]
+    print(f"To show your Lighter {net} account {acct} with the agent, the agent asks Lighter's library for a read-only "
+          "token that lasts one minute and sends it to the FUZE server once. The server uses it to ask Lighter one "
+          "question, whether this agent holds a key of that account, and never stores it.")
+    if input("Type YES to send it: ").strip() != "YES":
+        print("Nothing was sent.")
+        return 1
+    from fuze import lighter_venue
+    try:
+        client = lighter_venue.connect(cfg, net)
+    except Exception as e:
+        print(f"Could not open Lighter {net} with your key ({_plain(e)}). Nothing was sent.")
+        return 2
+    try:
+        st, ans = rep.prove(client, net, acct)
+    except Exception as e:
+        st, ans = 0, {"error": _plain(e)}
+    finally:
+        close = getattr(client, "close", None)
+        if close:
+            close()
+    if st == 200 and ans.get("wallet"):
+        print(f"Lighter confirmed it: account {acct} is now shown with the agent.")
+        return 0
+    print(f"Not shown: {ans.get('error') or 'Lighter did not confirm the token'}.")
+    return 1
+
+
+def cmd_share(args) -> int:
+    """`fuze share`: what is sent. public, private and prove only at a terminal: an AI tool must not make a user
+    public (the MCP server has no tool for it)."""
+    cfg = config.load()
+    if not args.what:
+        return _share_show(cfg)
+    if not sys.stdin.isatty():
+        print(f"`fuze share {args.what}` needs you at a terminal; refusing because input is not a terminal. Nothing "
+              "was changed.")
+        return 2
+    if args.what == "prove":
+        return _share_prove(cfg)
+    if args.what == "private":
+        cfg = config.save({**cfg, "public": False, "handle": None})
+        print("Saved: this agent is private. It still reports its trades and results; only FUZE sees them.")
+        return _hello_now(cfg)
+    link = args.handle if args.handle is not None else _ask_link()
+    cfg = config.save({**cfg, "public": True, "handle": link or None})
+    print("Saved: this agent is public" + (f", shown with {cfg['handle']}" if cfg["handle"] else "") + ".")
+    return _hello_now(cfg)
+
+
 def cmd_mode(args) -> int:
     cfg = config.load()
     if args.target:
@@ -617,6 +754,7 @@ def cmd_go_live(args) -> int:
           "`fuze go-live` again.\n"
           "The signal is the same in every mode, and your keys and the rehearsal are remembered: once this is done, "
           "`fuze mode simulation` and `fuze mode mainnet` move you back and forth.\n")
+    print(report.DISCLOSURE + f" This agent is {'public' if cfg['public'] else 'private'}.\n")
     print("Step 1 of 4: an account on Lighter's test exchange (test money, free).")
     cfg, bal = _lighter_account(cfg, "testnet")
     if bal is None:
@@ -697,6 +835,27 @@ def _interview(cfg) -> dict:
     return cfg
 
 
+def _ask_link() -> str | None:
+    """The handle shown with a public agent: an X or GitHub profile link, asked until it is one or Enter is pressed."""
+    while True:
+        text = input("Your X or GitHub profile link, shown with the agent (Enter for none): ").strip()
+        if not text or report.handle(text):
+            return text or None
+        print("  That is not an X or GitHub profile link. It looks like https://x.com/name or https://github.com/name.")
+
+
+def _ask_sharing(cfg) -> dict:
+    """The disclosure, then public or private (private unless the user types yes)."""
+    print(report.DISCLOSURE)
+    while True:
+        text = input("Show this agent publicly in the FUZE Fellowship? (yes/no) [no]: ").strip().lower()
+        if text in ("", "n", "no"):
+            return {**cfg, "public": False, "handle": None}
+        if text in ("y", "yes"):
+            return config.validate({**cfg, "public": True, "handle": _ask_link()})
+        print("  answer yes or no")
+
+
 def cmd_init(args) -> int:
     path = config.ensure_home() / "config.json"
     asked = _asked(args)
@@ -717,7 +876,7 @@ def cmd_init(args) -> int:
     ask = sys.stdin.isatty() and not args.yes
     target = args.mode or (_ask_mode("simulation") if ask else "simulation")
     if ask:
-        new = _interview(new)
+        new = _ask_sharing(_interview(new))
     print(f"Your sizing, shown on a ${new['dry_balance']:,.0f} balance:")
     _show(new, new["dry_balance"])
     up = []
@@ -733,13 +892,16 @@ def cmd_init(args) -> int:
     elif ask and input("Save this? [Y/n] ").strip().lower() not in ("", "y", "yes"):
         print("Not saved.")
         return 1
-    try:  # the Lighter account settings survive a --force
+    try:  # the Lighter account settings survive a --force, and so does public or private when it was not asked
         keep = config.load() if path.exists() else {}
     except (ValueError, OSError):
         keep = {}
-    new = config.save({**new, **{k: v for k, v in keep.items() if k.startswith(config.NETS)}})
+    new = config.save({**new, **{k: v for k, v in keep.items()
+                                 if k.startswith(config.NETS) or (not ask and k in ("public", "handle"))}})
     print(f"Wrote {path} (simulation: simulated account, no real money). Change the sizing later with "
           "`fuze limits`, the mode with `fuze mode`.")
+    if not ask:
+        print(report.DISCLOSURE + f" This agent is {'public' if new['public'] else 'private'}.")
     if target != "simulation":
         if not sys.stdin.isatty():
             print(f"Changing the mode to {target} needs you at a terminal: run `fuze mode {target}` there.")
@@ -880,6 +1042,11 @@ def main(argv=None) -> int:
     _sizing_args(lim)
     lim.add_argument("--stale-flat-min", dest="stale_flat_min", help='minutes, or "off"')
     sub.add_parser("check", help="check the local setup")
+    sh = sub.add_parser("share", help="what the agent reports to the FUZE server; public or private (terminal only)")
+    sh.add_argument("what", nargs="?", choices=("public", "private", "prove"),
+                    help="public: listed in the FUZE Fellowship; private: only FUZE sees the reports; prove: your "
+                         "GitHub handle or Lighter account")
+    sh.add_argument("--handle", help="with public: your X or GitHub profile link")
     from fuze.ui import PORT
     ui = sub.add_parser("ui", help=f"a read-only page about the agent, on this computer only (http://127.0.0.1:{PORT})")
     ui.add_argument("--port", type=int, default=PORT, help=f"port on 127.0.0.1 (default {PORT})")
@@ -906,7 +1073,7 @@ def main(argv=None) -> int:
             return _undo_flag({"resume": "PAUSE", "unflatten": "FLATTEN"}[args.cmd])
         return {"init": cmd_init, "run": cmd_run, "status": cmd_status, "check": cmd_check,
                 "limits": cmd_limits, "mode": cmd_mode, "keys": cmd_keys, "rehearse": cmd_rehearse, "go-live": cmd_go_live,
-                "ui": cmd_ui, "mcp-config": cmd_mcp_config}[args.cmd](args)
+                "ui": cmd_ui, "mcp-config": cmd_mcp_config, "share": cmd_share}[args.cmd](args)
     except ValueError as e:
         print(f"Error: {e}")
         return 2

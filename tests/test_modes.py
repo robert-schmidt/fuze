@@ -342,7 +342,8 @@ def test_install_hint_for_a_checkout_and_for_pip(tmp_path, monkeypatch):
 
 def test_init_asks_the_mode(exchanges, monkeypatch, capsys):
     (config.home() / "config.json").unlink()
-    answers(monkeypatch, "testnet", "", "", "", "", "", "", "77", "", "RAISE")  # mode, sizing x5, save, account, index
+    answers(monkeypatch, "testnet", "", "", "", "", "", "", "", "77", "", "RAISE")  # mode, sizing x5, private, save,
+    #                                                                                     account, index
     assert cli.main(["init"]) == 0 and config.load()["mode"] == "testnet"
 
 

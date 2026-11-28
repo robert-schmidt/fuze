@@ -185,6 +185,9 @@ def build() -> MCPServer:
             if mode == "mainnet" or s.get("mode") == "mainnet":
                 out["warning"] = "REAL MONEY: the agent trades a real Lighter account."
             out["sizing"] = describe(cfg, config.current_balance(cfg))
+            from fuze.report import status_line
+            out["sharing"] = "public" if cfg["public"] else "private"  # changed only with `fuze share` in a terminal
+            out["reporting"] = status_line(cfg)
         except (ValueError, OSError) as e:
             out["sizing"] = f"config.json is not valid: {e}"
         return out

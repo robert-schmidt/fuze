@@ -3,6 +3,27 @@
 What changed in each version of the FUZE agent. A new version that changes how orders are sent asks for a new testnet
 rehearsal (`fuze rehearse`) before mainnet unlocks on a computer again; the entries say so.
 
+## 0.5.0 (28 November 2026)
+
+- **The agent reports its trades and results to the FUZE server.** Every agent does; there is no off switch, and
+  `fuze share` prints exactly what is sent: a hello at start and when a setting changes (the sizing in words, the
+  exposure cap, the daily loss stop, yes or no for a balance ceiling and a cap per position), a beat every 5 minutes
+  (the result since the start with deposits and withdrawals left out, each position as a multiple of the balance, and
+  what the agent is doing), one report per trade (coin, side, why, size as a multiple of the balance, price, the
+  signal's price and revision, how late) and a bye at a clean stop. No dollar amount, no balance, no key and nothing
+  about the computer is sent. Reports are signed with a key the agent makes on your computer (`agent.key`) and go out
+  from a queue on a thread of their own: an error or a slow server changes nothing in trading. See
+  [What your agent reports](docs/agent/sharing.md).
+- **Public or private.** Private is the default: only FUZE sees the reports. `fuze share public` lists the agent in the
+  FUZE Fellowship on the site with your X or GitHub link; `fuze share private` undoes it. `fuze share prove` checks a
+  GitHub handle with a gist and, on testnet or mainnet, the Lighter account with a read-only token that lasts a
+  minute, sent once after you type `YES`. These commands work only at a terminal; the MCP server has no tool for them,
+  and its `status` says public or private.
+- `fuze init` says what is reported and asks whether to show the agent publicly; `fuze go-live`, `fuze run` and
+  `fuze status` say it in a line.
+- A trade report carries the fill price where the agent can work it out from the position's new entry price (opening
+  and adding); otherwise the price the order was sent at.
+
 ## 0.4.0 (28 November 2026)
 
 - **Emergency stop.** The part of each position with no take profit or stop loss of its own (the slow trend part) now

@@ -6,7 +6,9 @@ This page is the authoritative specification of the signal. For the same thing i
 FUZE publishes **the position its own account holds**, signed. It does not publish orders. An agent that starts late,
 reconnects, or misses a message still arrives at the same position.
 
-Nothing flows back: the server takes no input, and an agent never sends it a key, a balance or a position.
+Reading the signal sends nothing: these endpoints take no input. The agent reports its trades and results on a
+separate endpoint, signed with a key of its own, never with a key, a balance or a dollar amount; see
+[What your agent reports](agent/sharing.md). Nothing in a report reaches the signal or the signer.
 
 ## Endpoints (HTTPS, GET only)
 

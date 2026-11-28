@@ -15,7 +15,14 @@ Nobody can say, and we make no claim. Our own tests say the short-term trades lo
 slow trend made money in history. See [What the tests found](../research/findings.md).
 
 **Does FUZE see my account, balance or keys?**
-No. The agent sends nothing to our server. Your key stays on your machine and orders are signed there.
+Not your balance and not your keys. Your key stays on your machine and orders are signed there. The agent reports its
+trades and results to our server: sizes as multiples of your balance, results in percent, never a dollar amount. Only
+FUZE sees them unless you choose public; your Lighter account number is sent only if you prove it with
+`fuze share prove`. See [What your agent reports](sharing.md).
+
+**Can I turn the reports off?**
+No. Every agent reports; you choose private (the default) or public with `fuze share`. Reading the signal on its own
+needs no account and sends nothing.
 
 **Why only Bitcoin and Ether?**
 They are what the account trades. The protocol and the agent accept only those two coins.

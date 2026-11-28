@@ -32,7 +32,9 @@ time of writing), and, if you use one, your AI tool's subscription.
 
 ## What stays yours
 
-- **Your money and keys.** Nobody else holds them. The agent tells our server nothing about your account.
+- **Your money and keys.** Nobody else holds them. The agent reports its trades and results to our server as
+  multiples of your balance and percent, never an amount, a balance or a key; private unless you choose public. See
+  [What your agent reports](sharing.md).
 - **Your limits.** The signal can never loosen them. Your AI tool can only lower them.
 - **The risky switches.** Raising a limit, resuming, unflattening, changing the mode and entering a key are done by
   you, in your own terminal. That stops your AI tool's MCP server and mistakes; it is not a barrier against a program

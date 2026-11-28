@@ -1,7 +1,7 @@
 # The signal
 
 This section explains what FUZE publishes: the account's position, signed, every few seconds and at every change. It
-is free, public and read-only: anyone can read it, nobody needs an account, and nothing flows back to us.
+is free, public and read-only: anyone can read it, nobody needs an account, and reading it sends us nothing.
 
 ## In one paragraph
 
@@ -13,7 +13,8 @@ our trading side. Anyone can check the signature against the public key printed 
 The signal does not know who follows it. It carries no dollar amount, no number of coins and nothing about any
 follower: only multiples of our own balance, and prices. The same message serves an agent with $50 and one with
 $50,000, in simulation, on the test exchange or with real money. Each agent turns the multiple into its own size from
-its own balance and its own limits, and tells us nothing.
+its own balance and its own limits. Separately, the agent reports its trades and results to our server, as
+multiples of its balance and percent; see [What your agent reports](../agent/sharing.md).
 
 ## Where to read it
 

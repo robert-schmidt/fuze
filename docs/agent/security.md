@@ -12,7 +12,7 @@ version of the repository's `SECURITY.md`.
 | A forged signal | Every message is signed (Ed25519) and checked against a key built into the agent's code. The key is never fetched from the server; a new one comes only in a new release |
 | A replayed or delayed signal | The timestamp of the newest accepted message is kept on disk (`guard.json`); anything not newer is dropped, also after a restart. Expired messages, messages that claim to live longer than 60 seconds, and messages from the future are dropped |
 | A malformed signal | After the signature, every field is checked: types, finite numbers, sizes within 50 times the balance, only BTC and ETH, known states. A short-term part whose stop is on the wrong side or more than 1.5% away is not opened |
-| A compromised FUZE server or signing key | A valid signature proves who signed, not that the trade is wise. Your limits bound the damage: sizing, cap per position, exposure cap against your real balance, daily loss stop. The signal cannot loosen them. The server takes no input from agents and cannot read your account |
+| A compromised FUZE server or signing key | A valid signature proves who signed, not that the trade is wise. Your limits bound the damage: sizing, cap per position, exposure cap against your real balance, daily loss stop. The signal cannot loosen them. The agent's reports carry no key and no balance, and nothing the server answers reaches a decision, so it cannot read your account |
 | A network attacker | HTTPS with certificate checks always on; redirects refused; responses size-limited |
 | The signal goes quiet | No valid message for 60 seconds: hold and open nothing new; optionally close everything after `stale_flat_min`. On Lighter the short-term part rests under its take profit and stop loss on the exchange |
 | Prompt injection through your AI tool | The MCP server can only read and reduce risk. A tool refuses arguments it does not take (it never silently ignores `mode` or `api_key`, and never repeats a value). A switch sent to a folder with no agent is an error naming the folder, not a false success. The signal's `why` text is marked as data, stripped of control characters and length-limited |
@@ -20,6 +20,7 @@ version of the repository's `SECURITY.md`.
 | Real money by mistake | The mode changes only with `fuze mode` at a terminal, agent stopped, nothing open. Mainnet needs `RAISE`, `REAL MONEY` and a rehearsal on testnet that Lighter testnet itself confirms (see [The rehearsal and the mainnet lock](modes/rehearsal.md)) |
 | The local page framed by another site | The page refuses to be shown in a frame (`frame-ancestors 'none'`, `X-Frame-Options: DENY`) |
 | Orders that go wrong | Account read back after every order; no blind second order; the order in flight written to disk first; reduce-only reductions; a worst price on every market order |
+| Reporting getting in the way | The reports ([What your agent reports](sharing.md)) go out from a queue on a thread of their own; an error, a slow server or no server changes nothing in trading. They are signed with a key the agent made on your computer and carry no amount, balance or key |
 | Two agents on one folder | A lock; the second refuses to start |
 | Supply chain | One runtime dependency (`cryptography`); the MCP SDK and Lighter's SDK (pinned exactly) only when you install those extras |
 

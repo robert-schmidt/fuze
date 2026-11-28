@@ -51,7 +51,7 @@ Testnet and mainnet keys are kept separately.
 
 | Never | How |
 |---|---|
-| The FUZE server | The agent sends nothing to it. Orders are signed on your machine by Lighter's SDK and go straight to Lighter |
+| The FUZE server | The agent's reports never carry a key (see [What your agent reports](sharing.md)). Orders are signed on your machine by Lighter's SDK and go straight to Lighter. `fuze share prove` sends a read-only token that lasts one minute, never the key |
 | Your AI coding tool | The MCP server never reads the key; it only reports "set" or "missing" |
 | Logs and status files | The key is never printed or logged; errors from the SDK are reduced to their type; a filter removes long hex strings from every log line |
 | An MCP argument | No tool takes a key. A tool given an argument named like `api_key`, `key`, `private_key` or `secret` refuses, says a key must never be pasted into a chat, and neither repeats nor logs the value |

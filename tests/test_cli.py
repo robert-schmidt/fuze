@@ -140,7 +140,8 @@ def test_init_force_refuses_while_in_a_live_mode(fuze_home):
 
 
 def test_init_asks_on_a_terminal(fuze_home, monkeypatch, capsys):
-    answers(monkeypatch, "", "fixed", "250", "none", "", "5", "")  # first: the mode, Enter keeps simulation
+    answers(monkeypatch, "", "fixed", "250", "none", "", "5", "", "")  # the mode first (Enter keeps simulation), then
+    #                                                                   the sizing, private (Enter), save (Enter)
     assert cli.main(["init"]) == 0
     cfg = config.load()
     assert (cfg["size_mode"], cfg["fixed_usd"], cfg["max_position_usd"], cfg["max_x"], cfg["daily_loss_frac"]) \
@@ -149,7 +150,7 @@ def test_init_asks_on_a_terminal(fuze_home, monkeypatch, capsys):
 
 
 def test_init_asks_again_after_a_bad_answer_and_can_be_declined(fuze_home, monkeypatch, capsys):
-    answers(monkeypatch, "", "", "500", "abc", "20", "", "", "", "n")
+    answers(monkeypatch, "", "", "500", "abc", "20", "", "", "", "", "n")
     assert cli.main(["init"]) == 1 and not (fuze_home / "config.json").exists()
     out = capsys.readouterr().out
     assert "between 1 and 100" in out and "not a number" in out and "Not saved" in out

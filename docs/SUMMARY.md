@@ -64,6 +64,7 @@
   * [What you can say](agent/ai-tools/what-to-say.md)
 * [MCP tools](agent/mcp-tools.md)
 * [The local page](agent/local-page.md)
+* [What your agent reports](agent/sharing.md)
 * [Command reference](agent/commands.md)
 * [Files it keeps](agent/files.md)
 * [Troubleshooting](agent/troubleshooting.md)
