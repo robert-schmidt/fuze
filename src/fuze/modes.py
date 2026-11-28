@@ -2,7 +2,8 @@
 
   simulation  a simulated account on this computer, no money (the default)
   testnet     Lighter's test exchange, test money
-  mainnet     Lighter, real money: only after THIS machine passed the testnet rehearsal with THIS version of FUZE
+  mainnet     Lighter, real money: only after THIS machine passed the testnet rehearsal with THIS version of FUZE,
+              and only while more than half of FUZE's proven trades won (its public record, real_money())
 
 Changing the mode is a terminal action (`fuze mode`), never an MCP tool. See cli.cmd_mode for the gates.
 """
@@ -64,6 +65,56 @@ def rehearsal_problem() -> str:
                 "that sends orders, so mainnet needs a rehearsal with the version that will trade: run `fuze rehearse` "
                 "again")
     return ""
+
+
+RECORD = "/v1/record"  # FUZE's public record, on the server the signal comes from
+
+
+def proven(doc) -> tuple:
+    """(open, one sentence) from FUZE's public record: real money opens only when more than half of FUZE's proven
+    trades won (a proven trade has its opening and its closing record time-stamped in a Bitcoin block). Checked here,
+    not taken from the record's own `open` alone; anything unexpected is locked. Pure."""
+    p = doc.get("proven") if isinstance(doc, dict) else None
+    won, n = (p.get("won"), p.get("n")) if isinstance(p, dict) else (None, None)
+    if not all(isinstance(v, int) and not isinstance(v, bool) for v in (won, n)) or not 0 <= won <= n or n == 0:
+        return False, ("Real money is locked: FUZE's public record gives no count of proven trades; it opens when "
+                       "more than half of them have won.")
+    count = f"{won} of FUZE's {n} proven trades won ({100 * won / n:.1f}%)"
+    if 2 * won > n and p.get("open") is True:
+        return True, f"Real money is open: {count}, more than half."
+    if 2 * won > n:
+        return False, f"Real money is locked: {count}, but the record does not say it is open."
+    return False, f"Real money is locked: {count}; it opens when more than half have won."
+
+
+def fetch_record(server: str, timeout: float = 5.0):
+    """GET the public record: no redirects, certificates checked, a generic User-Agent. Raises when it cannot."""
+    import json
+    import urllib.request
+
+    from fuze.agent import opener
+    req = urllib.request.Request(server + RECORD, headers={"User-Agent": f"fuze-agent/{__version__}"})
+    with opener().open(req, timeout=timeout) as r:
+        if r.status != 200:
+            raise ValueError(f"answer {r.status}")
+        body = r.read(16_000_001)
+    if len(body) > 16_000_000:
+        raise ValueError("the answer is too large")
+    try:
+        return json.loads(body)
+    except ValueError:
+        raise ValueError("the answer is not JSON") from None
+
+
+def real_money(server: str) -> tuple:
+    """(open, one sentence): proven() on the record read now. Unreachable, slow or malformed is locked. This lock
+    only ever blocks a switch to mainnet: an agent already in mainnet keeps running, and leaving mainnet always works."""
+    try:
+        return proven(fetch_record(server))
+    except Exception as e:
+        from fuze.agent import _plain
+        return False, (f"Real money is locked: FUZE's public record ({server}{RECORD}) could not be read "
+                       f"({_plain(e)}); it opens when more than half of FUZE's proven trades have won.")
 
 
 def confirm_on_testnet(cfg, client) -> str:

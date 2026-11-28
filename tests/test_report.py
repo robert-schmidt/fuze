@@ -80,7 +80,7 @@ def test_envelopes_verify_and_carry_only_fields_from_the_contract(fuze_home):
         assert hashlib.sha256(raw).hexdigest()[:16] == r.id
         p = json.loads(env["payload"])
         assert set(p) <= CONTRACT[p["kind"]], p
-        assert p["v"] == 1 and p["ver"] == "0.6.0" and p["mode"] == "simulation" and p["public"] is True
+        assert p["v"] == 1 and p["ver"] == "0.6.1" and p["mode"] == "simulation" and p["public"] is True
         assert env["payload"] == json.dumps(p, separators=(",", ":")) and len(json.dumps(env)) <= report.MAX_BODY
         assert "1234" not in env["payload"] and "500" not in env["payload"]  # no balance, no dollar cap
     hello, beat, trade = wire.payloads()[:3]

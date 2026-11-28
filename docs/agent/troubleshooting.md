@@ -56,7 +56,9 @@ This page lists messages and situations you may meet, what they mean, and what t
 | `Positions are open in testnet ... A mode change never strands a position.` | Something is still open in the mode you are leaving | Type `CLOSE` to close it there and then with market orders, or close it yourself (`fuze flatten`, let the agent close everything, stop it) and switch again |
 | `That account already holds positions or orders that FUZE did not open.` | The Lighter account is not empty | Give FUZE a sub-account of its own |
 | `the testnet rehearsal has not been done on this machine` | Mainnet is locked | Run `fuze rehearse` on testnet |
-| `the rehearsal was done with FUZE ..., this is ...` | You updated FUZE; each version changes code that sends orders | Run `fuze rehearse` again |
+| `Real money is locked: ... of FUZE's ... proven trades won ...` | Mainnet waits until more than half of FUZE's proven trades have won | Nothing to fix on your side; testnet and simulation work meanwhile. `fuze mode` shows the live count |
+| `Real money is locked: FUZE's public record (...) could not be read` | The switch to mainnet could not read https://fuze.trade/v1/record | Check your connection and try again; nothing was changed |
+| `the rehearsal was done with FUZE ..., this is ...` | You updated FUZE; every version asks for a new rehearsal | Run `fuze rehearse` again |
 | `... stays locked: could not reach Lighter testnet to confirm the rehearsal` | `fuze mode mainnet` could not ask testnet | Try again later; nothing was changed |
 | `... stays locked: Lighter testnet does not confirm ...` / `... another account or API key ...` / `... no transaction ...` | The rehearsal record does not match what testnet shows (an older record, another account, or an edited file) | Run `fuze rehearse` again |
 | `The agent is running on this FUZE folder. Stop it first` | Mode changes, rehearsals and key changes need the agent stopped | Stop it with Ctrl+C |

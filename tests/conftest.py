@@ -17,6 +17,26 @@ def fuze_home(tmp_path, monkeypatch):
     return home
 
 
+OPEN_RECORD = {"proven": {"won": 3, "n": 5, "open": True}}
+
+
+@pytest.fixture(autouse=True)
+def fuze_record(monkeypatch):
+    """FUZE's public record, as modes.real_money reads it: open unless a test says otherwise. No test reads the network;
+    a test sets `record["doc"]` to another answer, or to an exception to raise."""
+    from fuze import modes
+    record = {"doc": OPEN_RECORD, "asked": [], "real": modes.fetch_record}
+
+    def fetch(server, timeout=5.0):
+        record["asked"].append(server)
+        if isinstance(record["doc"], Exception):
+            raise record["doc"]
+        return record["doc"]
+
+    monkeypatch.setattr(modes, "fetch_record", fetch)
+    return record
+
+
 class Signer:
     """A key made inside the test, never published."""
 

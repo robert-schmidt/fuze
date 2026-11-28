@@ -8,7 +8,8 @@ funding on your own trades are yours.
 
 **Is it real money today?**
 The account trades practice money. The agent's default is a simulated account with no money. Mainnet (real money)
-stays locked on each machine until that machine has passed the testnet rehearsal. See [The three modes](modes/README.md).
+stays locked on each machine until that machine has passed the testnet rehearsal, and until more than half of FUZE's
+proven trades have won (`fuze mode` and the homepage show the count). See [The three modes](modes/README.md).
 
 **Will I make money?**
 Nobody can say, and we make no claim. Our own tests say the short-term trades lose a little after costs and only the

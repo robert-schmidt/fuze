@@ -37,7 +37,8 @@ install anything.
 - Software, servers, exchanges and networks fail. When the signal stops, the agent holds what it has and opens nothing
   new; it does not know what the account would have done.
 - The agent has had no independent security review. Start in simulation, then testnet with small sizes; mainnet
-  stays locked on each machine until that machine has passed the testnet rehearsal, for each new version.
+  stays locked on each machine until that machine has passed the testnet rehearsal, for each new version, and until
+  more than half of FUZE's proven trades have won.
 - Lighter itself can stop. Its documentation describes a way out through Ethereum: your wallet can send a withdrawal,
   a cancel of all orders or a reduce-only order straight to its contract, "even if Lighter's API is unavailable", and if
   these are not processed in time the contract freezes and users withdraw from it directly on Ethereum, with open

@@ -7,7 +7,9 @@ Reading the signal needs no account and sends nothing: anyone can read it. The a
 every agent reports its trades and results to the FUZE server. There is no switch to turn this off. You choose who
 sees the reports:
 
-- **Private** (the default): only FUZE sees them, in a private dashboard.
+- **Private** (the default): only FUZE sees them, in a private dashboard. They count in the combined figures on the
+  homepage (how many agents have traded, their middle result, wins and losses by coin), where no single agent can be
+  told apart.
 - **Public**: the agent is listed on the site in the **FUZE Fellowship**, with your handle.
 
 `fuze share` prints the same lists as this page, whether your agent is public, its id, and its public page when it
@@ -107,8 +109,9 @@ limit how many new agents one address can add, and never writes it to disk.
 | | Private (default) | Public |
 |---|---|---|
 | Who sees the reports | FUZE only | Anyone, on the site |
+| Counts in the combined figures on the homepage | Yes, as one of many: counts and middle values only | Yes |
 | Listed in the FUZE Fellowship | No | Yes, at `https://fuze.trade/fellowship/<id>` |
-| Shown | Nothing | Your handle, the mode, the settings above, how long the agent has been running, its result in percent, its last trades, and on Lighter its account number after `fuze share prove` |
+| Shown about this agent | Nothing | Your handle, the mode, the settings above, how long the agent has been running, its result in percent, its last trades, and on Lighter its account number after `fuze share prove` |
 | Handle and account number kept by the server | No: going private removes them | Yes |
 
 A public agent's page shows what the reports say, nothing more. Others can see your handle next to your result, and,

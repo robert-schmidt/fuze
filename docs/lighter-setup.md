@@ -9,7 +9,8 @@ Deposits are held by its smart contracts on Ethereum, and its documentation says
 their assets." (https://docs.lighter.xyz/about-lighter/technical-architecture-lighter-core.md)
 
 Start on testnet with small sizes and watch it; mainnet stays locked on each machine until that machine has passed
-`fuze rehearse` on testnet, for each new version of FUZE. FUZE is not affiliated with Lighter. Lighter's own documentation is the authority; facts below were checked against https://docs.lighter.xyz (which
+`fuze rehearse` on testnet, for each new version of FUZE, and until more than half of FUZE's proven trades have won.
+FUZE is not affiliated with Lighter. Lighter's own documentation is the authority; facts below were checked against https://docs.lighter.xyz (which
 https://apidocs.lighter.xyz now redirects to) and Lighter's official Python SDK on 2026-11-25, and the testnet steps
 were done on Lighter testnet that day. What we did not try ourselves is listed once, at the end.
 
@@ -165,7 +166,7 @@ holds and why.
 
 Only if you accept the risks in [Risks, plainly](risks.md), and only after the testnet rehearsal passed on this machine
 with this version of FUZE (`fuze mode` tells you; `fuze mode mainnet` also asks Lighter testnet to confirm its
-orders). Then:
+orders), and while more than half of FUZE's proven trades have won (`fuze mode` shows the count). Then:
 
 ```sh
 fuze keys mainnet      # a separate mainnet API key, restricted to the coins you follow, on a sub-account of its own

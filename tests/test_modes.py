@@ -216,6 +216,130 @@ def test_a_new_version_needs_a_new_rehearsal_and_says_why(exchanges):
     assert "0.2.0" in why and "changes code that sends orders" in why
 
 
+# --- the record's lock: more than half of FUZE's proven trades won ------------------------------------------------
+
+@pytest.mark.parametrize("doc,opens,said", [
+    ({"proven": {"won": 101, "n": 192, "open": True}}, True, "Real money is open: 101 of FUZE's 192 proven trades won "
+                                                            "(52.6%)"),
+    ({"proven": {"won": 78, "n": 192, "open": False}}, False, "Real money is locked: 78 of FUZE's 192 proven trades "
+                                                              "won (40.6%); it opens when more than half have won."),
+    ({"proven": {"won": 96, "n": 192, "open": True}}, False, "96 of FUZE's 192"),  # exactly half is not more than half
+    ({"proven": {"won": 101, "n": 192, "open": False}}, False, "does not say it is open"),  # both must agree
+    ({"proven": {"won": 101, "n": 192, "open": "true"}}, False, "does not say it is open"),
+    ({"proven": {"won": 101, "n": 192}}, False, "does not say it is open"),
+    ({"proven": {"won": 0, "n": 0, "open": True}}, False, "no count"),
+    ({"proven": {"won": True, "n": 1, "open": True}}, False, "no count"),  # a bool is not a count
+    ({"proven": {"won": 1, "n": True, "open": True}}, False, "no count"),
+    ({"proven": {"won": 3.0, "n": 5, "open": True}}, False, "no count"),
+    ({"proven": {"won": 6, "n": 5, "open": True}}, False, "no count"),
+    ({"proven": {"won": -1, "n": 5, "open": True}}, False, "no count"),
+    ({"proven": {"won": "3", "n": "5", "open": True}}, False, "no count"),
+    ({"proven": None}, False, "no count"),
+    ({"balance": 99.0}, False, "no count"),
+    ([1, 2], False, "no count"),
+    (None, False, "no count"),
+])
+def test_real_money_opens_only_when_more_than_half_of_the_proven_trades_won(doc, opens, said):
+    ok, why = modes.proven(doc)
+    assert ok is opens and said in why and why.startswith("Real money is ")
+
+
+class FakeOpener:
+    def __init__(self, body=b"", status=200, error=None):
+        self.body, self.status, self.error, self.seen = body, status, error, []
+
+    def open(self, req, timeout):
+        self.seen.append((req.full_url, req.get_header("User-agent"), timeout))
+        if self.error:
+            raise self.error
+        r = io.BytesIO(self.body)
+        r.status = self.status
+        return r
+
+
+def test_the_record_is_read_from_the_signal_server_and_fails_closed(monkeypatch, fuze_record):
+    monkeypatch.setattr(modes, "fetch_record", fuze_record["real"])  # the real one, with a fake opener: no network
+    fake = FakeOpener(json.dumps({"proven": {"won": 3, "n": 5, "open": True}}).encode())
+    monkeypatch.setattr("fuze.agent.opener", lambda: fake)
+    assert modes.real_money("https://fuze.trade") == (True, "Real money is open: 3 of FUZE's 5 proven trades won "
+                                                            "(60.0%), more than half.")
+    url, agent, timeout = fake.seen[0]
+    assert url == "https://fuze.trade/v1/record" and agent == f"fuze-agent/{cli.__version__}" and timeout <= 5
+    for bad, why in [(FakeOpener(error=TimeoutError("timed out")), "timed out"),
+                     (FakeOpener(error=OSError("no route to host")), "no route to host"),
+                     (FakeOpener(b'{"proven": {"won": 3, "n": 5, "open": true}}', status=203), "answer 203"),
+                     (FakeOpener(b"<html>maintenance</html>"), "not JSON")]:
+        monkeypatch.setattr("fuze.agent.opener", lambda: bad)
+        ok, said = modes.real_money("https://fuze.trade")
+        assert not ok and "could not be read" in said and why in said and "https://fuze.trade/v1/record" in said
+
+
+def never_asked(monkeypatch):
+    monkeypatch.setattr("sys.stdin", Tty())
+    monkeypatch.setattr("builtins.input", lambda _: pytest.fail("asked something while real money is locked"))
+    monkeypatch.setattr("getpass.getpass", lambda _: pytest.fail("asked for a key while real money is locked"))
+
+
+def test_mode_mainnet_refuses_before_any_question_while_the_record_is_locked(exchanges, monkeypatch, capsys,
+                                                                             fuze_record):
+    rehearsed(exchanges)
+    connects = []
+    monkeypatch.setattr(lighter_venue, "connect", lambda cfg, net: connects.append(net) or exchanges[net])
+    for doc in ({"proven": {"won": 78, "n": 192, "open": False}}, OSError("no route to host"), {"proven": "?"}):
+        fuze_record["doc"] = doc
+        never_asked(monkeypatch)
+        assert cli.main(["mode", "mainnet"]) == 2 and config.load()["mode"] == "simulation"
+        out = capsys.readouterr().out
+        assert out.startswith("Real money is locked: ") and "Nothing was changed." in out
+    assert connects == [] and fuze_record["asked"] == ["https://fuze.trade"] * 3  # not even testnet was asked
+    fuze_record["doc"] = {"proven": {"won": 101, "n": 192, "open": True}}  # open: on to the rehearsal check
+    answers(monkeypatch, "all", "RAISE", "REAL MONEY")
+    assert cli.main(["mode", "mainnet"]) == 0 and config.load()["mode"] == "mainnet"
+    out = capsys.readouterr().out
+    assert "Real money is open: 101 of FUZE's 192" in out and "Confirmed by Lighter testnet" in out
+
+
+def test_the_record_never_stops_an_agent_already_in_mainnet_or_leaving_it(exchanges, monkeypatch, capsys,
+                                                                          fuze_record):
+    rehearsed(exchanges)
+    config.save({**config.load(), "mode": "mainnet"})
+    fuze_record["doc"] = {"proven": {"won": 1, "n": 192, "open": False}}
+    assert modes.blockers(config.load()) == [] and fuze_record["asked"] == []  # `fuze run` does not read it
+    answers(monkeypatch)
+    assert cli.main(["mode", "simulation"]) == 0 and config.load()["mode"] == "simulation"
+    assert fuze_record["asked"] == []
+
+
+def test_mode_shows_the_lock_and_does_not_fail_when_the_record_cannot_be_read(exchanges, capsys, fuze_record):
+    fuze_record["doc"] = {"proven": {"won": 78, "n": 192, "open": False}}
+    assert cli.main(["mode"]) == 0
+    assert "Real money is locked: 78 of FUZE's 192 proven trades won (40.6%)" in capsys.readouterr().out
+    fuze_record["doc"] = TimeoutError("timed out")
+    assert cli.main(["mode"]) == 0
+    assert "Real money is locked: FUZE's public record" in capsys.readouterr().out
+
+
+def test_go_live_keeps_the_testnet_steps_and_asks_nothing_about_real_money_while_locked(exchanges, monkeypatch, capsys,
+                                                                                       fuze_record):
+    rehearsed(exchanges)
+    fuze_record["doc"] = {"proven": {"won": 78, "n": 192, "open": False}}
+    answers(monkeypatch, "RAISE")  # from simulation: the switch to testnet, nothing else
+    assert cli.main(["go-live"]) == 0 and config.load()["mode"] == "testnet"
+    out = capsys.readouterr().out
+    assert "Real money is locked: 78 of FUZE's 192" in out and "Step 3" not in out and "fuze mode` shows" in out
+    never_asked(monkeypatch)  # from testnet: it says why and stops
+    assert cli.main(["go-live"]) == 2 and config.load()["mode"] == "testnet"
+    assert "Step 3" not in capsys.readouterr().out
+
+
+def test_init_with_mainnet_refuses_while_the_record_is_locked(exchanges, monkeypatch, capsys, fuze_record):
+    (config.home() / "config.json").unlink()
+    fuze_record["doc"] = {"proven": {"won": 78, "n": 192, "open": False}}
+    never_asked(monkeypatch)
+    assert cli.main(["init", "--mode", "mainnet"]) == 2 and not (config.home() / "config.json").exists()
+    assert "Real money is locked" in capsys.readouterr().out
+
+
 def test_mode_change_refused_while_positions_are_open(exchanges, monkeypatch, capsys):
     answers(monkeypatch, "RAISE")
     cli.main(["mode", "testnet"])

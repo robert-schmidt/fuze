@@ -25,14 +25,14 @@ FUZE is not affiliated with Lighter or with any exchange or AI tool named here.
 |---|---|---|
 | `simulation` (default) | a simulated $1,000 account on your computer, no money | on from the start |
 | `testnet` | Lighter's test exchange, test money | your testnet API key (`fuze keys testnet`), then `fuze mode testnet` |
-| `mainnet` | Lighter, **real money** | locked on each machine until that machine passed `fuze rehearse` on testnet, for each new version |
+| `mainnet` | Lighter, **real money** | locked on each machine until that machine passed `fuze rehearse` on testnet, for each new version, and while no more than half of FUZE's proven trades have won |
 
 Lighter describes itself as "a zero-knowledge rollup on top of Ethereum" that "generates ZK proofs of all operations
 including order matching and liquidations" (https://lighter.xyz). A standard account pays no trading fee on regular
 orders (https://docs.lighter.xyz/trading/trading-fees.md).
 
 Start in simulation, then testnet with small sizes, and watch it; mainnet after that. The signal server is
-https://fuze.trade (`/v2/signal`, `/v2/stream`; agent 0.6.0 reads version 2 only); the code is at https://github.com/robert-schmidt/fuze.
+https://fuze.trade (`/v2/signal`, `/v2/stream`; agent 0.6.0 and later read version 2 only); the code is at https://github.com/robert-schmidt/fuze.
 
 ## Three modes
 
@@ -44,7 +44,7 @@ your mode risks more real money than the account you follow, for example real mo
 | | simulation | testnet | mainnet |
 |---|---|---|---|
 | Money | none | Lighter test money | **real** |
-| Needs | nothing | the `lighter` extra (below), a Lighter testnet account and API key | the same on mainnet, plus a passed testnet rehearsal on this machine, confirmed by Lighter testnet |
+| Needs | nothing | the `lighter` extra (below), a Lighter testnet account and API key | the same on mainnet, plus a passed testnet rehearsal on this machine, confirmed by Lighter testnet, and more than half of FUZE's proven trades won |
 | Switch to it | `fuze mode simulation` | `fuze mode testnet`, type `RAISE` | `fuze mode mainnet`, type `RAISE` and `REAL MONEY` |
 
 - **Choosing**: `fuze init` asks the mode (Enter keeps simulation). Later, `fuze mode` shows it and `fuze mode testnet`
@@ -67,6 +67,11 @@ your mode risks more real money than the account you follow, for example real mo
   for a new rehearsal. `fuze mode mainnet` does not trust the record alone: it asks Lighter testnet whether those
   transactions exist, belong to your testnet account and key index, and are from the recorded time, and stays locked
   when testnet cannot confirm it (also when testnet is down).
+- **The record's lock**: mainnet also stays locked until more than half of FUZE's own proven trades have won. A proven
+  trade has its opening and its closing record time-stamped in a Bitcoin block. Every switch to mainnet (`fuze mode
+  mainnet`, `fuze go-live`, `fuze init`) reads `proven` from https://fuze.trade/v1/record and checks the count itself
+  before it asks you anything; when the record cannot be read, mainnet stays locked. `fuze mode` and the homepage
+  show the live count. An agent already in mainnet keeps running, and leaving mainnet always works.
 - **`fuze check`** in testnet or mainnet reads your key and account (balance, positions, protective orders) and sends
   no order.
 - **Same rules everywhere**: your sizing, cap per position, exposure cap, daily loss stop and stale-signal behaviour work

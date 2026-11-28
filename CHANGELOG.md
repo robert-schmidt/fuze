@@ -1,7 +1,26 @@
 # Changes
 
-What changed in each version of the FUZE agent. A new version that changes how orders are sent asks for a new testnet
-rehearsal (`fuze rehearse`) before mainnet unlocks on a computer again; the entries say so.
+What changed in each version of the FUZE agent. Every new version asks for a new testnet rehearsal (`fuze rehearse`)
+before mainnet unlocks on a computer again; the entries say whether it changes how orders are sent.
+
+## 0.6.1 (28 November 2026)
+
+Orders are sent as in 0.6.0, but the rehearsal record carries the version, so like every version this one asks for a
+new testnet rehearsal (`fuze rehearse`) on each computer before mainnet.
+
+- **Real money waits for FUZE's own record.** Mainnet stays locked until more than half of FUZE's proven trades have
+  won. A proven trade is one whose opening and closing records are both time-stamped in a Bitcoin block
+  (OpenTimestamps). Every switch to mainnet (`fuze mode mainnet`, `fuze go-live`, `fuze init` with mainnet) reads
+  `proven` from `/v1/record` on the signal's server and checks it itself before it asks anything: `won` and `n` whole
+  numbers, `n` above 0, `won` more than half of `n` (exactly half stays locked), and `open` true. An unreachable
+  server, an error or a malformed answer keeps it locked, and the message gives the count when it is known. This lock
+  comes on top of the testnet rehearsal. `fuze go-live` still walks through the testnet steps while it is locked.
+  `fuze mode` prints the lock's state and the live count; the homepage shows it too. An agent already in mainnet keeps
+  running, and leaving mainnet always works. See [The record's lock](docs/agent/modes/rehearsal.md#the-records-lock).
+- **Private agents count in the combined figures.** The homepage now shows every agent that has traded, combined:
+  how many, their middle result, wins and losses by coin. A private agent's reports count there as one of many;
+  it is still never listed or named. The agent reports nothing new: the disclosure (`fuze share`, the first-run
+  notice, `docs/agent/sharing.md`) says so.
 
 ## 0.6.0 (28 November 2026)
 

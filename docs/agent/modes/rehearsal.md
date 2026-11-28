@@ -1,7 +1,7 @@
 # The rehearsal and the mainnet lock
 
 This page explains `fuze rehearse`, the short testnet run that must pass on your machine before mainnet can be chosen,
-and what the lock does and does not protect against.
+the second lock that waits for FUZE's own record, and what the locks do and do not protect against.
 
 ## What the rehearsal does
 
@@ -34,7 +34,7 @@ Mainnet can be chosen only when the last rehearsal:
 - passed every step,
 - ran on testnet,
 - ran on **this machine**,
-- ran with **this version** of FUZE. Each version changes code that sends orders, so an update asks for a new
+- ran with **this version** of FUZE. The rehearsal is recorded for the version that passed it, so an update asks for a new
   rehearsal: the version that will trade real money must have worked on testnet first.
 
 `fuze mode mainnet` does not trust the file alone. It asks Lighter testnet (reads only, no order):
@@ -46,6 +46,34 @@ Mainnet can be chosen only when the last rehearsal:
 If testnet does not confirm all of it, or cannot be reached, mainnet stays locked and the message says why; try again
 later or run `fuze rehearse` again. `fuze mode` shows whether a passed rehearsal is recorded. `fuze run` checks the
 local record again at every start, without the network.
+
+## The record's lock
+
+Mainnet also stays locked until more than half of FUZE's own proven trades have won. A proven trade is one whose
+opening and closing records are both time-stamped in a Bitcoin block (see [Proof of results](../../record/proofs.md)).
+This lock comes on top of the rehearsal; passing one does not replace the other.
+
+Every switch to mainnet (`fuze mode mainnet`, `fuze go-live`, `fuze init` with mainnet) reads `proven` from the public
+record on the server the signal comes from (`https://fuze.trade/v1/record`) before it asks you anything:
+
+```json
+"proven": {"won": 50, "n": 120, "open": false}
+```
+
+Real money opens only when the agent's own check passes: `won` and `n` are whole numbers, `n` is above 0, `won` is
+more than half of `n` (exactly half stays locked), and the record says `open` is true. Anything else, an unreachable
+server, a slow answer, an error or a field that is missing or malformed, keeps it locked, and the message says why with
+the count when it is known:
+
+```text
+Real money is locked: 50 of FUZE's 120 proven trades won (41.7%); it opens when more than half have won.
+```
+
+The numbers above show the format only; `fuze mode` and the homepage show the live count. An agent already in mainnet keeps
+running when the count falls back, so a position is never stranded, and leaving mainnet always works.
+
+The record is not signed. The check can only refuse a switch, so a forged answer could at most take this one lock
+away; the rehearsal, the typed confirmations and your own limits stay.
 
 ## What the lock is for, and its limit
 

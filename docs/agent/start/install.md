@@ -151,8 +151,8 @@ uv tool upgrade fuze-agent                      # uv: fetches the newest commit,
 cd fuze && git pull && ~/.fuze-venv/bin/pip install '.[mcp]'   # a clone (add lighter if you use it)
 ```
 
-Read the release notes before you update. After an update, mainnet asks for a new testnet rehearsal: each version
-changes code that sends orders, so the version that will trade real money must have worked on testnet first.
+Read the release notes before you update. After an update, mainnet asks for a new testnet rehearsal: the version that
+will trade real money must have worked on testnet first.
 
 ## Removing
 

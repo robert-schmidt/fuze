@@ -9,7 +9,7 @@ and how you move between them.
 |---|---|---|---|
 | Where | A simulated account on your computer | Lighter's test exchange | Lighter |
 | Money | None | Lighter test money | **Real** |
-| Needs | Nothing | The `[mcp,lighter]` extras ([Install](../start/install.md#the-extras)), a Lighter testnet account and API key | The same on mainnet, plus a passed testnet rehearsal on this machine with this version, confirmed by Lighter testnet |
+| Needs | Nothing | The `[mcp,lighter]` extras ([Install](../start/install.md#the-extras)), a Lighter testnet account and API key | The same on mainnet, plus a passed testnet rehearsal on this machine with this version, confirmed by Lighter testnet, and more than half of FUZE's proven trades won |
 | Risks | Nothing | Test money only | **Everything on the mainnet sub-account** |
 | Switch to it | `fuze mode simulation` | `fuze mode testnet`, type `RAISE` | `fuze mode mainnet`, type `RAISE` and `REAL MONEY` |
 
@@ -29,7 +29,8 @@ key, the switch. It skips what is already done, so you can stop at any question 
 2. **Testnet, small sizes**: the same orders on Lighter's test exchange. `fuze rehearse` runs the whole order path once
    (open, emergency stop, take profit and stop loss, cancel both, close) and records it.
 3. **Mainnet**: only after you have watched testnet work and accept that you can lose everything you put on that
-   account. Each new version of FUZE asks for a new testnet rehearsal before mainnet unlocks again.
+   account, and only once more than half of FUZE's own proven trades have won (`fuze mode` shows the count). Each new
+   version of FUZE asks for a new testnet rehearsal before mainnet unlocks again.
 
 > **Warning:** on mainnet the protection for your money is on the exchange side: a sub-account of its own holding only
 > what you can lose, and an API key restricted to the markets of the coins you follow. See [Security model](../security.md).
@@ -49,7 +50,7 @@ key, the switch. It skips what is already done, so you can stop at any question 
 Your Lighter account numbers, the API keys and the rehearsal stay on this computer when you change the mode. Going from
 real money back to simulation and to real money again asks for the confirmations only (and asks Lighter testnet to
 confirm the rehearsal again). Your simulated account keeps its balance while you are away. What does not carry over:
-a new version of FUZE that changes how orders are sent asks for a new rehearsal, and so does another computer.
+a new version of FUZE asks for a new rehearsal, and so does another computer.
 
 ## Any mode can follow any source
 

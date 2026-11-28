@@ -35,6 +35,7 @@ This page defines the terms used in these docs, in alphabetical order.
 | Paper (practice money) | Simulated trading at real prices, with no money at stake |
 | Perpetual future (perp) | A futures contract with no expiry that tracks the coin's price |
 | Placebo | A deliberately meaningless version of a signal, used to check that a test result is not noise |
+| Proven trade | A trade whose opening and closing records are both time-stamped in a Bitcoin block (OpenTimestamps); mainnet stays locked until more than half of FUZE's proven trades have won |
 | Rehearsal | The agent's testnet run that opens, protects and closes the smallest position, required before mainnet |
 | Reduce-only | An order that can only shrink a position, never open or grow one |
 | Revision (`rev`) | The signal's counter that rises only when the position, its bracket or the state changes |

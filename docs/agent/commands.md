@@ -90,9 +90,11 @@ balance).
 fuze mode [{simulation,testnet,mainnet}]
 ```
 
-With no argument: the mode, the account link and key state, and whether a passed rehearsal is recorded. With one:
-switches, with the agent stopped and nothing open; toward real money it asks for `RAISE` (and `REAL MONEY` for mainnet).
-`fuze mode mainnet` first asks Lighter testnet to confirm the rehearsal record (reads only).
+With no argument: the mode, the account link and key state, whether a passed rehearsal is recorded, and whether
+FUZE's record opens real money, with the live count of proven trades. With one: switches, with the agent stopped and
+nothing open; toward real money it asks for `RAISE` (and `REAL MONEY` for mainnet). `fuze mode mainnet` first reads
+FUZE's public record and refuses, before it asks anything, unless more than half of FUZE's proven trades have won; then
+it asks Lighter testnet to confirm the rehearsal record (reads only).
 
 ## fuze keys
 
@@ -118,6 +120,8 @@ in order, and says at each one what to do on Lighter:
 
 1. An account on Lighter's test exchange and an API key for it (typed hidden), then it reads the account back.
 2. The rehearsal, if this computer has not passed it with this version.
+   While FUZE's record keeps real money locked (no more than half of its proven trades have won), it stops here: from
+   simulation it offers the switch to testnet, and it asks nothing about real money.
 3. A choice: follow on the test exchange first (recommended), or carry on. Run `fuze go-live` again later to carry on.
 4. Your Lighter account for real money and its API key, read back the same way.
 5. The switch, confirmed by typing `RAISE` and `REAL MONEY`.

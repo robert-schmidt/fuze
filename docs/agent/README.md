@@ -25,7 +25,7 @@ time of writing), and, if you use one, your AI tool's subscription.
 |---|---|---|---|
 | `simulation` (default) | A simulated $1,000 account on your computer | None | On from the start |
 | `testnet` | Lighter's test exchange | Test money | Your testnet API key, then `fuze mode testnet` |
-| `mainnet` | Lighter | **Real** | Locked on each machine until that machine passed `fuze rehearse` on testnet, for each new version |
+| `mainnet` | Lighter | **Real** | Locked on each machine until that machine passed `fuze rehearse` on testnet, for each new version, and until more than half of FUZE's proven trades have won |
 
 > **Warning:** start in simulation, then testnet with small sizes, and watch it. Mainnet comes after that, with only
 > money you can afford to lose.

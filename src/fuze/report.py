@@ -75,7 +75,8 @@ NEVER = ("Never sent: a dollar amount, a number of coins, your balance, any key,
          "to limit how many new agents one address makes, and never writes it to disk.")
 DISCLOSURE = ("This agent reports its trades and results to the FUZE server. Sizes are sent as multiples of your "
               "balance and results in percent: no dollar amount, no balance and no key. Private (the default): only "
-              "FUZE sees them. Public: the agent is listed in the FUZE Fellowship on fuze.trade with your X or GitHub "
+              "FUZE sees them, and they count in the combined figures on fuze.trade (how many agents, their middle "
+              "result, wins and losses by coin), where no single agent can be told apart. Public: the agent is listed in the FUZE Fellowship on fuze.trade with your X or GitHub "
               "link. `fuze share` shows exactly what is sent, and changes it.")
 
 
@@ -178,7 +179,7 @@ def settings_of(cfg) -> dict:
 def status_line(cfg) -> str:
     """One line for `fuze run` and `fuze status`."""
     how = ("public: listed in the FUZE Fellowship" + (f" as {cfg['handle']}" if cfg.get("handle") else "")
-           if cfg.get("public") else "private: only FUZE sees them")
+           if cfg.get("public") else "private: only FUZE sees them; they count in the combined figures on fuze.trade")
     return (f"Reporting: this agent reports its trades and results to {cfg['server']} ({how}). `fuze share` shows "
             "what is sent.")
 

@@ -432,6 +432,12 @@ def switch_mode(cfg, target: str) -> int:
         print("Changing the mode needs you at a terminal; refusing because input is not a terminal. "
               "Nothing was changed.")
         return 2
+    if target == "mainnet":  # FUZE's own record first, before anything is asked (modes.real_money)
+        ok, why = modes.real_money(cfg["server"])
+        if not ok:
+            print(f"{why} Nothing was changed.")
+            return 2
+        print(why)
     lock = _lock()
     if not lock:
         print("The agent is running on this FUZE folder. Stop it first (Ctrl+C in its terminal), then change the mode.")
@@ -663,7 +669,7 @@ def cmd_share(args) -> int:
         return _share_prove(cfg)
     if args.what == "private":
         cfg = config.save({**cfg, "public": False, "handle": None})
-        print("Saved: this agent is private. It still reports its trades and results; only FUZE sees them.")
+        print("Saved: this agent is private. It still reports its trades and results; only FUZE sees them, and they count in the combined figures on fuze.trade, where no single agent can be told apart.")
         return _hello_now(cfg)
     link = args.handle if args.handle is not None else _ask_link()
     cfg = config.save({**cfg, "public": True, "handle": link or None})
@@ -681,9 +687,10 @@ def cmd_mode(args) -> int:
         why = modes.rehearsal_problem()
         print("Testnet rehearsal: " + ("recorded as passed on this machine with this version (`fuze mode mainnet` "
                                        "asks Lighter testnet to confirm it)" if not why else why))
+        print(modes.real_money(cfg["server"])[1])
     print("Change with `fuze mode simulation|testnet|mainnet` in a terminal. Moving toward real money asks you to "
-          f"type RAISE (and {modes.PHRASE} for mainnet); mainnet needs the testnet rehearsal first. "
-          "`fuze go-live` walks you through all of it, one step at a time.")
+          f"type RAISE (and {modes.PHRASE} for mainnet); mainnet needs the testnet rehearsal first, and more than "
+          "half of FUZE's proven trades won. `fuze go-live` walks you through all of it, one step at a time.")
     return 0
 
 
@@ -776,6 +783,9 @@ def cmd_go_live(args) -> int:
         print("Trading on Lighter needs one more part, Lighter's own signing library: "
               + config.pip_hint("mcp,lighter") + "\nThen run `fuze go-live` again.")
         return 2
+    live, why = modes.real_money(cfg["server"])  # FUZE's own record; switch_mode checks it again at the switch
+    if not live:
+        print(why + " Steps 1 and 2, on the test exchange, work while it is locked.\n")
     print("Real money, in four steps. Steps you have done are skipped; you can stop at any question and run "
           "`fuze go-live` again.\n"
           "The signal is the same in every mode, and your keys and the rehearsal are remembered: once this is done, "
@@ -797,6 +807,15 @@ def cmd_go_live(args) -> int:
     else:
         print("Passed on this computer with this version.")
     cfg = config.load()
+    if not live:  # nothing about real money is asked while the record keeps it locked
+        if cfg["mode"] == "simulation":
+            print("\nReal money is locked (see above), so the next step is following on the test exchange.")
+            code = switch_mode(cfg, "testnet")
+        else:
+            print("\n" + why)
+            code = 2
+        print("`fuze mode` shows the live count, and `fuze go-live` carries on with real money once it opens.")
+        return code
     if cfg["mode"] == "simulation":
         print("\nYou can follow on the test exchange for a while first and watch every order there (recommended), "
               "or carry on to real money now.")
@@ -906,6 +925,9 @@ def cmd_init(args) -> int:
     new = config.validate({**config.DEFAULTS, **asked})  # a new config is saved in simulation; see the mode below
     ask = sys.stdin.isatty() and not args.yes
     target = args.mode or (_ask_mode("simulation") if ask else "simulation")
+    if target == "mainnet" and not (live := modes.real_money(new["server"]))[0]:
+        print(f"{live[1]} Nothing was saved. Start with `fuze init --mode simulation` or `--mode testnet`.")
+        return 2
     if ask:
         new = _ask_sharing(_interview(new))
     print(f"Your sizing, shown on a ${new['dry_balance']:,.0f} balance:")

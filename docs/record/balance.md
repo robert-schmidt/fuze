@@ -30,6 +30,7 @@ This page explains the balance figures in the public record and why the record i
 | `trades` | The short-term trades of this test period, newest first, the open one included (`closed` is empty). `fills`: each order of the account with its time, side, units and price; `n`: how many of them were entries; `entry`: their average price; `tp`, `sl`: the take profit and stop loss; `moved`: the stop loss was moved into profit; `how`: what closed it (`tp`, `sl`, or the bot's own reason); `exit`, `result`: the closing price and the trade's own result in dollars |
 | `proof`, `mined` | On a fill or an `end`: the record's SHA-256, stamped with OpenTimestamps. `https://fuze.trade/proof/<proof>.json` is the stamped record and `.json.ots` its stamp; `mined` is true once the stamp names a Bitcoin block. See [proofs](proofs.md) |
 | `url` | On a fill, with real money only: the order on Lighter's explorer |
+| `proven` | Over the whole record, every coin: `n` proven trades (opening and closing records both time-stamped in a Bitcoin block), `won` of them won, and `open`: true when more than half have won. The agent keeps real money locked until then ([The record's lock](../agent/modes/rehearsal.md#the-records-lock)) |
 | `trend` | Per coin, the slow trend position: its average entry, since when it is held, its latest orders, and `stop`: the price of the [emergency stop](../agent/following.md) resting for it |
 
 Times are Unix seconds.

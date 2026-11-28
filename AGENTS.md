@@ -90,7 +90,8 @@ mainnet comes from the running agent or from `fuze rehearse` that the user start
    right one when it is missing). Have them follow `docs/lighter-setup.md` for a testnet account and an API key
    restricted to the markets of the coins they follow, then type `fuze keys testnet` and `fuze mode testnet` themselves. Suggest
    small sizes on testnet and that they watch it trade.
-6. Mainnet only after the user ran `fuze rehearse` on testnet on this machine and watched it work. Tell them the
+6. Mainnet only after the user ran `fuze rehearse` on testnet on this machine and watched it work, and only while more
+   than half of FUZE's proven trades have won (`fuze mode` shows the count; until then every switch refuses). Tell them the
    commands; they type them. The simplest for them is `fuze go-live` in their own terminal: it asks for each thing in
    turn. Never run it for them and never ask them to paste a key into the chat. If status says their mode is more real than the account they follow (for example real
    money following our practice account), repeat that to them in plain words.

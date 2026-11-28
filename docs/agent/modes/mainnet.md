@@ -11,6 +11,9 @@ This page covers following with real money on Lighter. Read it to the end before
 - `fuze rehearse` passed on this machine with this version (`fuze mode` tells you), with the same testnet account and
   key index still set: `fuze mode mainnet` asks Lighter testnet to confirm the rehearsal's orders, and stays locked if
   testnet cannot confirm them (also when testnet is down).
+- More than half of FUZE's own proven trades have won. Every switch to mainnet checks FUZE's public record first and
+  refuses before it asks anything while they have not; `fuze mode` shows the live count. See
+  [The record's lock](rehearsal.md#the-records-lock).
 - You do not give an AI tool unattended shell access on this machine: the typed confirmations do not stop a program
   that runs as you, and it could read the key. See [Security model](../security.md).
 - An account **of its own** holds only the money you want to trade and can afford to lose completely: best a wallet
@@ -37,7 +40,8 @@ Or by hand:
 fuze keys mainnet      # account index, key index, then the key (hidden)
 fuze check             # reads the mainnet account; sends no order
 fuze mode mainnet      # stop the agent first. It closes what is open in the current mode (on Lighter after you
-                       # type CLOSE), asks Lighter testnet to confirm the rehearsal, then you type RAISE and REAL MONEY
+                       # type CLOSE), checks FUZE's record, asks Lighter testnet to confirm the rehearsal, then you
+                       # type RAISE and REAL MONEY
 fuze run
 ```
 

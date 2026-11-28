@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fuze-agent"
-version = "0.6.0"
+version = "0.6.1"
 description = "Vibe trading, with your limits: tell your AI coding tool to follow the signed FUZE position signal, and it sets up this agent on your own account (simulation, Lighter testnet or mainnet). No promise of profit."
 keywords = ["vibe trading", "trading agent", "copy trading", "signal", "perpetual futures", "bitcoin", "ether", "lighter", "mcp", "ai coding tool", "claude code", "codex", "self-custody"]
 readme = "README.md"

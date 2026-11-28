@@ -43,7 +43,8 @@ situation.
   we tried beat trading costs. Only the slow trend position made money in those tests. Past results promise nothing.
 - **Futures use leverage.** You can lose everything you put in, and faster than you expect.
 - **Start small, in order.** Simulation first, then Lighter testnet with small sizes; mainnet stays locked on each
-  machine until that machine has passed the testnet rehearsal.
+  machine until that machine has passed the testnet rehearsal, and until more than half of FUZE's proven trades have
+  won.
 
 The full list is on [Risks, plainly](risks.md). Read it before anything else.
 
