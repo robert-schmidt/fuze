@@ -15,6 +15,11 @@ rehearsal (`fuze rehearse`) before mainnet unlocks on a computer again; the entr
   cancelling one never touches the other.
 - `fuze status`, the local page (`fuze ui`) and the MCP tools show each position's emergency stop. In simulation the
   stop is checked while the agent runs.
+- **`fuze go-live`**: one guided command from simulation to real money. It asks for a Lighter testnet account and API
+  key, runs the rehearsal, asks for the mainnet account and key and makes the switch, skipping what is already done.
+  Keys, account numbers and the rehearsal are remembered across mode changes.
+- **`fuze mode` closes what is open** in the mode you leave instead of only refusing: simulated positions by itself,
+  positions on Lighter with market orders once you type `CLOSE`.
 - **The testnet rehearsal has two more steps**: it places the emergency stop beside a take profit and stop loss, checks
   neither is taken for the other, and removes it. **Mainnet asks for a new rehearsal with this version.**
 

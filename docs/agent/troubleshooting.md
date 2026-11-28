@@ -49,7 +49,7 @@ This page lists messages and situations you may meet, what they mean, and what t
 | `that is not a Lighter API private key: those are 80 hexadecimal characters ...` | What you pasted has the wrong length or is not hexadecimal; nothing was saved | Paste the API private key (80 hex characters), never a wallet key |
 | `the stored ... API key is not a Lighter API private key` or `the Lighter SDK could not use the stored ... API key` | A key stored earlier has the wrong shape | Enter it again with `fuze keys testnet` (or `mainnet`) |
 | `Lighter does not accept this API key for account ... at key index ...` | The account index, key index or key do not match on Lighter | Check all three with `fuze keys testnet`; see [Lighter account and API key](../lighter-setup.md) |
-| `Positions are open in simulation ... A mode change never strands a position.` | Something is still open in the current mode | `fuze flatten`, let the agent close everything, stop it, then switch |
+| `Positions are open in testnet ... A mode change never strands a position.` | Something is still open in the mode you are leaving | Type `CLOSE` to close it there and then with market orders, or close it yourself (`fuze flatten`, let the agent close everything, stop it) and switch again |
 | `That account already holds positions or orders that FUZE did not open.` | The Lighter account is not empty | Give FUZE a sub-account of its own |
 | `the testnet rehearsal has not been done on this machine` | Mainnet is locked | Run `fuze rehearse` on testnet |
 | `the rehearsal was done with FUZE ..., this is ...` | You updated FUZE; each version changes code that sends orders | Run `fuze rehearse` again |

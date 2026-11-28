@@ -222,11 +222,75 @@ def test_mode_change_refused_while_positions_are_open(exchanges, monkeypatch, ca
     rehearsed_ok = {"ok": True, "net": "testnet", "machine": modes.machine(), "version": cli.__version__,
                     "steps": [{"step": s, "ok": True} for s in modes.STEPS]}
     config.write_json(config.home() / "rehearsal.json", rehearsed_ok)
-    answers(monkeypatch)  # no question may be asked
+    answers(monkeypatch, "close")  # only the exact word closes anything
     assert cli.main(["mode", "simulation"]) == 2 and "Positions are open in testnet" in capsys.readouterr().out
-    assert config.load()["mode"] == "testnet"
-    exchanges["testnet"].pos[1] = 0.0
-    assert cli.main(["mode", "simulation"]) == 0 and config.load()["mode"] == "simulation"  # safer: no RAISE
+    assert config.load()["mode"] == "testnet" and exchanges["testnet"].pos[1] == -0.003
+    answers(monkeypatch, "CLOSE")  # closed with a reduce-only market order, then the switch; safer, so no RAISE
+    assert cli.main(["mode", "simulation"]) == 0 and config.load()["mode"] == "simulation"
+    assert exchanges["testnet"].pos[1] == 0.0 and "nothing is open in testnet now" in capsys.readouterr().out
+
+
+def test_leaving_simulation_closes_the_simulated_positions(exchanges, monkeypatch, capsys):
+    from fuze.venue import open_venue
+    sim = open_venue(config.load(), config.home())
+    sim.mark({"BTC": 60000.0})
+    sim.market("BTC", -0.01, 60000.0)
+    assert sim.account(fresh=True)["positions"]["BTC"] == -0.01
+    answers(monkeypatch, "RAISE")
+    assert cli.main(["mode", "testnet"]) == 0 and config.load()["mode"] == "testnet"
+    assert "simulated positions" in capsys.readouterr().out
+    assert not any(open_venue({**config.load(), "mode": "simulation"}, config.home()).account()["positions"].values())
+
+
+def test_go_live_walks_from_nothing_to_real_money_and_remembers_it(monkeypatch, capsys):
+    """No account, no key, no rehearsal: one command asks for each in turn. Afterwards going back to simulation and
+    to real money again asks for no key and no rehearsal."""
+    fakes = {"testnet": FakeLighter(), "mainnet": FakeLighter(balance=500.0)}
+    monkeypatch.setattr(lighter_venue, "connect", lambda cfg, net: fakes[net])
+    monkeypatch.setenv("FUZE_NO_KEYRING", "1")
+    monkeypatch.setattr(modes, "sleep", lambda s: None, raising=False)
+    monkeypatch.setattr("time.sleep", lambda s: None)
+    config.save(config.DEFAULTS)
+    monkeypatch.setattr("sys.stdin", io.StringIO("77\n"))
+    assert cli.main(["go-live"]) == 2 and keys.state("testnet") != "set"  # not a terminal: nothing asked, nothing set
+    monkeypatch.setattr(modes, "sdk_installed", lambda: False)
+    answers(monkeypatch)
+    assert cli.main(["go-live"]) == 2 and "signing library" in capsys.readouterr().out
+    monkeypatch.setattr(modes, "sdk_installed", lambda: True)
+    # testnet account 77 + key, the rehearsal (yes), then "testnet": follow with test money first
+    answers(monkeypatch, "77", "", "yes", "testnet", "RAISE")
+    assert cli.main(["go-live"]) == 0 and config.load()["mode"] == "testnet" and keys.state("testnet") == "set"
+    out = capsys.readouterr().out
+    assert "Step 1 of 4" in out and "PASSED" in out and "carries on with real money" in out and KEY not in out
+    assert not modes.rehearsal_problem()
+    # again: steps 1 and 2 are skipped; mainnet account 5 + key, then RAISE and the phrase
+    answers(monkeypatch, "5", "", "RAISE", "REAL MONEY")
+    assert cli.main(["go-live"]) == 0 and config.load()["mode"] == "mainnet"
+    out = capsys.readouterr().out
+    assert "Passed on this computer with this version" in out and "Generate API key" in out and KEY not in out
+    assert cli.main(["go-live"]) == 0 and "already trade real money" in capsys.readouterr().out
+    # back to practice and to real money again: nothing is typed but the confirmations
+    answers(monkeypatch)
+    assert cli.main(["mode", "simulation"]) == 0 and config.load()["mode"] == "simulation"
+    assert keys.state("mainnet") == "set" and config.load()["mainnet_account"] == 5 and not modes.rehearsal_problem()
+    answers(monkeypatch, "RAISE", "REAL MONEY")
+    assert cli.main(["mode", "mainnet"]) == 0 and config.load()["mode"] == "mainnet"
+    answers(monkeypatch, "mainnet", "RAISE", "REAL MONEY")  # and go-live from simulation asks only where to go
+    cli.main(["mode", "simulation"])
+    assert cli.main(["go-live"]) == 0 and config.load()["mode"] == "mainnet"
+
+
+def test_go_live_stops_when_lighter_refuses_the_key(monkeypatch, capsys):
+    def refuse(cfg, net):
+        raise RuntimeError("invalid key for /home/me/.fuze/lighter-testnet.key")
+    monkeypatch.setattr(lighter_venue, "connect", refuse)
+    monkeypatch.setattr(modes, "sdk_installed", lambda: True)
+    monkeypatch.setenv("FUZE_NO_KEYRING", "1")
+    config.save(config.DEFAULTS)
+    answers(monkeypatch, "77", "")
+    assert cli.main(["go-live"]) == 2 and config.load()["mode"] == "simulation"
+    out = capsys.readouterr().out
+    assert "does not accept" in out and "fuze keys testnet" in out and KEY not in out
 
 
 def test_mode_change_refused_when_the_new_account_is_not_empty(exchanges, monkeypatch, capsys):
@@ -240,13 +304,6 @@ def test_mode_change_refused_while_the_agent_runs(exchanges, monkeypatch, capsys
     answers(monkeypatch, "RAISE")
     assert cli.main(["mode", "testnet"]) == 2 and "Stop it first" in capsys.readouterr().out
     lock.close()
-
-
-def test_simulated_positions_block_leaving_simulation(exchanges, monkeypatch, capsys):
-    from fuze.dry import DryExchange
-    DryExchange(config.home(), 1000.0).market("BTC", 0.01, 60000.0)
-    answers(monkeypatch, "RAISE")
-    assert cli.main(["mode", "testnet"]) == 2 and "Positions are open in simulation" in capsys.readouterr().out
 
 
 def test_missing_keys_block_the_mode(monkeypatch, capsys):

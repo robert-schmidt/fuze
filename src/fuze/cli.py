@@ -346,6 +346,39 @@ def _held(a) -> bool:
     return bool(a["brackets"] or a.get("guards")) or any(abs(v) > 1e-12 for v in a["positions"].values())
 
 
+def _close_first(cfg, cur: str, a, why="A mode change never strands a position.") -> int:
+    """Something is open in `cur` and has to be closed first (a mode change never strands a position; the rehearsal
+    needs an empty account). The simulated account closes it by itself; on Lighter you type CLOSE and it is closed
+    with market orders now. 0 once nothing is open."""
+    ex = _venue(cfg, cur)
+    if cur != "simulation":
+        print(f"Positions are open in {cur}: {a['positions']}. {why}\n"
+              "Type CLOSE to close them now with market orders and cancel their open orders. Anything else leaves "
+              "them as they are.")
+        if input("Type CLOSE to close them: ").strip() != "CLOSE":
+            print("Nothing was changed. You can also close them with `fuze flatten` and `fuze run`, then change "
+                  "the mode.")
+            return 2
+    try:
+        ex.flatten()
+        for _ in range(10):
+            a = ex.account(fresh=True)
+            if not _held(a):
+                break
+            time.sleep(1.0)
+    except Exception as e:
+        print(f"Closing did not go through ({_plain(e)}). Nothing was changed; check the account: {ex.link()}")
+        return 2
+    if _held(a):
+        print("Not everything closed" + (" (the simulated account has no price yet: run `fuze run` once first)"
+                                         if cur == "simulation" else f": {a['positions']}. Check {ex.link()}")
+              + ". Nothing was changed.")
+        return 2
+    print("Closed: your simulated positions, in the simulated account." if cur == "simulation"
+          else f"Closed: nothing is open in {cur} now.")
+    return 0
+
+
 def switch_mode(cfg, target: str) -> int:
     """Change the mode. Terminal only, agent stopped, nothing open in the current mode, the new one ready; moving
     toward real money asks for RAISE, and mainnet also for the phrase."""
@@ -367,6 +400,7 @@ def switch_mode(cfg, target: str) -> int:
             print(f"{modes.NAMES[target]} is not ready:")
             for m in missing:
                 print("  - " + m)
+            print("`fuze go-live` walks you through these, one step at a time.")
             return 2
         if target == "mainnet" and (why := _confirm_rehearsal(cfg)):
             print(f"{modes.NAMES[target]} stays locked: {why}. Nothing was changed.")
@@ -385,11 +419,8 @@ def switch_mode(cfg, target: str) -> int:
                 print("Not changed.")
                 return 1
             a = {"positions": {}, "brackets": []}
-        if _held(a):
-            print(f"Positions are open in {cur}: {a['positions']}. A mode change never strands a position. Close "
-                  "them first: `fuze flatten`, let `fuze run` close everything, stop it, then change the mode "
-                  "(and `fuze unflatten` when you want it to follow again).")
-            return 2
+        if _held(a) and (code := _close_first(cfg, cur, a)):
+            return code
         bal = config.current_balance(cfg)
         if target != "simulation":
             try:
@@ -500,6 +531,95 @@ def cmd_rehearse(args) -> int:
         lock.close()
 
 
+APP = {"testnet": "https://testnet.app.lighter.xyz", "mainnet": "https://app.lighter.xyz"}
+
+
+def _lighter_account(cfg, net: str):
+    """One step of `fuze go-live`: the Lighter account and API key for `net`, asked only when missing, then read
+    back. Returns (config, balance), or (config, None) when Lighter does not accept them."""
+    if cfg[f"{net}_account"] is None or keys.state(net) != "set":
+        print(f"  1. Open {APP[net]} and connect a wallet only you control."
+              + (" Open the account panel (your address, top right) and press Request Funds: the account is created "
+                 "with test money." if net == "testnet" else
+                 " Make a sub-account for FUZE (Sub-accounts, New Sub-Account) and transfer into it only money you "
+                 "can afford to lose completely."))
+        print(f"  2. Open {APP[net]}/apikeys with that account selected, press Generate API key, choose index 4, "
+              "leave Maker only off" + ("" if net == "testnet" else ", and restrict the key to the BTC and ETH "
+                                        "markets") + ". Your wallet signs it.")
+        print("  3. The page shows the private key once, and your account index. Type both here. The key is hidden "
+              "as you type, stored on this computer only, and never shown again. Never type your wallet's own key "
+              "or recovery phrase anywhere.")
+        cfg = _keys_prompt(cfg, net)
+    try:
+        ex = _venue(cfg, net)
+        a = ex.account(fresh=True)
+    except Exception as e:
+        print(f"Lighter {net} does not accept this account index, key index and key together ({_plain(e)}). "
+              f"Run `fuze keys {net}` to type them again, then `fuze go-live`.")
+        return cfg, None
+    print(f"Lighter {net} account {cfg[f'{net}_account']}: balance ${a['balance']:,.2f}. {ex.link()}")
+    return cfg, a["balance"]
+
+
+def cmd_go_live(args) -> int:
+    """The guided way from simulation to real money. It only runs the same steps as `fuze keys`, `fuze rehearse` and
+    `fuze mode`, in order, and skips what is already done: stop at any question and run it again to carry on."""
+    cfg = config.load()
+    if not sys.stdin.isatty():
+        print("`fuze go-live` asks you questions and takes your keys at a terminal; refusing because input is not a "
+              "terminal. Nothing was changed.")
+        return 2
+    if cfg["mode"] == "mainnet":
+        print("You already trade real money (Lighter mainnet). `fuze status` shows what the agent holds; "
+              "`fuze mode simulation` goes back to the simulated account.")
+        return 0
+    if _agent_running():
+        print("The agent is running on this FUZE folder. Stop it first (Ctrl+C in its terminal), then run "
+              "`fuze go-live` again.")
+        return 2
+    if not modes.sdk_installed():
+        print("Trading on Lighter needs one more part, Lighter's own signing library: "
+              + config.pip_hint("mcp,lighter") + "\nThen run `fuze go-live` again.")
+        return 2
+    print("Real money, in four steps. Steps you have done are skipped; you can stop at any question and run "
+          "`fuze go-live` again.\n"
+          "The signal is the same in every mode, and your keys and the rehearsal are remembered: once this is done, "
+          "`fuze mode simulation` and `fuze mode mainnet` move you back and forth.\n")
+    print("Step 1 of 4: an account on Lighter's test exchange (test money, free).")
+    cfg, bal = _lighter_account(cfg, "testnet")
+    if bal is None:
+        return 2
+    print("\nStep 2 of 4: the rehearsal. The agent sends its whole set of orders once on the test exchange and "
+          "checks each on the account.")
+    if modes.rehearsal_problem():
+        held = _venue(cfg, "testnet").account(fresh=True)
+        if _held(held) and (code := _close_first(cfg, "testnet", held, "The rehearsal needs an empty account.")):
+            return code
+        if code := cmd_rehearse(args):
+            print("Real money stays locked until the rehearsal passes. Run `fuze go-live` again to retry.")
+            return code
+    else:
+        print("Passed on this computer with this version.")
+    cfg = config.load()
+    if cfg["mode"] == "simulation":
+        print("\nYou can follow on the test exchange for a while first and watch every order there (recommended), "
+              "or carry on to real money now.")
+        if input("Type testnet to follow with test money first, or mainnet to carry on: ").strip().lower() != "mainnet":
+            code = switch_mode(cfg, "testnet")
+            if not code:
+                print("When you have watched it work, `fuze go-live` carries on with real money.")
+            return code
+    print("\nStep 3 of 4: your Lighter account for real money.\n"
+          "You can lose everything on the account the agent trades. Use a sub-account of its own that holds only "
+          "money you can afford to lose completely.")
+    cfg, bal = _lighter_account(cfg, "mainnet")
+    if bal is None:
+        return 2
+    print("\nStep 4 of 4: the switch. Your sizing is shown on that balance; you confirm by typing RAISE and "
+          f"{modes.PHRASE}.")
+    return switch_mode(cfg, "mainnet")
+
+
 def _ask_mode(default: str) -> str:
     while True:
         text = input(f"Where should the agent trade: simulation (no money), testnet (test money) or mainnet (real "
@@ -598,7 +718,7 @@ def cmd_init(args) -> int:
             new = _keys_prompt(new, net)
         if target == "mainnet" and modes.rehearsal_problem():
             print(f"Mainnet stays locked: {modes.rehearsal_problem()}. Your settings stay in simulation; "
-                  "start with `fuze mode testnet`.")
+                  "`fuze go-live` takes you there one step at a time.")
             return 2
         return switch_mode(new, target)
     print("Next: `fuze run` in its own terminal, then `fuze status`.")
@@ -715,6 +835,8 @@ def main(argv=None) -> int:
     kp.add_argument("--key-index", dest="key_index", type=int, help="the API key's index, 4 to 254")
     kp.add_argument("--delete", action="store_true", help="delete the stored key from this machine")
     sub.add_parser("rehearse", help="the testnet rehearsal that unlocks mainnet on this machine (test orders)")
+    sub.add_parser("go-live", help="from simulation to real money, one guided step at a time (terminal only): test "
+                                   "account and key, rehearsal, real account and key, the switch")
     sub.add_parser("status", help="what the agent holds and why")
     for name, text in (("pause", "hold, no new orders"), ("resume", "undo pause (terminal only, type RESUME)"),
                        ("flatten", "close everything and stay out"),
@@ -749,7 +871,7 @@ def main(argv=None) -> int:
         if args.cmd in ("resume", "unflatten"):
             return _undo_flag({"resume": "PAUSE", "unflatten": "FLATTEN"}[args.cmd])
         return {"init": cmd_init, "run": cmd_run, "status": cmd_status, "check": cmd_check,
-                "limits": cmd_limits, "mode": cmd_mode, "keys": cmd_keys, "rehearse": cmd_rehearse,
+                "limits": cmd_limits, "mode": cmd_mode, "keys": cmd_keys, "rehearse": cmd_rehearse, "go-live": cmd_go_live,
                 "ui": cmd_ui, "mcp-config": cmd_mcp_config}[args.cmd](args)
     except ValueError as e:
         print(f"Error: {e}")

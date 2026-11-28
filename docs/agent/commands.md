@@ -15,6 +15,7 @@ This page lists every `fuze` command with its options, as printed by `fuze --hel
 | `fuze mode` | Show or change the mode | Changing: yes |
 | `fuze keys` | Set the Lighter account and API key for testnet or mainnet | Yes, the key is typed hidden |
 | `fuze rehearse` | The testnet rehearsal that unlocks mainnet on this machine | Yes |
+| `fuze go-live` | From simulation to real money, one guided step at a time: test account and key, rehearsal, real account and key, the switch | Yes |
 | `fuze ui` | A read-only page about the agent on this computer. Options `--port`, `--open` | |
 | `fuze mcp` | Start the MCP server for AI coding tools | |
 | `fuze mcp-config` | Print the MCP settings for Claude Code, Codex, Copilot / VS Code, Cursor and other AI tools, with this `fuze`'s full path and your `FUZE_HOME`. Option `--tool` | |
@@ -92,6 +93,21 @@ there).
 Opens the smallest Bitcoin position on Lighter testnet, places its take profit and stop loss, cancels them and closes
 it, confirming each step by reading the account, and records each order's transaction hash. Asks you to type `yes`
 first. See [The rehearsal and the mainnet lock](modes/rehearsal.md).
+
+## fuze go-live
+
+The guided way from simulation to real money. It runs the same steps as `fuze keys`, `fuze rehearse` and `fuze mode`,
+in order, and says at each one what to do on Lighter:
+
+1. An account on Lighter's test exchange and an API key for it (typed hidden), then it reads the account back.
+2. The rehearsal, if this computer has not passed it with this version.
+3. A choice: follow on the test exchange first (recommended), or carry on. Run `fuze go-live` again later to carry on.
+4. Your Lighter account for real money and its API key, read back the same way.
+5. The switch, confirmed by typing `RAISE` and `REAL MONEY`.
+
+Steps already done are skipped, so you can stop at any question and run it again. Terminal only: it never runs through
+the MCP server or an AI tool. Your keys, account numbers and the rehearsal stay on this computer, so afterwards
+`fuze mode simulation` and `fuze mode mainnet` move you back and forth with nothing typed again but the confirmations.
 
 ## fuze resume, fuze unflatten
 

@@ -20,12 +20,20 @@ This page covers following with real money on Lighter. Read it to the end before
 
 ## Steps
 
+The guided way, which asks for each thing in turn and skips what is done:
+
+```sh
+fuze go-live
+fuze run
+```
+
+Or by hand:
+
 ```sh
 fuze keys mainnet      # account index, key index, then the key (hidden)
 fuze check             # reads the mainnet account; sends no order
-fuze flatten           # close what is open in the current mode; stop the agent once it is flat
-fuze mode mainnet      # asks Lighter testnet to confirm the rehearsal, then type RAISE and REAL MONEY
-fuze unflatten         # type UNFLATTEN
+fuze mode mainnet      # stop the agent first. It closes what is open in the current mode (on Lighter after you
+                       # type CLOSE), asks Lighter testnet to confirm the rehearsal, then you type RAISE and REAL MONEY
 fuze run
 ```
 
@@ -41,8 +49,10 @@ fuze run
 ## Leaving mainnet
 
 ```sh
-fuze flatten           # the running agent closes everything
-# wait until fuze status shows no positions, then stop the agent (Ctrl+C)
-fuze mode simulation   # reads the account to check nothing is open
-fuze unflatten         # if you want it to follow in simulation
+# stop the agent (Ctrl+C)
+fuze mode simulation   # type CLOSE: it closes every position with a market order and cancels the open orders
+fuze run               # it follows on the simulated account again
 ```
+
+Your mainnet key, account number and the rehearsal stay on this computer: `fuze mode mainnet` takes you back with the
+confirmations only. To remove the key from this computer, `fuze keys mainnet --delete`.

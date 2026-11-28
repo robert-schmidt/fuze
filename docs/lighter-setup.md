@@ -157,8 +157,8 @@ Warnings, plainly:
   `fuze status` says when this is the case.
 - You can lose everything on that sub-account. This is not financial advice.
 
-To leave mainnet: `fuze flatten`, let the agent close everything, stop it, `fuze mode simulation` (it reads the
-account to check nothing is open), then `fuze unflatten` if you want it to follow in simulation.
+To leave mainnet: stop the agent, then `fuze mode simulation`. It reads the account and, if something is open, closes
+it with market orders once you type `CLOSE`. Your key and the rehearsal stay on this computer for the way back.
 
 ## 8. How to revoke a key
 

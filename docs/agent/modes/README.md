@@ -13,6 +13,16 @@ and how you move between them.
 | Risks | Nothing | Test money only | **Everything on the mainnet sub-account** |
 | Switch to it | `fuze mode simulation` | `fuze mode testnet`, type `RAISE` | `fuze mode mainnet`, type `RAISE` and `REAL MONEY` |
 
+## The guided way
+
+```sh
+fuze go-live
+```
+
+One command walks through everything below in order: a testnet account and key, the rehearsal, a mainnet account and
+key, the switch. It skips what is already done, so you can stop at any question and run it again. See
+[fuze go-live](../commands.md#fuze-go-live). The rest of this section is the same path by hand.
+
 ## The order to go in
 
 1. **Simulation**: watch the agent follow the live signal with no money.
@@ -28,11 +38,18 @@ and how you move between them.
 
 - Only in a terminal, typed by you: never through the MCP server or an AI tool.
 - The agent must be stopped.
-- Nothing may be open in the current mode. Close it first: `fuze flatten`, let `fuze run` close everything, stop it,
-  then switch (and `fuze unflatten` when you want it to follow again). A mode change never strands a position.
+- Nothing may be open in the current mode, and a mode change never strands a position: `fuze mode` closes simulated positions by itself and, on Lighter, closes what is open with market orders once you type `CLOSE`.
+  Anything else typed there leaves everything as it is.
 - A Lighter account that already holds positions or orders FUZE did not open is refused: give FUZE a sub-account of its
   own.
 - Moving toward real money asks you to type `RAISE`; mainnet also `REAL MONEY`.
+
+## What is remembered
+
+Your Lighter account numbers, the API keys and the rehearsal stay on this computer when you change the mode. Going from
+real money back to simulation and to real money again asks for the confirmations only (and asks Lighter testnet to
+confirm the rehearsal again). Your simulated account keeps its balance while you are away. What does not carry over:
+a new version of FUZE that changes how orders are sent asks for a new rehearsal, and so does another computer.
 
 ## Any mode can follow any source
 

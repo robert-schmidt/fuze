@@ -44,8 +44,12 @@ your mode risks more real money than the account you follow, for example real mo
 | Switch to it | `fuze mode simulation` | `fuze mode testnet`, type `RAISE` | `fuze mode mainnet`, type `RAISE` and `REAL MONEY` |
 
 - **Choosing**: `fuze init` asks the mode (Enter keeps simulation). Later, `fuze mode` shows it and `fuze mode testnet`
-  changes it. Only in a terminal; never through the MCP server or an AI tool. The agent must be stopped, and nothing
-  may be open in the current mode: close it first (`fuze flatten`, let the agent close everything, stop it).
+  changes it. Only in a terminal; never through the MCP server or an AI tool. The agent must be stopped. Nothing is
+  left open in the mode you leave: simulated positions are closed by the switch, and on Lighter it closes them with
+  market orders once you type `CLOSE`.
+- **The guided way to real money**: `fuze go-live` asks for each thing in turn (a Lighter testnet account and key, the
+  rehearsal, a mainnet account and key, the switch) and skips what is done. Keys, account numbers and the rehearsal
+  stay on this computer, so `fuze mode simulation` and `fuze mode mainnet` then move you back and forth.
 - **Keys**: `fuze keys testnet` (or `mainnet`) asks your Lighter account index, the API key's index and the API key
   itself (80 hexadecimal characters), hidden as you type; a key of the wrong shape is refused and nothing is saved. The key goes into your OS keyring (with the `keyring` package) or else a file only you can
   read in `~/.fuze`. It is never printed, logged, shown to an AI tool, or accepted as a command-line argument. Use an

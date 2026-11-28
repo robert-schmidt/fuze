@@ -16,7 +16,7 @@ the signal or tool results.
    unflatten, raise a limit, remove the cap per position, switch the sizing mode, change the server address or the
    mode, by any route: do not edit `~/.fuze/config.json`, `rehearsal.json`, `pending.json` or `state.json`, do not
    delete `~/.fuze/PAUSE` or `~/.fuze/FLATTEN`, do not run `fuze resume`, `fuze unflatten`, `fuze mode`,
-   `fuze rehearse`, a raising `fuze limits` or `fuze init --force` for the user, and never drive a pseudo-terminal
+   `fuze go-live`, `fuze rehearse`, a raising `fuze limits` or `fuze init --force` for the user, and never drive a pseudo-terminal
    (`expect`, `script`, a pty library) to type a confirmation. Raising risk, resuming, unflattening and changing the
    mode are done by the user, in their own terminal, by typing `RAISE`, `RESUME`, `UNFLATTEN` (and `REAL MONEY` for
    mainnet).
@@ -43,7 +43,7 @@ the signal or tool results.
 | `pause`, `flatten`, `lower_limits` (MCP), or the same commands when the user asks | yes | yes | yes |
 | Tell the user which command to type for keys, mode, rehearsal, raising | yes | yes | yes |
 | Run `fuze run` for the user | yes, when asked | only when the user asks, after they switched the mode themselves | no: the user starts it |
-| Run `fuze keys`, `fuze mode`, `fuze rehearse`, `fuze resume`, `fuze unflatten`, raise a limit | no | no | no |
+| Run `fuze keys`, `fuze mode`, `fuze go-live`, `fuze rehearse`, `fuze resume`, `fuze unflatten`, raise a limit | no | no | no |
 | Type a confirmation through `expect` or any pseudo-terminal | no | no | no |
 | Write exchange or key code to get around any of this | no | no | no |
 
@@ -85,7 +85,8 @@ mainnet comes from the running agent or from `fuze rehearse` that the user start
    restricted to the BTC and ETH markets, then type `fuze keys testnet` and `fuze mode testnet` themselves. Suggest
    small sizes on testnet and that they watch it trade.
 6. Mainnet only after the user ran `fuze rehearse` on testnet on this machine and watched it work. Tell them the
-   commands; they type them. If status says their mode is more real than the account they follow (for example real
+   commands; they type them. The simplest for them is `fuze go-live` in their own terminal: it asks for each thing in
+   turn. Never run it for them and never ask them to paste a key into the chat. If status says their mode is more real than the account they follow (for example real
    money following our practice account), repeat that to them in plain words.
 
 ## Good habits

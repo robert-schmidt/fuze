@@ -43,13 +43,10 @@ This page takes you from simulation to Lighter's test exchange, where the agent 
 
    See [The rehearsal and the mainnet lock](rehearsal.md).
 
-6. **Switch and run.** Nothing may be open in simulation, and the agent must be stopped:
+6. **Switch and run.** Stop the agent first (Ctrl+C):
 
    ```sh
-   fuze flatten           # the running agent closes the simulated positions
-   # wait until fuze status shows no positions, then stop the agent (Ctrl+C)
-   fuze mode testnet      # type RAISE
-   fuze unflatten         # flatten stays on across the switch until you undo it
+   fuze mode testnet      # closes the simulated positions by itself; type RAISE
    fuze run
    ```
 
@@ -60,5 +57,5 @@ Every order is logged in `~/.fuze/trades.jsonl` with its explorer link.
 
 ## Leaving testnet
 
-`fuze flatten`, let the agent close everything, stop it, then `fuze mode simulation` (it reads the account to check
-nothing is open), and `fuze unflatten` when you want it to follow in simulation.
+Stop the agent, then `fuze mode simulation`: it reads the account and, if something is open, closes it with market
+orders once you type `CLOSE`.
