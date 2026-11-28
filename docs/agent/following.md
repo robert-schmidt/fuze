@@ -84,8 +84,8 @@ What it does not do:
   gap larger than that it does not fill.
 - In a move of more than 15% within seconds, faster than the agent can move it, it can fill while the agent runs.
   The position is then bought or sold back at the price of that moment.
-- Lighter keeps a resting order for 28 days at most. The agent places it again after 14 days; an agent that is off for
-  more than 28 days leaves the position without it.
+- Lighter lets an order rest between 5 minutes and 30 days. The agent places it for 28 days (the default of Lighter's
+  SDK) and places it again after 14; an agent that is off for more than 28 days leaves the position without it.
 - In simulation the stop is checked only while the agent runs, like the simulated take profit and stop loss.
 
 ## 6. States, staleness and switches
@@ -118,6 +118,10 @@ your balance grows.
   to reduce or close. On Lighter testnet, whose order book is thin, the bounds are 3% and 4%.
 - Sizes and prices are rounded to the decimals and smallest order Lighter publishes.
 - If the take profit and stop loss cannot be seen on the exchange after placing them, that part is closed.
+- The take profit, the stop loss and the emergency stop trigger on Lighter's mark price, not on the last trade. Lighter
+  calls the mark price "the fair price of a perpetual contract" and builds it from its own order book, an index of spot
+  prices and other exchanges' mark prices (https://docs.lighter.xyz/trading/fair-price-marking.md), so a stop can
+  trigger before the last trade reaches it, or after.
 - The emergency stop is a different order type from the take profit and stop loss (a stop-loss market order beside a
   take-profit-limit and a stop-loss-limit), so the agent never takes one for the other. If it cannot be placed, the
   position stays, the agent says so and tries again after 60 seconds.

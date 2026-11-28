@@ -489,7 +489,8 @@ def cmd_mode(args) -> int:
         print("Testnet rehearsal: " + ("recorded as passed on this machine with this version (`fuze mode mainnet` "
                                        "asks Lighter testnet to confirm it)" if not why else why))
     print("Change with `fuze mode simulation|testnet|mainnet` in a terminal. Moving toward real money asks you to "
-          f"type RAISE (and {modes.PHRASE} for mainnet); mainnet needs the testnet rehearsal first.")
+          f"type RAISE (and {modes.PHRASE} for mainnet); mainnet needs the testnet rehearsal first. "
+          "`fuze go-live` walks you through all of it, one step at a time.")
     return 0
 
 

@@ -33,8 +33,9 @@ from fuze.venue import CHAIN_ID, HOSTS, SLIP_ADD, SLIP_REDUCE, TESTNET_SLIP, Ven
 READ_EVERY_S = 5.0  # a standard Lighter account gets about 60 requests a minute, orders included
 TOKEN_S = 480.0  # the read token for open orders lasts 10 minutes; renew after 8
 GUARD_READ_S = 60.0  # a coin with only an emergency stop resting: its open orders are read this often (the request limit)
-GUARD_SLIP = 0.04  # the emergency stop's worst price, past its trigger: it must fill in a fast market (Lighter's own
-#                    bound is 5% from the mark price)
+GUARD_SLIP = 0.04  # the emergency stop's worst price, past its trigger: it must fill in a fast market (Lighter checks
+#                    a trigger order's price against its trigger, with a threshold it does not publish; its 5% bound
+#                    from the mark price is for limit orders)
 GUARD_TYPE = "stop-loss"  # how Lighter's order list names the emergency stop's order type
 MAX_BODY = 4_000_000
 

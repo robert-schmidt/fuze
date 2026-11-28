@@ -33,7 +33,8 @@ SLIP_ADD = 0.005  # worst price of an order that opens or adds: 0.5% past the re
 SLIP_REDUCE = 0.02  # ... and of one that reduces or closes: 2% (a close must fill)
 # Lighter testnet's order book is thin: on 2026-11-25 its best Bitcoin offer stood 1.4% above its best bid, and an order
 # bound to 0.5% of the last trade did not fill. Test money only, so the bound is wider there; it stays under the 5%
-# from the mark price past which Lighter itself refuses a price.
+# from the mark price past which Lighter refuses a new limit order's price (trigger orders are checked against their
+# trigger price instead, with a threshold Lighter does not publish).
 TESTNET_SLIP = (0.03, 0.04)
 HOSTS = {"mainnet": "https://mainnet.zklighter.elliot.ai", "testnet": "https://api.testnet.lighter.xyz"}
 CHAIN_ID = {"mainnet": 304, "testnet": 300}  # passed explicitly: the SDK guesses 304 (mainnet) for the testnet host

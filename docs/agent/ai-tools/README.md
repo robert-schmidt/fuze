@@ -85,6 +85,10 @@ A tricked AI tool can at worst make you safer through the MCP server. It cannot 
 The repository's `AGENTS.md` also tells coding agents not to do any of the right-hand column by other routes (editing
 your files or running commands for you); see [Security model](../security.md) for what that does and does not guarantee.
 
+FUZE's MCP server never sees your Lighter key. An AI tool that only needs to read a Lighter account gets a read-only
+token from Lighter, which "won't allow placing trades nor request withdrawals", never the trading key
+(https://docs.lighter.xyz/developers/integration-guides/api-keys.md).
+
 ## The setup that works
 
 **With `fuze` on your PATH** (installed with `uv tool install` or `pipx install`, see [Install](../start/install.md))

@@ -49,9 +49,23 @@ this, and well-behaved ones follow it; it is a rule, not a barrier.
 With that setup, the worst a misbehaving program on your machine can do is trade that sub-account's money away in
 Bitcoin and Ether. It cannot send it anywhere.
 
+Per Lighter's documentation (https://docs.lighter.xyz/developers/integration-guides/api-keys.md), no API key alone can
+transfer to another owner, make a fast withdrawal or approve an integrator with fees; those need your wallet. Only your
+wallet can set or loosen a key's restrictions, "so someone who holds only the API private key cannot loosen the
+limits". When FUZE runs on a server with a fixed address, you can also restrict the key to that IP address.
+
+What Lighter says about itself, not about FUZE: "Users always maintain custody of their assets." Deposits are held by
+its contracts on Ethereum. If its sequencer fails to process requests sent through Ethereum in time, the contract freezes into
+what it calls Escape Hatch mode, and "These proofs allow users to withdraw the full value of their assets directly on
+Ethereum, with no reliance on off-chain coordination"
+(https://docs.lighter.xyz/about-lighter/technical-architecture-lighter-core.md). Lighter publishes security audits of
+its smart contracts and circuits: https://docs.lighter.xyz/security/security-audits.md.
+
 ## Other honest limits
 
-- A stop loss is a trigger order: in a fast market it can fill worse than its price, or not at all.
+- A stop loss triggers on the mark price. On Lighter its order price is the worst price it may fill at once triggered,
+  and what cannot fill at that price or better is cancelled. The short-term stop loss may fill up to 2% past its
+  trigger, the emergency stop up to 4%; in a faster move it does not fill and the position stays open.
 - Your limits bound the size of a loss; they do not prevent one.
 - The rehearsal lock checks that the order path worked on testnet from your account, confirmed by Lighter testnet. It
   cannot prove that this copy or version of FUZE sent those orders, and `fuze run` re-checks only the local record at

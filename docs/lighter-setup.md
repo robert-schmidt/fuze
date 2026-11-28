@@ -3,6 +3,11 @@
 This page walks you through what the agent needs on Lighter: a wallet, an account (or sub-account), an API key and the
 two numbers that go with it. FUZE's modes `testnet` and `mainnet` trade on Lighter (lighter.xyz).
 
+Lighter is a decentralized exchange for perpetual futures. It describes itself as "a zero-knowledge rollup on top of
+Ethereum" that "generates ZK proofs of all operations including order matching and liquidations" (https://lighter.xyz).
+Deposits are held by its smart contracts on Ethereum, and its documentation says "Users always maintain custody of
+their assets." (https://docs.lighter.xyz/about-lighter/technical-architecture-lighter-core.md)
+
 Start on testnet with small sizes and watch it; mainnet stays locked on each machine until that machine has passed
 `fuze rehearse` on testnet, for each new version of FUZE. FUZE is not affiliated with Lighter. Lighter's own documentation is the authority; facts below were checked against https://docs.lighter.xyz (which
 https://apidocs.lighter.xyz now redirects to) and Lighter's official Python SDK on 2026-11-25, and the testnet steps
@@ -44,6 +49,9 @@ transaction signed for your account, and funds move between your accounts with t
 completely. FUZE treats every reduce-only trigger order on BTC and ETH in that account as its own take profit or stop
 loss and may cancel it, and `fuze mode` refuses an account that already holds positions or orders.
 
+A standard account can create up to 4 sub-accounts, and Lighter's fee page says "Sub accounts cannot be deleted."
+(https://docs.lighter.xyz/trading/trading-fees.md). Use one you can keep for FUZE.
+
 FUZE does not change your margin mode or leverage on Lighter. Your sizing and `max_x` decide how big the positions are;
 if the account cannot margin an order, Lighter refuses it and `fuze status` reports an order that did not fill.
 
@@ -71,6 +79,9 @@ What Lighter's docs say (https://docs.lighter.xyz/developers/integration-guides/
   BTC and ETH markets for FUZE.**
 - You can give a key an expiry (`valid_until`, at most 180 days ahead). After it, the key cannot sign. Expiry does not
   cancel the key's open orders.
+- You can restrict a key to up to 16 IP addresses, for example the fixed address of a server that runs FUZE.
+- Only your wallet can set or loosen a key's restrictions, "so someone who holds only the API private key cannot loosen
+  the limits".
 
 ### Creating and registering one
 
@@ -152,7 +163,10 @@ fuze run
 
 Warnings, plainly:
 
-- A stop loss is a trigger order: in a fast market it can fill worse than its price, or not at all.
+- A stop loss triggers on the mark price. On Lighter its order price is the worst price it may fill at once triggered,
+  and what cannot fill at that price or better is cancelled. The short-term stop loss may fill up to 2% past its
+  trigger, the emergency stop up to 4%; in a faster move it does not fill and the position stays open.
+  (https://docs.lighter.xyz/developers/integration-guides/signing-transactions.md)
 - When FUZE's own account is a practice (`paper`) account, its results cost it nothing; yours cost real money.
   `fuze status` says when this is the case.
 - You can lose everything on that sub-account. This is not financial advice.
@@ -167,6 +181,15 @@ one, and the new key starts without restrictions (set them again). An expired ke
 key leaked: replace it at once, cancel its open orders with another key, and move the funds out of that sub-account.
 `fuze keys testnet --delete` (or mainnet) removes FUZE's copy from this machine; it does not stop the key on Lighter.
 
+## 9. Taking money out
+
+Stop FUZE first (leave mainnet as above, which closes what is open). Lighter has two kinds of withdrawal
+(https://docs.lighter.xyz/developers/integration-guides/deposits-transfers-and-withdrawals.md):
+
+- A **secure withdrawal** goes only to the wallet address that owns the account and "Settles via Ethereum". On
+  2026-11-28 Lighter's API gave its delay as 1,180 seconds, about 20 minutes. An unrestricted API key can request one.
+- A **fast withdrawal** can go to any Ethereum address, in USDC only, and needs your wallet's signature as well.
+
 ## What we did not try ourselves
 
 Done on Lighter testnet on 2026-11-25: an account created and funded by the faucet, an API key made on the app's API
@@ -174,5 +197,5 @@ keys page at index 4, `fuze check`, and `fuze rehearse` (open, take profit and s
 confirmed on Lighter's public record.
 
 Not tried by us: the Request Funds button itself (we called the faucet it calls), creating a sub-account in the app, restricting a key to markets (Lighter's docs give the API call,
-signed by your wallet; we did not find the setting on the API keys page), a key with an expiry, and anything on
-mainnet.
+signed by your wallet; we did not find the setting on the API keys page), a key with an expiry, a withdrawal, and
+anything on mainnet.

@@ -8,8 +8,8 @@ rehearsal (`fuze rehearse`) before mainnet unlocks on a computer again; the entr
 - **Emergency stop.** The part of each position with no take profit or stop loss of its own (the slow trend part) now
   rests under one reduce-only stop order on the exchange, 20% from the price. While the agent follows a live signal it
   sets the stop again each time the price has moved 5%, so the price reaches it only when nothing is running to move
-  it: the agent is off, paused, or has no fresh signal. It is a safety net, not a trading rule. Lighter keeps a resting
-  order for 28 days; the agent places it again after 14. See
+  it: the agent is off, paused, or has no fresh signal. It is a safety net, not a trading rule. The agent places it
+  for 28 days (Lighter allows an order to rest between 5 minutes and 30 days) and places it again after 14. See
   [The emergency stop](docs/agent/following.md#5-the-emergency-stop).
 - The emergency stop is told apart from a short-term trade's take profit and stop loss by Lighter's own order type, so
   cancelling one never touches the other.

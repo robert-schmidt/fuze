@@ -19,7 +19,11 @@ Hyperliquid is a decentralised futures exchange. It is the account's main source
 
 ## Lighter
 
-Lighter is a futures exchange with no trading fee on a standard account. It is the account's main exchange: the
+Lighter is a decentralized exchange for perpetual futures. Lighter describes itself as "a zero-knowledge rollup on
+top of Ethereum optimized for speed, throughput and scale that generates ZK proofs of all operations including order
+matching and liquidations" (https://lighter.xyz). A standard account pays no trading fee on regular orders; TWAP,
+advanced orders and RFQ cost 1 bp, and funding and the spread are paid as on any exchange
+(https://docs.lighter.xyz/trading/trading-fees.md). It is the account's main exchange: the
 practice account is priced at Lighter's own best bid and ask from its public read-only stream, with Lighter's short wait
 on market orders. A follower's agent trades on Lighter in its testnet and mainnet modes (see
 [The three modes](../agent/modes/README.md)).

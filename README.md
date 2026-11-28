@@ -27,6 +27,10 @@ FUZE is not affiliated with Lighter or with any exchange or AI tool named here.
 | `testnet` | Lighter's test exchange, test money | your testnet API key (`fuze keys testnet`), then `fuze mode testnet` |
 | `mainnet` | Lighter, **real money** | locked on each machine until that machine passed `fuze rehearse` on testnet, for each new version |
 
+Lighter describes itself as "a zero-knowledge rollup on top of Ethereum" that "generates ZK proofs of all operations
+including order matching and liquidations" (https://lighter.xyz). A standard account pays no trading fee on regular
+orders (https://docs.lighter.xyz/trading/trading-fees.md).
+
 Start in simulation, then testnet with small sizes, and watch it; mainnet after that. The signal server is
 https://fuze.trade (`/v1/signal`, `/v1/stream`); the code is at https://github.com/robert-schmidt/fuze.
 
@@ -353,7 +357,9 @@ holds a mainnet key.**
 - Most scalping rules we have tested lose money after trading costs. Past results promise nothing about the future.
 - Futures use leverage. You can lose everything you put in, and faster than you expect.
 - Software, servers, exchanges and networks fail. Limits and stop losses reduce losses; they do not prevent them.
-- A stop loss can fill worse than its price in a fast market, or not at all.
+- A stop loss triggers on the mark price. On Lighter its order price is the worst price it may fill at once triggered,
+  and what cannot fill at that price or better is cancelled. The short-term stop loss may fill up to 2% past its
+  trigger, the emergency stop up to 4%; in a faster move it does not fill and the position stays open.
 - Only use money you can afford to lose completely. This is not financial advice.
 
 ## More

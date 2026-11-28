@@ -63,14 +63,16 @@ in profit.
 
 ## Why the stop is never beyond 1%
 
-At 40x leverage, the exchange would force-close (liquidate) a position after a move of roughly 1.27% against it. A stop
-at most 1% from the average entry fires well before that, at any leverage the account uses. It is also a rule we keep on purpose:
+By our own rough arithmetic, a 40x Bitcoin position held on its own (isolated margin) on Lighter would start to be
+liquidated after a move of about 1.3% against it: its margin is 2.5% of the position, and Lighter's maintenance margin
+for Bitcoin is 1.2% (https://docs.lighter.xyz/trading/contract-specifications.md). A stop
+at most 1% from the average entry fires before that, at any leverage the account uses. It is also a rule we keep on purpose:
 cut losses short.
 
 ## Why these distances
 
-- A 1.5% / 1% bracket with an 8-hour limit was the only bracket in our tests that was not clearly negative at a
-  near-zero fee when trading on the side of the slow trend. It is still not positive.
+- A 1.5% / 1% bracket with an 8-hour limit was the only bracket in our tests that was not clearly negative at
+  Lighter's costs (no trading fee on a standard account, only the spread) when trading on the side of the slow trend. It is still not positive.
 - Of about 70 exit variants tested on 70,000 busy candles, none beat it per trade; stops and targets at chart levels
   did not either. See [What the tests found](../../research/findings.md).
 - A high win rate on its own is not an edge: a 0.2% take profit with a 0.8% stop wins 70% of the time and still lost

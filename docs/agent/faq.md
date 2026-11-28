@@ -21,8 +21,12 @@ No. The agent sends nothing to our server. Your key stays on your machine and or
 They are what the account trades. The protocol and the agent accept only those two coins.
 
 **Why only Lighter?**
-Lighter charges no trading fee on a standard account, and costs decide whether short-term trading loses. See
-[Why costs decide](../research/costs.md). Lighter's terms exclude residents of some countries; check yours.
+Lighter charges no trading fee on regular orders on a standard account, and costs decide whether short-term trading
+loses. See [Why costs decide](../research/costs.md). Lighter describes itself as "a zero-knowledge rollup on top of
+Ethereum" and says "All operations including matching and liquidations are proven cryptographically and verified
+publicly on Ethereum" (https://lighter.xyz); its sequencer first gives "soft finality", before the proofs land
+(https://docs.lighter.xyz/about-lighter/technical-architecture-lighter-core.md). Lighter's terms exclude residents of
+some countries; check yours.
 
 **Why does my position differ from the account's?**
 Your fills come at a different moment and price, your caps can cut it, and changes under the larger of $10 and 2% of

@@ -36,6 +36,6 @@ down, it shorts: a rejected spike with the trend.
 ## What it is not
 
 - Not a discovery. On three years of history it loses after costs at Hyperliquid's fees (about -9 bps per dollar
-  traded) and is close to zero at Lighter's near-zero fee. See [What the tests found](../../research/findings.md).
+  traded) and is close to zero at Lighter's costs (no trading fee on a standard account, only the spread). See [What the tests found](../../research/findings.md).
 - Not tuned. Filters get added only when a history test or the live scorecard shows they win, and none has.
 - Not secret logic hidden behind the words above: this table is the whole rule set.

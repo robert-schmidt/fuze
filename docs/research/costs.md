@@ -33,7 +33,9 @@ Lighter and why the agent follows on Lighter: costs matter, and they are the one
 
 - A standard account's taker orders wait about 0.3 seconds; paying market makers do not.
 - Lighter's terms exclude residents of several countries and can change without notice.
-- Heavy use of a standard account can hit a limit Lighter does not publish.
+- A standard account has published limits: 60 requests a rolling minute, orders included; 40 transactions a minute
+  by default; at most 250 open orders (30 per market) and 50 stop and take-profit orders waiting for
+  their trigger (10 per market). Heavy use can hit them (https://docs.lighter.xyz/developers/reference/rate-limits.md).
 
 ## Funding
 

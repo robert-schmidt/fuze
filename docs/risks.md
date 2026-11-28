@@ -20,6 +20,11 @@ install anything.
 - Futures let a position be many times larger than the money behind it. The account's short-term trades open at 20 to
   40 times leverage. A 1% move against a 30x position is about a 30% loss of the money set aside for it.
 - You can lose everything you put in, quickly. A stop loss limits a loss; it does not guarantee the price you get.
+- If the account's margin runs out, Lighter liquidates it in stages on the mark price: it cancels the open orders and
+  closes positions at any price, taking up to 1% as a fee for its insurance fund; further down the fund takes the
+  positions over. When the fund cannot, Lighter closes positions on the other side, ranked by leverage and unrealized
+  profit (auto-deleveraging), so a winning position can be closed without your choice
+  (https://docs.lighter.xyz/trading/liquidations-and-llp-insurance-fund.md).
 
 ## Following is not the same as holding
 
@@ -33,7 +38,16 @@ install anything.
   new; it does not know what the account would have done.
 - The agent has had no independent security review. Start in simulation, then testnet with small sizes; mainnet
   stays locked on each machine until that machine has passed the testnet rehearsal, for each new version.
-- A stop loss can fill worse than its price in a fast market, or not at all.
+- Lighter itself can stop. Its documentation describes a way out through Ethereum: your wallet can send a withdrawal,
+  a cancel of all orders or a reduce-only order straight to its contract, "even if Lighter's API is unavailable", and if
+  these are not processed in time the contract freezes and users withdraw from it directly on Ethereum, with open
+  positions "assumed to be settled at the latest mark price"
+  (https://docs.lighter.xyz/developers/reference/priority-transactions.md, and Lighter's whitepaper,
+  https://assets.lighter.xyz/whitepaper.pdf). That route needs your wallet and Ethereum network fees; FUZE does not use
+  it.
+- A stop loss triggers on the mark price. On Lighter its order price is the worst price it may fill at once triggered,
+  and what cannot fill at that price or better is cancelled. The short-term stop loss may fill up to 2% past its
+  trigger, the emergency stop up to 4%; in a faster move it does not fill and the position stays open.
 
 ## You and your situation
 

@@ -20,15 +20,15 @@ This page defines the terms used in these docs, in alphabetical order.
 | Exposure cap (`max_x`) | The most the agent may hold across coins, as a multiple of your balance |
 | Fear & Greed index | A daily 0 to 100 reading of crypto market mood |
 | Flatten | Close everything and stay out |
-| Funding | A payment between longs and shorts every hour that keeps a perpetual's price near the spot price |
+| Funding | A payment between longs and shorts every hour that keeps a perpetual's price near the spot price. On Lighter it is "fully peer-to-peer with no fees taken by the exchange" and capped at 4% per 8 hours (0.5% an hour) (https://docs.lighter.xyz/trading/funding.md) |
 | Leverage | How many times bigger a position is than the margin set aside for it |
-| Lighter | A futures exchange with no trading fee on a standard account; the account's main exchange and where the agent trades in its testnet and mainnet modes |
-| Liquidation | The exchange closing a position by force because its margin ran out |
+| Lighter | A decentralized exchange for perpetual futures, built as a zero-knowledge rollup on Ethereum. A standard account pays no trading fee on regular orders; TWAP, advanced orders and RFQ cost 1 bp, and funding and the spread are paid as anywhere (https://docs.lighter.xyz/trading/trading-fees.md). The account's main exchange and where the agent trades in its testnet and mainnet modes |
+| Liquidation | The exchange closing positions by force because the account's margin ran out. Lighter does it in stages on the mark price: below the maintenance margin it cancels the account's open orders and closes its positions at any price, taking up to 1% as a fee for its insurance fund; below the lower close-out margin the fund takes the positions over; when the fund cannot, positions on the other side are cut (auto-deleveraging) (https://docs.lighter.xyz/trading/liquidations-and-llp-insurance-fund.md) |
 | Long / short | A position that gains when the price rises / falls |
 | Mainnet | The real exchange, with real money |
-| Maker / taker | A maker order waits in the book; a taker order trades at once and usually pays a higher fee |
+| Maker / taker | A maker order waits in the book; a taker order trades at once. Many exchanges charge the taker more; on Lighter's standard account neither pays a fee |
 | Margin | The part of the balance set aside to hold a position |
-| Mark price | The price an exchange uses for margin and stop losses |
+| Mark price | The price an exchange uses for margin and stop losses. Lighter calls it "the fair price of a perpetual contract" and builds it from its order book, an index of spot prices and other exchanges' mark prices, so it can differ from the last trade (https://docs.lighter.xyz/trading/fair-price-marking.md) |
 | MCP (Model Context Protocol) | A standard way for AI tools to call local programs. The agent's MCP server is how your AI tool talks to it |
 | Open interest | The value of all futures positions still open |
 | Order book | The orders waiting to buy (bids) and sell (asks) |

@@ -42,9 +42,15 @@ fuze run
 - `fuze status` shows a REAL MONEY warning, the account's explorer link, what it holds and why.
 - The short-term part rests under its take profit and stop loss on Lighter, so it stays protected while the agent is
   down. The rest of each position rests under its [emergency stop](../following.md#5-the-emergency-stop), about 20%
-  from the price the agent last saw. Lighter keeps a resting order for 28 days at most, so an agent that is off longer
-  than that leaves the position without it.
-- A stop loss is a trigger order: in a fast market it can fill worse than its price, or not at all.
+  from the price the agent last saw. The agent places it for 28 days (Lighter allows 5 minutes to 30 days) and again
+  after 14, so an agent that is off for more than 28 days leaves the position without it.
+- A stop loss triggers on the mark price. On Lighter its order price is the worst price it may fill at once triggered,
+  and what cannot fill at that price or better is cancelled. The short-term stop loss may fill up to 2% past its
+  trigger, the emergency stop up to 4%; in a faster move it does not fill and the position stays open.
+- If Lighter's app and API are down, Lighter's documentation describes "priority transactions" that your wallet sends
+  straight to its contract on Ethereum: cancel all orders, a reduce-only order that fills at once or not at all, a
+  withdrawal. "Everything here works even if Lighter's API is unavailable."
+  (https://docs.lighter.xyz/developers/reference/priority-transactions.md). FUZE does not send them; your wallet does.
 
 ## Leaving mainnet
 

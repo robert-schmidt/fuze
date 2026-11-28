@@ -50,6 +50,14 @@ This page takes you from simulation to Lighter's test exchange, where the agent 
    fuze run
    ```
 
+## How Lighter's testnet differs
+
+Lighter's testnet is a separate chain (chain ID 300; mainnet is 304) that settles on Ethereum's Sepolia test network,
+and "A transaction signed for `304` will be rejected by testnet, and vice versa." Its faucet "gives test USDC and LIT
+but no ETH" (https://docs.lighter.xyz/developers/getting-started/environments.md). Its markets have other ids and larger
+smallest orders than mainnet; FUZE reads both from Lighter. Lighter's own advice to developers is "Default to testnet in
+examples and tests." (https://docs.lighter.xyz/developers/ai-and-agents/agent-instructions.md)
+
 ## Watching it
 
 `fuze status` shows the mode, your account's page on Lighter's public testnet explorer, what the agent holds and why.

@@ -25,9 +25,10 @@ HONEST = ("What the confirmations protect against: the typed words (RAISE, REAL 
           "rehearsal lock stop this server's tools, programs without a terminal, and mistakes. They are not a barrier "
           "against a program already running as the user with shell access: such a program can do whatever the user "
           "can, and could also read the API key. The protection for money is on the exchange: a Lighter sub-account "
-          "holding only what the user is willing to lose, and an API key that cannot withdraw. Do not run commands "
-          "that raise risk, change the mode or touch keys, and tell the user not to give an AI tool unattended shell "
-          "access on a machine that holds a mainnet key.")
+          "holding only what the user is willing to lose, and an API key restricted to the BTC and ETH markets, which "
+          "cannot withdraw (an unrestricted key can still make secure withdrawals to the owner's own wallet). Do not "
+          "run commands that raise risk, change the mode or touch keys, and tell the user not to give an AI tool "
+          "unattended shell access on a machine that holds a mainnet key.")
 SECRETISH = re.compile(r"mode|key|secret|private|seed|mnemonic|phrase|password|token|wallet|server|resume|unflatten",
                        re.I)
 FLAG = {"percent": "--percent", "fixed_usd": "--fixed-usd", "max_position_usd": "--max-position-usd", "max_x": "--max-x",

@@ -8,7 +8,8 @@ short-term trades still run even though the tests say they lose a little after c
 - About **10,000 rule variants** across twelve directions, a three-year replay of our own algorithm, and a
   **machine-learning study** with 42 variants found **nothing short-term that beats trading costs**.
 - On three years of history (2023 to 2026) the short-term trades **lose a little after costs**: about 9 bps per dollar
-  traded at Hyperliquid's fees, close to zero at Lighter's near-zero fee. Before costs they make about nothing.
+  traded at Hyperliquid's fees, close to zero at Lighter's costs (no trading fee on a standard account, only the
+  spread). Before costs they make about nothing.
 - **Only the slow trend made money** in our tests, with deep drops along the way.
 - The short-term trades still run because the account trades **practice money** and the point is to learn.
 

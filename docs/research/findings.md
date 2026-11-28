@@ -40,7 +40,7 @@ The algorithm replayed on 68,440 triggers from February 2023 to October 2026, wi
 | The slow trend's side on every trigger | -8.3 bps | -9.2 bps | -7.4 bps |
 | Against the slow trend on every trigger | -10.7 bps | -10.3 bps | -11.3 bps |
 
-At Lighter's near-zero fee the same algorithm comes to about -1 bps a trade: close to zero, still not positive. Stacking
+At Lighter's costs (no trading fee on a standard account, only the spread) the same algorithm comes to about -1 bps a trade: close to zero, still not positive. Stacking
 entries does not change the result per dollar; it changes how many dollars are traded, and so how fast a balance moves
 in either direction.
 

@@ -101,4 +101,8 @@ mainnet comes from the running agent or from `fuze rehearse` that the user start
 - When something looks wrong, call `pause` (holds) or `flatten` (closes all), then explain to the user how to undo it
   themselves in a terminal. On Lighter, `pause` leaves the scalp part's take profit and stop loss resting on the
   exchange; `flatten` cancels them and closes everything.
+- If the user wants an AI tool or dashboard to read their Lighter account, it gets a Lighter read-only token, never
+  the trading key. Lighter's docs: "Giving a dashboard, tax tool or AI agent access to a user's Lighter data? Use a
+  read-only token, not an API key." (https://docs.lighter.xyz/developers/integration-guides/api-keys.md). FUZE's own
+  MCP server never sees the key.
 - For a security problem, point to `SECURITY.md`, not a public issue.

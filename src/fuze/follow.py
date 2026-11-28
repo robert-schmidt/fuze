@@ -27,7 +27,8 @@ SCALP_SL_MAX = 0.015  # a scalp stop loss further than 1.5% from the price is re
 # off, or the signal is gone or paused).
 GUARD_FRAC = 0.20  # how far from the price the stop is set
 GUARD_STEP = 0.05  # it is set again once the price is this far from where it was set
-GUARD_AGE_S = 14 * 86400.0  # ... or once it is this old: Lighter keeps a resting order 28 days at most
+GUARD_AGE_S = 14 * 86400.0  # ... or once it is this old: placed for 28 days (the SDK's default; Lighter allows 5 min
+#                             to 30 days)
 
 
 @dataclass
